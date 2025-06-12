@@ -76,6 +76,14 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
     return `${period}. Ders`;
   };
 
+  // UPDATED: Get subject for teacher - find the subject that matches teacher's branch
+  const getSubjectForTeacher = (teacher: Teacher): Subject | undefined => {
+    return subjects.find(subject => 
+      subject.branch === teacher.branch && 
+      subject.level === teacher.level
+    );
+  };
+
   return (
     <div className="bg-white" style={{ 
       width: '297mm', 
@@ -452,18 +460,36 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
                               justifyContent: 'center',
                               boxSizing: 'border-box'
                             }}>
+                              {/* UPDATED: Show teacher name and subject */}
                               <div style={{ 
                                 fontWeight: 'bold', 
                                 color: '#064E3B', 
-                                fontSize: '9px',
+                                fontSize: '8px',
                                 lineHeight: '1.1',
                                 wordWrap: 'break-word',
-                                textAlign: 'center'
+                                textAlign: 'center',
+                                marginBottom: '1px'
                               }}>
                                 {slot.teacher.name.length > 12 
                                   ? slot.teacher.name.substring(0, 12) + '...'
                                   : slot.teacher.name
                                 }
+                              </div>
+                              {/* ADDED: Subject name */}
+                              <div style={{ 
+                                fontSize: '7px',
+                                color: '#047857',
+                                lineHeight: '1',
+                                textAlign: 'center',
+                                fontWeight: '500'
+                              }}>
+                                {(() => {
+                                  const subject = getSubjectForTeacher(slot.teacher);
+                                  const subjectName = subject?.name || slot.teacher.branch;
+                                  return subjectName.length > 10 
+                                    ? subjectName.substring(0, 10) + '...'
+                                    : subjectName;
+                                })()}
                               </div>
                             </div>
                           ) : (

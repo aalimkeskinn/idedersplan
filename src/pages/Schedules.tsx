@@ -893,7 +893,10 @@ const Schedules = () => {
                 <tr className="bg-blue-50">
                   <td className="px-4 py-3 font-medium text-gray-900 bg-blue-100">
                     <div className="text-center">
-                      <div className="font-bold text-lg text-blue-800">Hazırlık</div>
+                      <div className="font-bold text-lg text-blue-800">
+                        {/* FIXED: Show correct label based on level */}
+                        {(selectedTeacher || selectedClass)?.level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı'}
+                      </div>
                       <div className="text-xs text-blue-600 mt-1 flex items-center justify-center">
                         <Clock className="w-3 h-3 mr-1" />
                         {(selectedTeacher || selectedClass)?.level === 'Ortaokul' ? '08:30-08:40' : '08:30-08:50'}
@@ -909,7 +912,7 @@ const Schedules = () => {
                         <div className={`w-full min-h-[80px] p-3 rounded-lg border-2 ${fixedInfo?.color || 'bg-blue-100 border-blue-300'} cursor-not-allowed`}>
                           <div className="text-center">
                             <div className="font-medium text-lg">
-                              {fixedInfo?.title || 'Hazırlık'}
+                              {fixedInfo?.title || ((selectedTeacher || selectedClass)?.level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı')}
                             </div>
                             <div className="text-xs mt-1">
                               {fixedInfo?.subtitle || '🔒 Yemek'}

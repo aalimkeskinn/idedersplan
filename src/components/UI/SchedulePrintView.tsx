@@ -90,9 +90,9 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
     <div className="bg-white" style={{ 
       width: '297mm', 
       height: '210mm',
-      padding: '6mm',
-      fontSize: '10px',
-      lineHeight: '1.3',
+      padding: '5mm',
+      fontSize: '9px',
+      lineHeight: '1.2',
       display: 'flex',
       flexDirection: 'column',
       fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
@@ -100,30 +100,29 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
       overflow: 'hidden',
       color: '#1a1a1a'
     }}>
-      {/* Header - IMPROVED: Better spacing and typography */}
+      {/* Header */}
       <div style={{ 
         background: 'linear-gradient(135deg, #3B82F6, #1E40AF)',
         color: 'white', 
-        borderRadius: '8px', 
-        marginBottom: '4mm',
-        padding: '8px',
+        borderRadius: '6px', 
+        marginBottom: '3mm',
+        padding: '6px',
         flexShrink: 0,
         boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <div style={{ 
-              width: '44px', 
-              height: '44px', 
+              width: '40px', 
+              height: '40px', 
               backgroundColor: 'white', 
-              borderRadius: '8px', 
+              borderRadius: '6px', 
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'center',
-              marginRight: '12px',
-              padding: '4px',
-              boxSizing: 'border-box',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              marginRight: '10px',
+              padding: '3px',
+              boxSizing: 'border-box'
             }}>
               <img 
                 src="https://cv.ide.k12.tr/images/ideokullari_logo.png" 
@@ -138,237 +137,106 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
                   target.style.display = 'none';
                   const parent = target.parentElement;
                   if (parent) {
-                    parent.innerHTML = '<span style="color: #3B82F6; font-weight: bold; font-size: 14px;">İDE</span>';
+                    parent.innerHTML = '<span style="color: #3B82F6; font-weight: bold; font-size: 12px;">İDE</span>';
                   }
                 }}
               />
             </div>
             <div>
-              <h1 style={{ 
-                fontSize: '16px', 
-                fontWeight: 'bold', 
-                margin: 0,
-                letterSpacing: '0.5px'
-              }}>
-                HAFTALIK DERS PROGRAMI
-              </h1>
-              <p style={{ 
-                fontSize: '10px', 
-                margin: 0, 
-                opacity: 0.9,
-                marginTop: '2px',
-                fontWeight: '500'
-              }}>
+              <h1 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0 }}>HAFTALIK DERS PROGRAMI</h1>
+              <p style={{ fontSize: '9px', margin: 0, opacity: 0.9 }}>
                 İDE Okulları - {new Date().getFullYear()}-{new Date().getFullYear() + 1} Eğitim Öğretim Yılı
               </p>
             </div>
           </div>
-          <div style={{ 
-            textAlign: 'right', 
-            fontSize: '9px',
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            padding: '6px 8px',
-            borderRadius: '6px'
-          }}>
-            <p style={{ margin: 0, fontWeight: '600' }}>Tarih: {new Date().toLocaleDateString('tr-TR')}</p>
-            <p style={{ margin: 0, marginTop: '2px', fontWeight: '500' }}>Seviye: {teacher.level}</p>
+          <div style={{ textAlign: 'right', fontSize: '8px' }}>
+            <p style={{ margin: 0 }}>Tarih: {new Date().toLocaleDateString('tr-TR')}</p>
+            <p style={{ margin: 0, marginTop: '1px' }}>Seviye: {teacher.level}</p>
           </div>
         </div>
       </div>
 
-      {/* Teacher Info - IMPROVED: Better layout and typography */}
+      {/* Teacher Info */}
       <div style={{ 
-        backgroundColor: '#F8FAFC', 
-        border: '2px solid #E2E8F0', 
-        borderRadius: '8px', 
-        marginBottom: '4mm',
-        padding: '8px',
-        flexShrink: 0,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        backgroundColor: '#EFF6FF', 
+        border: '1px solid #BFDBFE', 
+        borderRadius: '6px', 
+        marginBottom: '3mm',
+        padding: '6px',
+        flexShrink: 0
       }}>
-        {/* PROMINENT TEACHER NAME SECTION */}
-        <div style={{ 
-          textAlign: 'center', 
-          marginBottom: '8px', 
-          padding: '6px',
-          background: 'linear-gradient(135deg, #3B82F6, #1E40AF)',
-          borderRadius: '6px',
-          boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
-        }}>
-          <h2 style={{ 
-            margin: 0, 
-            color: 'white', 
-            fontSize: '18px', 
-            fontWeight: 'bold',
-            letterSpacing: '1px',
-            textShadow: '0 1px 2px rgba(0,0,0,0.2)'
-          }}>
-            {teacher.name.toUpperCase()}
-          </h2>
-        </div>
-
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: '8px',
-          fontSize: '10px'
+          gap: '6px',
+          fontSize: '9px'
         }}>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ 
-              margin: 0, 
-              color: '#64748B', 
-              fontSize: '9px', 
-              fontWeight: '600',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              Branş
-            </p>
-            <p style={{ 
-              margin: 0, 
-              fontWeight: 'bold', 
-              fontSize: '12px',
-              color: '#1E293B',
-              marginTop: '2px'
-            }}>
-              {teacher.branch}
-            </p>
+            <p style={{ margin: 0, color: '#6B7280', fontSize: '8px', fontWeight: '500' }}>Ad Soyad</p>
+            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px' }}>{teacher.name}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ 
-              margin: 0, 
-              color: '#64748B', 
-              fontSize: '9px', 
-              fontWeight: '600',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              Seviye
-            </p>
-            <p style={{ 
-              margin: 0, 
-              fontWeight: 'bold', 
-              fontSize: '12px',
-              color: '#1E293B',
-              marginTop: '2px'
-            }}>
-              {teacher.level}
-            </p>
+            <p style={{ margin: 0, color: '#6B7280', fontSize: '8px', fontWeight: '500' }}>Branş</p>
+            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px' }}>{teacher.branch}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ 
-              margin: 0, 
-              color: '#64748B', 
-              fontSize: '9px', 
-              fontWeight: '600',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              Haftalık Toplam
-            </p>
-            <p style={{ 
-              margin: 0, 
-              fontWeight: 'bold', 
-              color: '#059669', 
-              fontSize: '12px',
-              marginTop: '2px'
-            }}>
-              {calculateWeeklyHours()} saat
-            </p>
+            <p style={{ margin: 0, color: '#6B7280', fontSize: '8px', fontWeight: '500' }}>Seviye</p>
+            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px' }}>{teacher.level}</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ 
-              margin: 0, 
-              color: '#64748B', 
-              fontSize: '9px', 
-              fontWeight: '600',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              Program Türü
-            </p>
-            <p style={{ 
-              margin: 0, 
-              fontWeight: 'bold', 
-              fontSize: '12px',
-              color: '#1E293B',
-              marginTop: '2px'
-            }}>
-              Öğretmen
-            </p>
+            <p style={{ margin: 0, color: '#6B7280', fontSize: '8px', fontWeight: '500' }}>Haftalık Toplam</p>
+            <p style={{ margin: 0, fontWeight: 'bold', color: '#059669', fontSize: '10px' }}>{calculateWeeklyHours()} saat</p>
           </div>
         </div>
-        
-        <div style={{ 
-          marginTop: '8px', 
-          paddingTop: '6px', 
-          borderTop: '1px solid #E2E8F0',
-          textAlign: 'center'
-        }}>
-          <p style={{ 
-            margin: 0, 
-            fontSize: '9px', 
-            color: '#64748B',
-            fontWeight: '500'
-          }}>
-            Müdür İmzası: ________________________ &nbsp;&nbsp;&nbsp;&nbsp; Öğretmen İmzası: ________________________
+        <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #E5E7EB' }}>
+          <p style={{ margin: 0, fontSize: '8px', color: '#6B7280' }}>
+            Müdür İmzası: ________________________
           </p>
         </div>
       </div>
 
-      {/* Schedule Table - IMPROVED: Better spacing and alignment */}
+      {/* Schedule Table */}
       <div style={{ 
         border: '2px solid #3B82F6', 
-        borderRadius: '8px', 
+        borderRadius: '6px', 
         overflow: 'hidden',
         flexGrow: 1,
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 0,
-        boxShadow: '0 4px 6px rgba(59, 130, 246, 0.1)'
+        minHeight: 0
       }}>
         <table style={{ 
           width: '100%', 
           height: '100%',
           borderCollapse: 'collapse',
           tableLayout: 'fixed',
-          flexGrow: 1,
-          fontSize: '10px'
+          flexGrow: 1
         }}>
           <thead>
-            <tr style={{ 
-              background: 'linear-gradient(135deg, #3B82F6, #1E40AF)',
-              color: 'white'
-            }}>
+            <tr style={{ background: '#3B82F6', color: 'white' }}>
               <th style={{ 
-                border: '1px solid #1E40AF', 
-                padding: '8px 4px',
+                border: '1px solid #3B82F6', 
+                padding: '4px 2px',
                 textAlign: 'center', 
                 fontWeight: 'bold',
-                fontSize: '10px',
+                fontSize: '9px',
                 width: '12%',
-                verticalAlign: 'middle',
-                letterSpacing: '0.5px'
+                verticalAlign: 'middle'
               }}>
                 DERS SAATİ<br />
-                <span style={{ 
-                  fontSize: '8px', 
-                  fontWeight: 'normal',
-                  opacity: 0.9
-                }}>
+                <span style={{ fontSize: '7px', fontWeight: 'normal' }}>
                   {teacher.level === 'Ortaokul' ? '(Ortaokul Saatleri)' : '(Genel Saatler)'}
                 </span>
               </th>
               {DAYS.map(day => (
                 <th key={day} style={{ 
-                  border: '1px solid #1E40AF', 
-                  padding: '8px 4px', 
+                  border: '1px solid #3B82F6', 
+                  padding: '4px 2px', 
                   textAlign: 'center', 
                   fontWeight: 'bold',
-                  fontSize: '10px',
+                  fontSize: '9px',
                   width: '17.6%',
-                  verticalAlign: 'middle',
-                  letterSpacing: '0.5px'
+                  verticalAlign: 'middle'
                 }}>
                   {day.toUpperCase()}
                 </th>
@@ -376,48 +244,44 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
             </tr>
           </thead>
           <tbody>
-            {/* Preparation Period - IMPROVED: Better styling */}
+            {/* Preparation Period */}
             <tr style={{ backgroundColor: '#EFF6FF' }}>
               <td style={{ 
-                border: '1px solid #CBD5E1', 
-                padding: '8px 4px', 
+                border: '1px solid #D1D5DB', 
+                padding: '6px 4px', 
                 textAlign: 'center', 
                 fontWeight: 'bold', 
                 backgroundColor: '#DBEAFE',
-                verticalAlign: 'middle'
+                verticalAlign: 'middle',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '40px'
               }}>
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
+                <div style={{ 
+                  width: '24px', 
+                  height: '24px', 
+                  backgroundColor: '#3B82F6', 
+                  color: 'white', 
+                  borderRadius: '50%', 
+                  display: 'flex', 
+                  alignItems: 'center', 
                   justifyContent: 'center',
-                  minHeight: '44px'
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  marginBottom: '2px'
                 }}>
-                  <div style={{ 
-                    width: '28px', 
-                    height: '28px', 
-                    background: 'linear-gradient(135deg, #3B82F6, #1E40AF)', 
-                    color: 'white', 
-                    borderRadius: '50%', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    marginBottom: '3px',
-                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-                  }}>
-                    H
-                  </div>
-                  <div style={{ 
-                    fontSize: '8px', 
-                    color: '#1E40AF',
-                    fontWeight: '600',
-                    textAlign: 'center',
-                    lineHeight: '1.2'
-                  }}>
-                    Hazırlık
-                  </div>
+                  H
+                </div>
+                <div style={{ 
+                  fontSize: '7px', 
+                  color: '#374151',
+                  fontWeight: 'normal',
+                  textAlign: 'center',
+                  lineHeight: '1'
+                }}>
+                  Hazırlık
                 </div>
               </td>
               {DAYS.map(day => {
@@ -425,28 +289,27 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
                 
                 return (
                   <td key={`${day}-prep`} style={{ 
-                    border: '1px solid #CBD5E1', 
-                    padding: '4px',
+                    border: '1px solid #D1D5DB', 
+                    padding: '3px',
                     verticalAlign: 'middle'
                   }}>
                     <div style={{ 
                       backgroundColor: '#DBEAFE', 
-                      border: '2px solid #93C5FD', 
-                      borderRadius: '6px', 
-                      padding: '6px 4px', 
+                      border: '1px solid #BFDBFE', 
+                      borderRadius: '4px', 
+                      padding: '4px 2px', 
                       textAlign: 'center',
-                      minHeight: '32px',
+                      minHeight: '28px',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'center',
-                      boxSizing: 'border-box',
-                      boxShadow: '0 1px 3px rgba(59, 130, 246, 0.1)'
+                      boxSizing: 'border-box'
                     }}>
                       <div style={{ 
                         fontWeight: 'bold', 
                         color: '#1E3A8A', 
-                        fontSize: '10px',
-                        lineHeight: '1.2',
+                        fontSize: '9px',
+                        lineHeight: '1.1',
                         textAlign: 'center'
                       }}>
                         {fixedInfo?.title || 'Hazırlık'}
@@ -470,108 +333,104 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
               return (
                 <React.Fragment key={period}>
                   <tr style={{ 
-                    backgroundColor: isLunchPeriod ? '#F0FDF4' : (periodIndex % 2 === 0 ? '#FAFAFA' : 'white')
+                    backgroundColor: isLunchPeriod ? '#F0FDF4' : (periodIndex % 2 === 0 ? '#F9FAFB' : 'white')
                   }}>
                     <td style={{ 
-                      border: '1px solid #CBD5E1', 
-                      padding: '8px 4px', 
+                      border: '1px solid #D1D5DB', 
+                      padding: '6px 4px', 
                       textAlign: 'center', 
                       fontWeight: 'bold', 
                       backgroundColor: isLunchPeriod ? '#DCFCE7' : '#DBEAFE',
-                      verticalAlign: 'middle'
+                      verticalAlign: 'middle',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: '40px'
                     }}>
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        minHeight: '44px'
-                      }}>
-                        {isLunchPeriod ? (
-                          <>
-                            <div style={{ 
-                              width: '28px', 
-                              height: '28px', 
-                              background: 'linear-gradient(135deg, #16A34A, #15803D)', 
-                              color: 'white', 
-                              borderRadius: '50%', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              fontSize: '12px',
-                              fontWeight: 'bold',
-                              marginBottom: '3px',
-                              boxShadow: '0 2px 4px rgba(22, 163, 74, 0.3)'
-                            }}>
-                              Y
-                            </div>
-                            <div style={{ 
-                              fontSize: '8px', 
-                              color: '#15803D',
-                              fontWeight: '600',
-                              textAlign: 'center',
-                              lineHeight: '1.2'
-                            }}>
-                              Yemek
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div style={{ 
-                              width: '28px', 
-                              height: '28px', 
-                              background: 'linear-gradient(135deg, #3B82F6, #1E40AF)', 
-                              color: 'white', 
-                              borderRadius: '50%', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              fontSize: '13px',
-                              fontWeight: 'bold',
-                              marginBottom: '3px',
-                              boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-                            }}>
-                              {period}
-                            </div>
-                            <div style={{ 
-                              fontSize: '7px', 
-                              color: '#1E40AF',
-                              fontWeight: '500',
-                              textAlign: 'center',
-                              lineHeight: '1.2'
-                            }}>
-                              {timeInfo}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      {isLunchPeriod ? (
+                        <>
+                          <div style={{ 
+                            width: '24px', 
+                            height: '24px', 
+                            backgroundColor: '#16A34A', 
+                            color: 'white', 
+                            borderRadius: '50%', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            fontSize: '10px',
+                            fontWeight: 'bold',
+                            marginBottom: '2px'
+                          }}>
+                            Y
+                          </div>
+                          <div style={{ 
+                            fontSize: '7px', 
+                            color: '#374151',
+                            fontWeight: 'normal',
+                            textAlign: 'center',
+                            lineHeight: '1'
+                          }}>
+                            Yemek
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ 
+                            width: '24px', 
+                            height: '24px', 
+                            backgroundColor: '#3B82F6', 
+                            color: 'white', 
+                            borderRadius: '50%', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            marginBottom: '2px'
+                          }}>
+                            {period}
+                          </div>
+                          <div style={{ 
+                            fontSize: '6px', 
+                            color: '#374151',
+                            fontWeight: 'normal',
+                            textAlign: 'center',
+                            lineHeight: '1'
+                          }}>
+                            {timeInfo}
+                          </div>
+                        </>
+                      )}
                     </td>
                     {DAYS.map(day => {
                       if (isLunchPeriod) {
+                        const fixedInfo = getFixedPeriodInfo(day, period, teacher.level);
+                        
                         return (
                           <td key={`${day}-${period}`} style={{ 
-                            border: '1px solid #CBD5E1', 
-                            padding: '4px',
+                            border: '1px solid #D1D5DB', 
+                            padding: '3px',
                             verticalAlign: 'middle'
                           }}>
                             <div style={{ 
                               backgroundColor: '#DCFCE7', 
-                              border: '2px solid #86EFAC', 
-                              borderRadius: '6px', 
-                              padding: '6px 4px', 
+                              border: '1px solid #BBF7D0', 
+                              borderRadius: '4px', 
+                              padding: '4px 2px', 
                               textAlign: 'center',
-                              minHeight: '32px',
+                              minHeight: '28px',
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'center',
-                              boxSizing: 'border-box',
-                              boxShadow: '0 1px 3px rgba(22, 163, 74, 0.1)'
+                              boxSizing: 'border-box'
                             }}>
                               <div style={{ 
                                 fontWeight: 'bold', 
                                 color: '#15803D', 
-                                fontSize: '10px',
-                                lineHeight: '1.2',
+                                fontSize: '9px',
+                                lineHeight: '1.1',
                                 textAlign: 'center'
                               }}>
                                 Yemek
@@ -585,29 +444,28 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
                       
                       return (
                         <td key={`${day}-${period}`} style={{ 
-                          border: '1px solid #CBD5E1', 
-                          padding: '4px',
+                          border: '1px solid #D1D5DB', 
+                          padding: '3px',
                           verticalAlign: 'middle'
                         }}>
                           {slotInfo ? (
                             <div style={{ 
                               backgroundColor: '#EFF6FF', 
-                              border: '2px solid #93C5FD', 
-                              borderRadius: '6px', 
-                              padding: '6px 4px', 
+                              border: '1px solid #BFDBFE', 
+                              borderRadius: '4px', 
+                              padding: '4px 2px', 
                               textAlign: 'center',
-                              minHeight: '32px',
+                              minHeight: '28px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              boxSizing: 'border-box',
-                              boxShadow: '0 1px 3px rgba(59, 130, 246, 0.1)'
+                              boxSizing: 'border-box'
                             }}>
                               <div style={{ 
                                 fontWeight: 'bold', 
                                 color: '#1E3A8A', 
-                                fontSize: '11px',
-                                lineHeight: '1.3',
+                                fontSize: '9px',
+                                lineHeight: '1.1',
                                 wordWrap: 'break-word',
                                 textAlign: 'center',
                                 width: '100%'
@@ -617,22 +475,21 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
                             </div>
                           ) : (
                             <div style={{ 
-                              backgroundColor: '#F8FAFC', 
-                              border: '1px solid #E2E8F0', 
-                              borderRadius: '6px', 
-                              padding: '6px 4px', 
+                              backgroundColor: '#F3F4F6', 
+                              border: '1px solid #E5E7EB', 
+                              borderRadius: '4px', 
+                              padding: '4px 2px', 
                               textAlign: 'center',
-                              minHeight: '32px',
+                              minHeight: '28px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               boxSizing: 'border-box'
                             }}>
                               <span style={{ 
-                                color: '#94A3B8', 
-                                fontSize: '9px',
-                                fontStyle: 'italic',
-                                fontWeight: '500'
+                                color: '#9CA3AF', 
+                                fontSize: '8px',
+                                fontStyle: 'italic'
                               }}>
                                 Boş
                               </span>
@@ -643,76 +500,73 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
                     })}
                   </tr>
 
-                  {/* İkindi Kahvaltısı 8. ders sonrasında - IMPROVED */}
+                  {/* İkindi Kahvaltısı 8. ders sonrasında */}
                   {showAfternoonBreakAfter && (
                     <tr style={{ backgroundColor: '#FFFBEB' }}>
                       <td style={{ 
-                        border: '1px solid #CBD5E1', 
-                        padding: '8px 4px', 
+                        border: '1px solid #D1D5DB', 
+                        padding: '6px 4px', 
                         textAlign: 'center', 
                         fontWeight: 'bold', 
                         backgroundColor: '#FEF3C7',
-                        verticalAlign: 'middle'
+                        verticalAlign: 'middle',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: '40px'
                       }}>
-                        <div style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
+                        <div style={{ 
+                          width: '24px', 
+                          height: '24px', 
+                          backgroundColor: '#F59E0B', 
+                          color: 'white', 
+                          borderRadius: '50%', 
+                          display: 'flex', 
+                          alignItems: 'center', 
                           justifyContent: 'center',
-                          minHeight: '44px'
+                          fontSize: '9px',
+                          fontWeight: 'bold',
+                          marginBottom: '2px'
                         }}>
-                          <div style={{ 
-                            width: '28px', 
-                            height: '28px', 
-                            background: 'linear-gradient(135deg, #F59E0B, #D97706)', 
-                            color: 'white', 
-                            borderRadius: '50%', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            marginBottom: '3px',
-                            boxShadow: '0 2px 4px rgba(245, 158, 11, 0.3)'
-                          }}>
-                            İ
-                          </div>
-                          <div style={{ 
-                            fontSize: '7px', 
-                            color: '#92400E',
-                            fontWeight: '600',
-                            textAlign: 'center',
-                            lineHeight: '1.2'
-                          }}>
-                            İkindi Kahvaltısı
-                          </div>
+                          İ
+                        </div>
+                        <div style={{ 
+                          fontSize: '6px', 
+                          color: '#374151',
+                          fontWeight: 'normal',
+                          textAlign: 'center',
+                          lineHeight: '1'
+                        }}>
+                          İkindi Kahvaltısı
                         </div>
                       </td>
                       {DAYS.map(day => {
+                        const fixedInfo = getFixedPeriodInfo(day, 'afternoon-breakfast', teacher.level);
+                        
                         return (
                           <td key={`${day}-afternoon-breakfast`} style={{ 
-                            border: '1px solid #CBD5E1', 
-                            padding: '4px',
+                            border: '1px solid #D1D5DB', 
+                            padding: '3px',
                             verticalAlign: 'middle'
                           }}>
                             <div style={{ 
                               backgroundColor: '#FEF3C7', 
-                              border: '2px solid #FDE68A', 
-                              borderRadius: '6px', 
-                              padding: '6px 4px', 
+                              border: '1px solid #FDE68A', 
+                              borderRadius: '4px', 
+                              padding: '4px 2px', 
                               textAlign: 'center',
-                              minHeight: '32px',
+                              minHeight: '28px',
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'center',
-                              boxSizing: 'border-box',
-                              boxShadow: '0 1px 3px rgba(245, 158, 11, 0.1)'
+                              boxSizing: 'border-box'
                             }}>
                               <div style={{ 
                                 fontWeight: 'bold', 
                                 color: '#92400E', 
-                                fontSize: '9px',
-                                lineHeight: '1.2',
+                                fontSize: '8px',
+                                lineHeight: '1.1',
                                 textAlign: 'center'
                               }}>
                                 İkindi Kahvaltısı
@@ -730,32 +584,29 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
         </table>
       </div>
 
-      {/* Footer - IMPROVED: Better typography and spacing */}
+      {/* Footer */}
       <div style={{ 
-        backgroundColor: '#F8FAFC', 
-        border: '1px solid #E2E8F0', 
-        borderRadius: '8px', 
-        marginTop: '3mm',
-        padding: '6px',
-        flexShrink: 0,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        backgroundColor: '#EFF6FF', 
+        border: '1px solid #BFDBFE', 
+        borderRadius: '6px', 
+        marginTop: '2mm',
+        padding: '4px',
+        flexShrink: 0
       }}>
         <div style={{ textAlign: 'center' }}>
           <p style={{ 
             margin: 0, 
-            fontSize: '8px', 
-            color: '#64748B', 
-            fontStyle: 'italic',
-            fontWeight: '500'
+            fontSize: '7px', 
+            color: '#6B7280', 
+            fontStyle: 'italic'
           }}>
             Bu program otomatik olarak oluşturulmuştur. Güncellemeler için okul yönetimine başvurunuz.
           </p>
           <p style={{ 
             margin: 0, 
-            fontSize: '7px', 
-            color: '#94A3B8',
-            marginTop: '3px',
-            fontWeight: '400'
+            fontSize: '6px', 
+            color: '#9CA3AF',
+            marginTop: '2px'
           }}>
             Oluşturma Tarihi: {new Date().toLocaleDateString('tr-TR')} {new Date().toLocaleTimeString('tr-TR')} • 
             Seviye: {teacher.level} • Zaman Dilimi: {teacher.level === 'Ortaokul' ? 'Ortaokul Saatleri' : 'Genel Saatler'}

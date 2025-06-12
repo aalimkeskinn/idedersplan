@@ -166,7 +166,12 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
               fontWeight: 'bold',
               backgroundColor: '#e6f3ff'
             }}>
-              {classItem.level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı'}
+              <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
+                {classItem.level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı'}
+              </div>
+              <div style={{ fontSize: '8px', color: '#666666', marginTop: '2px' }}>
+                {classItem.level === 'Ortaokul' ? '08:30-08:40' : '08:30-08:50'}
+              </div>
             </td>
             {DAYS.map(day => {
               const fixedInfo = getFixedPeriodInfo('prep', classItem.level);
@@ -209,7 +214,15 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
                     fontWeight: 'bold',
                     backgroundColor: isLunchPeriod ? '#e6ffe6' : '#e6f3ff'
                   }}>
-                    {isLunchPeriod ? 'Yemek' : `${period}.`}
+                    <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
+                      {isLunchPeriod ? 'Yemek' : `${period}.`}
+                    </div>
+                    <div style={{ fontSize: '8px', color: '#666666', marginTop: '2px' }}>
+                      {isLunchPeriod 
+                        ? (classItem.level === 'İlkokul' || classItem.level === 'Anaokulu' ? '11:50-12:25' : '12:30-13:05')
+                        : timeInfo
+                      }
+                    </div>
                   </td>
                   {DAYS.map(day => {
                     if (isLunchPeriod) {
@@ -277,7 +290,12 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
                       fontWeight: 'bold',
                       backgroundColor: '#ffe6cc'
                     }}>
-                      Kahvaltı
+                      <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
+                        Kahvaltı
+                      </div>
+                      <div style={{ fontSize: '8px', color: '#666666', marginTop: '2px' }}>
+                        09:15-09:35
+                      </div>
                     </td>
                     {DAYS.map(day => {
                       const fixedInfo = getFixedPeriodInfo('breakfast', classItem.level);
@@ -306,7 +324,12 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
                       fontWeight: 'bold',
                       backgroundColor: '#fff3e0'
                     }}>
-                      İkindi Kahvaltısı
+                      <div style={{ fontSize: '10px', fontWeight: 'bold' }}>
+                        İkindi Kahvaltısı
+                      </div>
+                      <div style={{ fontSize: '8px', color: '#666666', marginTop: '2px' }}>
+                        14:35-14:45
+                      </div>
                     </td>
                     {DAYS.map(day => (
                       <td key={`${day}-afternoon-breakfast`} style={{ 

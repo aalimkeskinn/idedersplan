@@ -54,6 +54,15 @@ const ClassSchedules = () => {
     }
   }, [location.search, classes]);
 
+  // FIXED: Reset preview when class changes
+  useEffect(() => {
+    console.log('🔄 Sınıf değişti, önizleme sıfırlanıyor:', { 
+      selectedClassId, 
+      previousPreview: showPreview 
+    });
+    setShowPreview(false);
+  }, [selectedClassId]);
+
   const sortedClasses = [...classes].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
   const levelOptions = [
@@ -166,6 +175,7 @@ const ClassSchedules = () => {
   const handleViewClass = (classId: string) => {
     const classItem = classes.find(c => c.id === classId);
     if (classItem) {
+      console.log('👁️ Sınıf görüntüleme:', { classId, className: classItem.name });
       setSelectedClassId(classId);
       
       // Scroll to the schedule view with smooth animation
@@ -181,27 +191,35 @@ const ClassSchedules = () => {
     }
   };
 
-  // FIXED: Toggle preview function with proper state management
+  // FIXED: Improved toggle preview function with better state management
   const togglePreview = () => {
+    const newPreviewState = !showPreview;
+    
     console.log('🔄 Önizleme toggle edildi:', { 
       currentState: showPreview, 
-      newState: !showPreview,
+      newState: newPreviewState,
       selectedClass: selectedClassId 
     });
     
-    setShowPreview(prev => {
-      const newState = !prev;
-      console.log('✅ Önizleme state güncellendi:', newState);
+    setShowPreview(newPreviewState);
+    
+    // Show appropriate toast message
+    if (newPreviewState) {
+      info('👁️ Önizleme Açıldı', 'Program önizlemesi aşağıda görüntüleniyor');
       
-      // Show appropriate toast message
-      if (newState) {
-        info('👁️ Önizleme Açıldı', 'Program önizlemesi aşağıda görüntüleniyor');
-      } else {
-        info('🙈 Önizleme Kapatıldı', 'Program önizlemesi gizlendi');
-      }
-      
-      return newState;
-    });
+      // Scroll to preview after a short delay
+      setTimeout(() => {
+        const previewElement = document.getElementById('schedule-preview');
+        if (previewElement) {
+          previewElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 300);
+    } else {
+      info('🙈 Önizleme Kapatıldı', 'Program önizlemesi gizlendi');
+    }
   };
 
   // NEW: Delete all class schedules function
@@ -411,6 +429,9 @@ const ClassSchedules = () => {
   );
   const selectedClass = classes.find(c => c.id === selectedClassId);
 
+  // FIXED: Check if selected class has schedule
+  const selectedClassHasSchedule = selectedClass ? calculateWeeklyHours(selectedClass.id) > 0 : false;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -477,9 +498,6 @@ const ClassSchedules = () => {
             onChange={(value) => {
               console.log('🔄 Sınıf değiştirildi:', { oldClass: selectedClassId, newClass: value });
               setSelectedClassId(value);
-              // Reset preview when changing class
-              setShowPreview(false);
-              console.log('🔄 Önizleme sıfırlandı (sınıf değişti)');
               
               if (value) {
                 const classItem = classes.find(c => c.id === value);
@@ -499,7 +517,8 @@ const ClassSchedules = () => {
             }))}
           />
 
-          {selectedClass && calculateWeeklyHours(selectedClass.id) > 0 && (
+          {/* FIXED: Better condition for showing preview controls */}
+          {selectedClass && selectedClassHasSchedule && (
             <div className="flex items-end space-x-2">
               <Button
                 onClick={togglePreview}
@@ -577,7 +596,7 @@ const ClassSchedules = () => {
                   <span className="ml-2">Haftalık toplam: <strong>{calculateWeeklyHours(selectedClass.id)} ders saati</strong></span>
                 </p>
               </div>
-              {calculateWeeklyHours(selectedClass.id) > 0 && (
+              {selectedClassHasSchedule && (
                 <div className="flex items-center space-x-2">
                   <Button
                     onClick={togglePreview}
@@ -601,7 +620,7 @@ const ClassSchedules = () => {
             </div>
           </div>
           
-          {calculateWeeklyHours(selectedClass.id) > 0 ? (
+          {selectedClassHasSchedule ? (
             <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead className="bg-emerald-50">
@@ -756,7 +775,7 @@ const ClassSchedules = () => {
           )}
 
           {/* Off-screen print view for PDF generation */}
-          {calculateWeeklyHours(selectedClass.id) > 0 && (
+          {selectedClassHasSchedule && (
             <div style={{ 
               position: 'absolute', 
               left: '-9999px', 
@@ -785,9 +804,9 @@ const ClassSchedules = () => {
         </div>
       )}
 
-      {/* Preview - FIXED: Proper conditional rendering and state management */}
-      {selectedClass && showPreview && calculateWeeklyHours(selectedClass.id) > 0 && (
-        <div className="bg-gray-100 p-6 rounded-lg mb-6">
+      {/* FIXED: Preview Section with proper conditional rendering and unique ID */}
+      {selectedClass && selectedClassHasSchedule && showPreview && (
+        <div id="schedule-preview" className="bg-gray-100 p-6 rounded-lg mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-900 flex items-center">
               <Eye className="w-6 h-6 mr-2 text-emerald-600" />

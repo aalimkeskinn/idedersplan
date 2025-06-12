@@ -1,0 +1,663 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* İDE OKULLARI KURUMSAL RENK PALETİ */
+:root {
+  /* GERÇEK İDE OKULLARI KURUMSAL RENKLERİ */
+  --ide-primary: #006EB7;      /* Ana mavi - logo ana rengi */
+  --ide-primary-light: #3B9AE1; /* Açık mavi */
+  --ide-primary-dark: #004A80;  /* Koyu mavi */
+  
+  --ide-secondary: #279C38;     /* Yeşil - logo ikinci rengi */
+  --ide-secondary-light: #4CAF50; /* Açık yeşil */
+  --ide-secondary-dark: #1B5E20;  /* Koyu yeşil */
+  
+  --ide-accent: #E84D0D;        /* Kırmızı/Turuncu - logo vurgu rengi */
+  --ide-accent-light: #FF6F47;  /* Açık kırmızı/turuncu */
+  --ide-accent-dark: #BF360C;   /* Koyu kırmızı/turuncu */
+  
+  /* Nötr Renkler */
+  --ide-gray-50: #f8fafc;
+  --ide-gray-100: #f1f5f9;
+  --ide-gray-200: #e2e8f0;
+  --ide-gray-300: #cbd5e1;
+  --ide-gray-400: #94a3b8;
+  --ide-gray-500: #64748b;
+  --ide-gray-600: #475569;
+  --ide-gray-700: #334155;
+  --ide-gray-800: #1e293b;
+  --ide-gray-900: #0f172a;
+  
+  /* Durum Renkleri */
+  --ide-success: var(--ide-secondary);
+  --ide-warning: var(--ide-accent);
+  --ide-error: var(--ide-accent);
+  --ide-info: var(--ide-primary);
+}
+
+/* Improved focus styles for accessibility */
+@layer base {
+  * {
+    @apply focus:outline-none;
+  }
+  
+  /* Better focus rings with IDE colors */
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  a:focus-visible {
+    @apply ring-2 ring-offset-2;
+    ring-color: var(--ide-primary);
+  }
+  
+  /* Improved contrast for better readability */
+  body {
+    color: var(--ide-gray-900);
+    background-color: var(--ide-gray-50);
+  }
+  
+  /* Better scrollbar styling with IDE colors */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background-color: var(--ide-gray-100);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--ide-gray-300);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--ide-primary);
+  }
+}
+
+/* Custom animations with IDE branding */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+  20%, 40%, 60%, 80% { transform: translateX(8px); }
+}
+
+@keyframes glow {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(232, 77, 13, 0.4), 0 0 40px rgba(232, 77, 13, 0.3); 
+  }
+  50% { 
+    box-shadow: 0 0 40px rgba(232, 77, 13, 0.8), 0 0 80px rgba(232, 77, 13, 0.6); 
+  }
+}
+
+@keyframes errorPulse {
+  0%, 100% { 
+    background-color: rgba(254, 242, 242, 0.8);
+  }
+  50% { 
+    background-color: rgba(254, 226, 226, 0.9);
+  }
+}
+
+@keyframes ideGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-slide-out {
+  animation: slideOut 0.3s ease-in;
+}
+
+.animate-shake {
+  animation: shake 0.6s ease-in-out;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+.animate-error-pulse {
+  animation: errorPulse 1.5s ease-in-out infinite;
+}
+
+.animate-ide-gradient {
+  animation: ideGradient 3s ease infinite;
+  background-size: 200% 200%;
+}
+
+/* CRITICAL: Toast container - Maximum z-index */
+#toast-portal-root {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  z-index: 2147483647 !important; /* Maximum z-index value */
+  pointer-events: none !important;
+  max-width: 90vw !important;
+}
+
+#toast-portal-root > * {
+  pointer-events: auto !important;
+  z-index: 2147483647 !important;
+}
+
+/* Error toast special effects with IDE colors */
+.toast-error {
+  animation: shake 0.6s ease-in-out, glow 2s ease-in-out infinite !important;
+  border-left-width: 8px !important;
+  border-left-color: var(--ide-accent) !important;
+  box-shadow: 
+    0 25px 50px -12px rgba(232, 77, 13, 0.5), 
+    0 0 0 4px rgba(232, 77, 13, 0.2),
+    0 0 30px rgba(232, 77, 13, 0.4) !important;
+  position: relative !important;
+  z-index: 2147483647 !important;
+}
+
+/* MOBILE-FIRST RESPONSIVE IMPROVEMENTS */
+@layer utilities {
+  /* Better table responsiveness with IDE styling */
+  .table-responsive {
+    @apply overflow-x-auto relative;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ide-primary) var(--ide-gray-100);
+  }
+  
+  .table-responsive::-webkit-scrollbar {
+    height: 8px;
+  }
+  
+  .table-responsive::-webkit-scrollbar-track {
+    background-color: var(--ide-gray-100);
+    border-radius: 4px;
+  }
+  
+  .table-responsive::-webkit-scrollbar-thumb {
+    background-color: var(--ide-primary);
+    border-radius: 4px;
+  }
+  
+  /* Mobile scroll indicator with IDE colors */
+  .table-responsive::after {
+    content: '← Kaydırın →';
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    background: linear-gradient(90deg, transparent, var(--ide-primary), transparent);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+    animation: pulse 2s infinite;
+    z-index: 10;
+  }
+  
+  /* Hide scroll indicator on desktop */
+  @media (min-width: 1024px) {
+    .table-responsive::after {
+      display: none;
+    }
+  }
+  
+  /* Touch-friendly buttons with IDE colors */
+  .btn-touch {
+    @apply min-h-[44px] min-w-[44px] p-3;
+  }
+  
+  /* Better mobile spacing */
+  .mobile-spacing {
+    @apply p-4 lg:p-6;
+  }
+  
+  /* Mobile-optimized cards with IDE styling */
+  .mobile-card {
+    @apply rounded-lg shadow-sm border bg-white;
+    border-color: var(--ide-gray-200);
+  }
+  
+  /* Responsive grid improvements */
+  .responsive-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6;
+  }
+  
+  /* IDE Corporate gradient backgrounds */
+  .ide-gradient-primary {
+    background: linear-gradient(135deg, var(--ide-primary), var(--ide-primary-light));
+  }
+  
+  .ide-gradient-secondary {
+    background: linear-gradient(135deg, var(--ide-secondary), var(--ide-secondary-light));
+  }
+  
+  .ide-gradient-accent {
+    background: linear-gradient(135deg, var(--ide-accent), var(--ide-accent-light));
+  }
+  
+  .ide-gradient-full {
+    background: linear-gradient(135deg, 
+      var(--ide-primary), 
+      var(--ide-secondary), 
+      var(--ide-accent)
+    );
+  }
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 640px) {
+  /* Toast adjustments for mobile */
+  #toast-portal-root {
+    top: 10px !important;
+    right: 10px !important;
+    left: 10px !important;
+    max-width: none !important;
+    width: auto !important;
+  }
+  
+  /* Better mobile table handling */
+  .schedule-table {
+    min-width: 800px;
+  }
+  
+  .schedule-table td,
+  .schedule-table th {
+    min-width: 120px;
+    padding: 8px 4px;
+  }
+  
+  /* Mobile modal improvements */
+  .modal-mobile {
+    margin: 10px;
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+  }
+  
+  /* Better mobile form spacing */
+  .form-mobile {
+    @apply space-y-4;
+  }
+  
+  .form-mobile input,
+  .form-mobile select,
+  .form-mobile textarea {
+    @apply text-base; /* Prevents zoom on iOS */
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .responsive-grid {
+    @apply grid-cols-2 lg:grid-cols-3;
+  }
+  
+  .tablet-spacing {
+    @apply p-5;
+  }
+}
+
+/* High contrast mode support with IDE colors */
+@media (prefers-contrast: high) {
+  .bg-gray-50 {
+    background-color: white;
+  }
+  
+  .text-gray-600 {
+    color: var(--ide-gray-900);
+  }
+  
+  .border-gray-300 {
+    border-color: var(--ide-gray-600);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .animate-shake,
+  .animate-glow,
+  .animate-bounce,
+  .animate-pulse,
+  .animate-error-pulse,
+  .animate-ide-gradient {
+    animation: none !important;
+  }
+}
+
+/* Enhanced focus indicators for accessibility with IDE colors */
+@media (prefers-reduced-motion: no-preference) {
+  .focus-enhanced:focus-visible {
+    ring-color: var(--ide-primary);
+    animation: focusPulse 0.3s ease-out;
+  }
+}
+
+@keyframes focusPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* Print optimizations */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-before: always;
+  }
+  
+  .print-avoid-break {
+    page-break-inside: avoid;
+  }
+}
+
+/* Toast özel shadow with IDE colors */
+.shadow-3xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 110, 183, 0.25), 0 0 0 1px rgba(0, 110, 183, 0.05);
+}
+
+/* Ensure maximum toast visibility */
+.toast-visible {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  pointer-events: auto !important;
+}
+
+/* Override any conflicting z-index */
+.toast-container * {
+  z-index: 2147483647 !important;
+}
+
+/* Mobile-optimized schedule table */
+.schedule-mobile {
+  @apply overflow-x-auto;
+  scroll-snap-type: x mandatory;
+}
+
+.schedule-mobile table {
+  @apply min-w-full;
+  width: max-content;
+}
+
+.schedule-mobile th,
+.schedule-mobile td {
+  scroll-snap-align: start;
+  @apply whitespace-nowrap;
+}
+
+/* Better mobile button groups */
+.button-group-mobile {
+  @apply flex flex-wrap gap-2;
+}
+
+.button-group-mobile > * {
+  @apply flex-1 min-w-[120px];
+}
+
+/* Enhanced mobile cards with IDE styling */
+.card-mobile {
+  @apply bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition-shadow;
+  border: 1px solid var(--ide-gray-200);
+}
+
+.card-mobile:hover {
+  border-color: var(--ide-primary-light);
+  box-shadow: 0 4px 12px rgba(0, 110, 183, 0.15);
+}
+
+/* Mobile-friendly modals */
+.modal-mobile-full {
+  @apply fixed inset-0 z-50 overflow-y-auto bg-white;
+}
+
+@media (min-width: 640px) {
+  .modal-mobile-full {
+    @apply relative inset-auto bg-transparent;
+  }
+}
+
+/* IDE Corporate Status Colors */
+.status-success {
+  background-color: var(--ide-secondary);
+  color: white;
+}
+
+.status-warning {
+  background-color: var(--ide-accent);
+  color: white;
+}
+
+.status-error {
+  background-color: var(--ide-accent);
+  color: white;
+}
+
+.status-info {
+  background-color: var(--ide-primary);
+  color: white;
+}
+
+/* IDE Corporate Button Variants */
+.btn-ide-primary {
+  background-color: var(--ide-primary);
+  color: white;
+  border: 2px solid var(--ide-primary);
+}
+
+.btn-ide-primary:hover {
+  background-color: var(--ide-primary-dark);
+  border-color: var(--ide-primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 110, 183, 0.3);
+}
+
+.btn-ide-secondary {
+  background-color: var(--ide-secondary);
+  color: white;
+  border: 2px solid var(--ide-secondary);
+}
+
+.btn-ide-secondary:hover {
+  background-color: var(--ide-secondary-dark);
+  border-color: var(--ide-secondary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(39, 156, 56, 0.3);
+}
+
+.btn-ide-accent {
+  background-color: var(--ide-accent);
+  color: white;
+  border: 2px solid var(--ide-accent);
+}
+
+.btn-ide-accent:hover {
+  background-color: var(--ide-accent-dark);
+  border-color: var(--ide-accent-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(232, 77, 13, 0.3);
+}
+
+/* IDE Corporate Header Styling */
+.ide-header {
+  background: var(--ide-gradient-full);
+  background-size: 400% 400%;
+  animation: ideGradient 8s ease infinite;
+}
+
+/* IDE Corporate Card Styling */
+.ide-card {
+  background: white;
+  border: 1px solid var(--ide-gray-200);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 110, 183, 0.08);
+  transition: all 0.3s ease;
+}
+
+.ide-card:hover {
+  border-color: var(--ide-primary-light);
+  box-shadow: 0 8px 24px rgba(0, 110, 183, 0.15);
+  transform: translateY(-2px);
+}
+
+/* IDE Corporate Table Styling */
+.ide-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--ide-gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ide-table th {
+  background-color: var(--ide-primary);
+  color: white;
+  font-weight: 600;
+  padding: 12px 16px;
+  text-align: left;
+}
+
+.ide-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ide-gray-200);
+}
+
+.ide-table tr:hover td {
+  background-color: var(--ide-gray-50);
+}
+
+/* IDE Corporate Form Styling */
+.ide-input {
+  border: 2px solid var(--ide-gray-300);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.ide-input:focus {
+  border-color: var(--ide-primary);
+  box-shadow: 0 0 0 3px rgba(0, 110, 183, 0.1);
+  outline: none;
+}
+
+.ide-input:invalid {
+  border-color: var(--ide-accent);
+  box-shadow: 0 0 0 3px rgba(232, 77, 13, 0.1);
+}
+
+/* IDE Corporate Badge Styling */
+.ide-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ide-badge-primary {
+  background-color: var(--ide-primary);
+  color: white;
+}
+
+.ide-badge-secondary {
+  background-color: var(--ide-secondary);
+  color: white;
+}
+
+.ide-badge-accent {
+  background-color: var(--ide-accent);
+  color: white;
+}
+
+/* IDE Corporate Loading Animation */
+.ide-loading {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--ide-gray-200);
+  border-top: 4px solid var(--ide-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* IDE Corporate Progress Bar */
+.ide-progress {
+  width: 100%;
+  height: 8px;
+  background-color: var(--ide-gray-200);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ide-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ide-primary), var(--ide-secondary));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* IDE Corporate Notification Styling */
+.ide-notification {
+  border-left: 4px solid var(--ide-primary);
+  background-color: var(--ide-gray-50);
+  padding: 16px;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 2px 8px rgba(0, 110, 183, 0.1);
+}
+
+.ide-notification-success {
+  border-left-color: var(--ide-secondary);
+}
+
+.ide-notification-warning {
+  border-left-color: var(--ide-accent);
+}
+
+.ide-notification-error {
+  border-left-color: var(--ide-accent);
+}

@@ -85,558 +85,220 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
   };
 
   return (
-    <div className="bg-white" style={{ 
+    <div style={{ 
       width: '297mm', 
       height: '210mm',
-      padding: '5mm',
-      fontSize: '9px',
-      lineHeight: '1.2',
-      display: 'flex',
-      flexDirection: 'column',
+      padding: '10mm',
+      fontSize: '12px',
+      lineHeight: '1.4',
       fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
-      boxSizing: 'border-box',
-      overflow: 'hidden',
-      color: '#1a1a1a'
+      backgroundColor: 'white',
+      color: '#000000'
     }}>
       {/* Header */}
       <div style={{ 
-        background: 'linear-gradient(135deg, #059669, #047857)',
-        color: 'white', 
-        borderRadius: '6px', 
-        marginBottom: '3mm',
-        padding: '6px',
-        flexShrink: 0,
-        boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)'
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: '8mm',
+        paddingBottom: '4mm',
+        borderBottom: '2px solid #000000'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              backgroundColor: 'white', 
-              borderRadius: '6px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              marginRight: '10px',
-              padding: '3px',
-              boxSizing: 'border-box'
-            }}>
-              <img 
-                src="https://cv.ide.k12.tr/images/ideokullari_logo.png" 
-                alt="İDE Okulları Logo"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain'
-                }}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent) {
-                    parent.innerHTML = '<span style="color: #059669; font-weight: bold; font-size: 12px;">İDE</span>';
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <h1 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0 }}>SINIF DERS PROGRAMI</h1>
-              <p style={{ fontSize: '9px', margin: 0, opacity: 0.9 }}>
-                İDE Okulları - {new Date().getFullYear()}-{new Date().getFullYear() + 1} Eğitim Öğretim Yılı
-              </p>
-            </div>
-          </div>
-          <div style={{ textAlign: 'right', fontSize: '8px' }}>
-            <p style={{ margin: 0 }}>Tarih: {new Date().toLocaleDateString('tr-TR')}</p>
-            <p style={{ margin: 0, marginTop: '1px' }}>Seviye: {classItem.level}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Class Info */}
-      <div style={{ 
-        backgroundColor: '#F0FDF4', 
-        border: '1px solid #BBF7D0', 
-        borderRadius: '6px', 
-        marginBottom: '3mm',
-        padding: '6px',
-        flexShrink: 0
-      }}>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(4, 1fr)', 
-          gap: '6px',
-          fontSize: '9px'
-        }}>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: 0, color: '#6B7280', fontSize: '8px', fontWeight: '500' }}>Sınıf</p>
-            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px' }}>{classItem.name}</p>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: 0, color: '#6B7280', fontSize: '8px', fontWeight: '500' }}>Seviye</p>
-            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px' }}>{classItem.level}</p>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: 0, color: '#6B7280', fontSize: '8px', fontWeight: '500' }}>Haftalık Toplam</p>
-            <p style={{ margin: 0, fontWeight: 'bold', color: '#059669', fontSize: '10px' }}>{calculateWeeklyHours()} saat</p>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: 0, color: '#6B7280', fontSize: '8px', fontWeight: '500' }}>Öğretmen Sayısı</p>
-            <p style={{ margin: 0, fontWeight: 'bold', fontSize: '10px' }}>
-              {new Set(
-                Object.values(schedule).flatMap(day => 
-                  Object.values(day).filter(slot => slot && !isFixedPeriod('', '')).map(slot => slot!.teacher.id)
-                )
-              ).size} öğretmen
-            </p>
-          </div>
-        </div>
-        <div style={{ marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #E5E7EB' }}>
-          <p style={{ margin: 0, fontSize: '8px', color: '#6B7280' }}>
-            Sınıf Öğretmeni İmzası: ________________________
+        <div>
+          <h1 style={{ 
+            fontSize: '18px', 
+            fontWeight: 'bold', 
+            margin: '0 0 4px 0',
+            color: '#000000'
+          }}>
+            {classItem.name}
+          </h1>
+          <p style={{ 
+            fontSize: '14px', 
+            margin: 0,
+            color: '#000000'
+          }}>
+            {classItem.level} - Ortaokul
           </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <button style={{
+            backgroundColor: '#f0f0f0',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            padding: '8px 16px',
+            fontSize: '12px',
+            cursor: 'pointer'
+          }}>
+            📄 PDF İndir
+          </button>
         </div>
       </div>
 
       {/* Schedule Table */}
-      <div style={{ 
-        border: '2px solid #059669', 
-        borderRadius: '6px', 
-        overflow: 'hidden',
-        flexGrow: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 0
+      <table style={{ 
+        width: '100%',
+        borderCollapse: 'collapse',
+        fontSize: '11px'
       }}>
-        <table style={{ 
-          width: '100%', 
-          height: '100%',
-          borderCollapse: 'collapse',
-          tableLayout: 'fixed',
-          flexGrow: 1
-        }}>
-          <thead>
-            <tr style={{ background: '#059669', color: 'white' }}>
-              <th style={{ 
-                border: '1px solid #059669', 
-                padding: '4px 2px',
-                textAlign: 'center', 
+        <thead>
+          <tr>
+            <th style={{ 
+              border: '1px solid #000000',
+              padding: '8px 4px',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              backgroundColor: '#e6f3ff',
+              width: '80px'
+            }}>
+              SAAT
+            </th>
+            {DAYS.map(day => (
+              <th key={day} style={{ 
+                border: '1px solid #000000',
+                padding: '8px 4px',
+                textAlign: 'center',
                 fontWeight: 'bold',
-                fontSize: '9px',
-                width: '12%',
-                verticalAlign: 'middle'
+                backgroundColor: '#e6f3ff'
               }}>
-                DERS SAATİ<br />
-                <span style={{ fontSize: '7px', fontWeight: 'normal' }}>
-                  {classItem.level === 'Ortaokul' ? '(Ortaokul Saatleri)' : '(Genel Saatler)'}
-                </span>
+                {day.toUpperCase()}
               </th>
-              {DAYS.map(day => (
-                <th key={day} style={{ 
-                  border: '1px solid #059669', 
-                  padding: '4px 2px', 
-                  textAlign: 'center', 
-                  fontWeight: 'bold',
-                  fontSize: '9px',
-                  width: '17.6%',
-                  verticalAlign: 'middle'
-                }}>
-                  {day.toUpperCase()}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {/* Preparation Period */}
-            <tr style={{ backgroundColor: '#ECFDF5' }}>
-              <td style={{ 
-                border: '1px solid #D1D5DB', 
-                padding: '6px 4px', 
-                textAlign: 'center', 
-                fontWeight: 'bold', 
-                backgroundColor: '#D1FAE5',
-                verticalAlign: 'middle',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '40px'
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {/* Hazırlık Period */}
+          <tr style={{ backgroundColor: '#f0f8ff' }}>
+            <td style={{ 
+              border: '1px solid #000000',
+              padding: '8px 4px',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              backgroundColor: '#e6f3ff'
+            }}>
+              Hazırlık
+            </td>
+            {DAYS.map(day => (
+              <td key={`${day}-prep`} style={{ 
+                border: '1px solid #000000',
+                padding: '8px 4px',
+                textAlign: 'center',
+                backgroundColor: '#f0f8ff'
               }}>
-                <div style={{ 
-                  width: '24px', 
-                  height: '24px', 
-                  backgroundColor: '#059669', 
-                  color: 'white', 
-                  borderRadius: '50%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  fontSize: '10px',
-                  fontWeight: 'bold',
-                  marginBottom: '2px'
-                }}>
-                  H
-                </div>
-                <div style={{ 
-                  fontSize: '7px', 
-                  color: '#374151',
-                  fontWeight: 'normal',
-                  textAlign: 'center',
-                  lineHeight: '1'
-                }}>
-                  Hazırlık
-                </div>
+                Hazırlık
               </td>
-              {DAYS.map(day => {
-                const fixedInfo = getFixedPeriodInfo('prep', classItem.level);
-                
-                return (
-                  <td key={`${day}-prep`} style={{ 
-                    border: '1px solid #D1D5DB', 
-                    padding: '3px',
-                    verticalAlign: 'middle'
-                  }}>
-                    <div style={{ 
-                      backgroundColor: '#ECFDF5', 
-                      border: '1px solid #A7F3D0', 
-                      borderRadius: '4px', 
-                      padding: '4px 2px', 
-                      textAlign: 'center',
-                      minHeight: '28px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                      boxSizing: 'border-box'
-                    }}>
-                      <div style={{ 
-                        fontWeight: 'bold', 
-                        color: '#064E3B', 
-                        fontSize: '9px',
-                        lineHeight: '1.1',
-                        textAlign: 'center'
-                      }}>
-                        {fixedInfo?.title || 'Hazırlık'}
-                      </div>
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
+            ))}
+          </tr>
 
-            {PERIODS.map((period, periodIndex) => {
-              const timeInfo = getTimeInfo(period);
-              const isLunchPeriod = (
-                (classItem.level === 'İlkokul' || classItem.level === 'Anaokulu') && period === '5'
-              ) || (
-                classItem.level === 'Ortaokul' && period === '6'
-              );
-              
-              const showAfternoonBreakAfter = period === '8';
-              
-              return (
-                <React.Fragment key={period}>
-                  <tr style={{ 
-                    backgroundColor: isLunchPeriod ? '#F0FDF4' : (periodIndex % 2 === 0 ? '#F9FAFB' : 'white')
+          {PERIODS.map((period, periodIndex) => {
+            const timeInfo = getTimeInfo(period);
+            const isLunchPeriod = (
+              (classItem.level === 'İlkokul' || classItem.level === 'Anaokulu') && period === '5'
+            ) || (
+              classItem.level === 'Ortaokul' && period === '6'
+            );
+            
+            const showAfternoonBreakAfter = period === '8';
+            
+            return (
+              <React.Fragment key={period}>
+                <tr style={{ 
+                  backgroundColor: isLunchPeriod ? '#f0fff0' : (periodIndex % 2 === 0 ? '#ffffff' : '#f8f9fa')
+                }}>
+                  <td style={{ 
+                    border: '1px solid #000000',
+                    padding: '8px 4px',
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    backgroundColor: isLunchPeriod ? '#e6ffe6' : '#e6f3ff'
                   }}>
-                    <td style={{ 
-                      border: '1px solid #D1D5DB', 
-                      padding: '6px 4px', 
-                      textAlign: 'center', 
-                      fontWeight: 'bold', 
-                      backgroundColor: isLunchPeriod ? '#DCFCE7' : '#D1FAE5',
-                      verticalAlign: 'middle',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      minHeight: '40px'
-                    }}>
-                      {isLunchPeriod ? (
-                        <>
-                          <div style={{ 
-                            width: '24px', 
-                            height: '24px', 
-                            backgroundColor: '#16A34A', 
-                            color: 'white', 
-                            borderRadius: '50%', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            fontWeight: 'bold',
-                            marginBottom: '2px'
-                          }}>
-                            Y
-                          </div>
-                          <div style={{ 
-                            fontSize: '7px', 
-                            color: '#374151',
-                            fontWeight: 'normal',
-                            textAlign: 'center',
-                            lineHeight: '1'
-                          }}>
-                            Yemek
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div style={{ 
-                            width: '24px', 
-                            height: '24px', 
-                            backgroundColor: '#059669', 
-                            color: 'white', 
-                            borderRadius: '50%', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            marginBottom: '2px'
-                          }}>
-                            {period}
-                          </div>
-                          <div style={{ 
-                            fontSize: '6px', 
-                            color: '#374151',
-                            fontWeight: 'normal',
-                            textAlign: 'center',
-                            lineHeight: '1'
-                          }}>
-                            {timeInfo}
-                          </div>
-                        </>
-                      )}
-                    </td>
-                    {DAYS.map(day => {
-                      if (isLunchPeriod) {
-                        const fixedInfo = getFixedPeriodInfo(period, classItem.level);
-                        
-                        return (
-                          <td key={`${day}-${period}`} style={{ 
-                            border: '1px solid #D1D5DB', 
-                            padding: '3px',
-                            verticalAlign: 'middle'
-                          }}>
-                            <div style={{ 
-                              backgroundColor: '#DCFCE7', 
-                              border: '1px solid #BBF7D0', 
-                              borderRadius: '4px', 
-                              padding: '4px 2px', 
-                              textAlign: 'center',
-                              minHeight: '28px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'center',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ 
-                                fontWeight: 'bold', 
-                                color: '#15803D', 
-                                fontSize: '9px',
-                                lineHeight: '1.1',
-                                textAlign: 'center'
-                              }}>
-                                Yemek
-                              </div>
-                            </div>
-                          </td>
-                        );
-                      }
-                      
-                      const slot = schedule[day][period];
-                      
+                    {isLunchPeriod ? 'Yemek' : `${period}.`}
+                  </td>
+                  {DAYS.map(day => {
+                    if (isLunchPeriod) {
                       return (
                         <td key={`${day}-${period}`} style={{ 
-                          border: '1px solid #D1D5DB', 
-                          padding: '3px',
-                          verticalAlign: 'middle'
+                          border: '1px solid #000000',
+                          padding: '8px 4px',
+                          textAlign: 'center',
+                          backgroundColor: '#f0fff0'
                         }}>
-                          {slot ? (
-                            <div style={{ 
-                              backgroundColor: '#ECFDF5', 
-                              border: '1px solid #A7F3D0', 
-                              borderRadius: '4px', 
-                              padding: '4px 2px', 
-                              textAlign: 'center',
-                              minHeight: '28px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'center',
-                              boxSizing: 'border-box'
-                            }}>
-                              {/* FIXED: Show teacher name and subject properly */}
-                              <div style={{ 
-                                fontWeight: 'bold', 
-                                color: '#064E3B', 
-                                fontSize: '8px',
-                                lineHeight: '1.1',
-                                wordWrap: 'break-word',
-                                textAlign: 'center',
-                                marginBottom: '1px'
-                              }}>
-                                {slot.teacher.name.length > 12 
-                                  ? slot.teacher.name.substring(0, 12) + '...'
-                                  : slot.teacher.name
-                                }
-                              </div>
-                              {/* FIXED: Subject name - get from teacher's branch */}
-                              <div style={{ 
-                                fontSize: '7px',
-                                color: '#047857',
-                                lineHeight: '1.1',
-                                textAlign: 'center',
-                                fontWeight: '500'
-                              }}>
-                                {(() => {
-                                  const subject = getSubjectForTeacher(slot.teacher);
-                                  const subjectName = subject?.name || slot.teacher.branch;
-                                  return subjectName.length > 10 
-                                    ? subjectName.substring(0, 10) + '...'
-                                    : subjectName;
-                                })()}
-                              </div>
-                            </div>
-                          ) : (
-                            <div style={{ 
-                              backgroundColor: '#F3F4F6', 
-                              border: '1px solid #E5E7EB', 
-                              borderRadius: '4px', 
-                              padding: '4px 2px', 
-                              textAlign: 'center',
-                              minHeight: '28px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxSizing: 'border-box'
-                            }}>
-                              <span style={{ 
-                                color: '#9CA3AF', 
-                                fontSize: '8px',
-                                fontStyle: 'italic'
-                              }}>
-                                Boş
-                              </span>
-                            </div>
-                          )}
+                          Yemek
                         </td>
                       );
-                    })}
-                  </tr>
-
-                  {/* İkindi Kahvaltısı 8. ders sonrasında */}
-                  {showAfternoonBreakAfter && (
-                    <tr style={{ backgroundColor: '#FFFBEB' }}>
-                      <td style={{ 
-                        border: '1px solid #D1D5DB', 
-                        padding: '6px 4px', 
-                        textAlign: 'center', 
-                        fontWeight: 'bold', 
-                        backgroundColor: '#FEF3C7',
-                        verticalAlign: 'middle',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        minHeight: '40px'
+                    }
+                    
+                    const slot = schedule[day][period];
+                    
+                    return (
+                      <td key={`${day}-${period}`} style={{ 
+                        border: '1px solid #000000',
+                        padding: '8px 4px',
+                        textAlign: 'center',
+                        backgroundColor: periodIndex % 2 === 0 ? '#ffffff' : '#f8f9fa'
                       }}>
-                        <div style={{ 
-                          width: '24px', 
-                          height: '24px', 
-                          backgroundColor: '#F59E0B', 
-                          color: 'white', 
-                          borderRadius: '50%', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          fontSize: '9px',
-                          fontWeight: 'bold',
-                          marginBottom: '2px'
-                        }}>
-                          İ
-                        </div>
-                        <div style={{ 
-                          fontSize: '6px', 
-                          color: '#374151',
-                          fontWeight: 'normal',
-                          textAlign: 'center',
-                          lineHeight: '1'
-                        }}>
-                          İkindi Kahvaltısı
-                        </div>
-                      </td>
-                      {DAYS.map(day => {
-                        const fixedInfo = getFixedPeriodInfo('afternoon-breakfast', classItem.level);
-                        
-                        return (
-                          <td key={`${day}-afternoon-breakfast`} style={{ 
-                            border: '1px solid #D1D5DB', 
-                            padding: '3px',
-                            verticalAlign: 'middle'
-                          }}>
+                        {slot ? (
+                          <div>
                             <div style={{ 
-                              backgroundColor: '#FEF3C7', 
-                              border: '1px solid #FDE68A', 
-                              borderRadius: '4px', 
-                              padding: '4px 2px', 
-                              textAlign: 'center',
-                              minHeight: '28px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'center',
-                              boxSizing: 'border-box'
+                              fontWeight: 'bold',
+                              fontSize: '10px',
+                              marginBottom: '2px'
                             }}>
-                              <div style={{ 
-                                fontWeight: 'bold', 
-                                color: '#92400E', 
-                                fontSize: '8px',
-                                lineHeight: '1.1',
-                                textAlign: 'center'
-                              }}>
-                                İkindi Kahvaltısı
-                              </div>
+                              {slot.teacher.name.length > 12 
+                                ? slot.teacher.name.substring(0, 12) + '...'
+                                : slot.teacher.name
+                              }
                             </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                            <div style={{ 
+                              fontSize: '9px',
+                              color: '#666666'
+                            }}>
+                              {(() => {
+                                const subject = getSubjectForTeacher(slot.teacher);
+                                const subjectName = subject?.name || slot.teacher.branch;
+                                return subjectName.length > 10 
+                                  ? subjectName.substring(0, 10) + '...'
+                                  : subjectName;
+                              })()}
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#999999', fontSize: '9px' }}>Boş</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
 
-      {/* Footer */}
-      <div style={{ 
-        backgroundColor: '#F0FDF4', 
-        border: '1px solid #BBF7D0', 
-        borderRadius: '6px', 
-        marginTop: '2mm',
-        padding: '4px',
-        flexShrink: 0
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <p style={{ 
-            margin: 0, 
-            fontSize: '7px', 
-            color: '#6B7280', 
-            fontStyle: 'italic'
-          }}>
-            Bu program otomatik olarak oluşturulmuştur. Güncellemeler için okul yönetimine başvurunuz.
-          </p>
-          <p style={{ 
-            margin: 0, 
-            fontSize: '6px', 
-            color: '#9CA3AF',
-            marginTop: '2px'
-          }}>
-            Oluşturma Tarihi: {new Date().toLocaleDateString('tr-TR')} {new Date().toLocaleTimeString('tr-TR')} • 
-            Seviye: {classItem.level} • Zaman Dilimi: {classItem.level === 'Ortaokul' ? 'Ortaokul Saatleri' : 'Genel Saatler'}
-          </p>
-        </div>
-      </div>
+                {/* İkindi Kahvaltısı 8. ders sonrasında */}
+                {showAfternoonBreakAfter && (
+                  <tr style={{ backgroundColor: '#fffbf0' }}>
+                    <td style={{ 
+                      border: '1px solid #000000',
+                      padding: '8px 4px',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      backgroundColor: '#fff3e0'
+                    }}>
+                      İkindi Kahvaltısı
+                    </td>
+                    {DAYS.map(day => (
+                      <td key={`${day}-afternoon-breakfast`} style={{ 
+                        border: '1px solid #000000',
+                        padding: '8px 4px',
+                        textAlign: 'center',
+                        backgroundColor: '#fffbf0'
+                      }}>
+                        İkindi Kahvaltısı
+                      </td>
+                    ))}
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 };

@@ -95,44 +95,27 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
       backgroundColor: 'white',
       color: '#000000'
     }}>
-      {/* Header */}
+      {/* Header - CLEANED: Removed PDF button */}
       <div style={{ 
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
         marginBottom: '8mm',
         paddingBottom: '4mm',
         borderBottom: '2px solid #000000'
       }}>
-        <div>
-          <h1 style={{ 
-            fontSize: '18px', 
-            fontWeight: 'bold', 
-            margin: '0 0 4px 0',
-            color: '#000000'
-          }}>
-            {classItem.name}
-          </h1>
-          <p style={{ 
-            fontSize: '14px', 
-            margin: 0,
-            color: '#000000'
-          }}>
-            {classItem.level} - Ortaokul
-          </p>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <button style={{
-            backgroundColor: '#f0f0f0',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            padding: '8px 16px',
-            fontSize: '12px',
-            cursor: 'pointer'
-          }}>
-            📄 PDF İndir
-          </button>
-        </div>
+        <h1 style={{ 
+          fontSize: '18px', 
+          fontWeight: 'bold', 
+          margin: '0 0 4px 0',
+          color: '#000000'
+        }}>
+          {classItem.name}
+        </h1>
+        <p style={{ 
+          fontSize: '14px', 
+          margin: 0,
+          color: '#000000'
+        }}>
+          {classItem.level}
+        </p>
       </div>
 
       {/* Schedule Table */}

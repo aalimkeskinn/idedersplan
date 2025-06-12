@@ -170,21 +170,34 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section - SIMPLIFIED: Only icon, title and description */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Hero Section - UPDATED: Logo and smaller text sizes */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
-          <div className="flex justify-center mb-6">
-            <div className="p-3 bg-blue-100 rounded-full">
-              <School className="w-12 h-12 text-blue-600" />
+          <div className="flex justify-center mb-4">
+            <div className="p-2 bg-white rounded-full shadow-sm">
+              <img 
+                src="https://cv.ide.k12.tr/images/ideokullari_logo.png" 
+                alt="İDE Okulları Logo"
+                className="w-16 h-16 object-contain"
+                onError={(e) => {
+                  // Fallback if logo fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = '<div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>';
+                  }
+                }}
+              />
             </div>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
             İDE Okulları
-            <span className="block text-xl md:text-2xl font-normal mt-2 text-gray-600">
+            <span className="block text-lg md:text-xl font-normal mt-1 text-gray-600">
               Ders Programı Yönetim Sistemi
             </span>
           </h1>
-          <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+          <p className="text-base md:text-lg text-gray-600 mb-6 max-w-3xl mx-auto">
             Okul ders programlarını kolayca oluşturun, yönetin ve PDF olarak indirin. 
             Çakışma kontrolü, otomatik saatler ve profesyonel çıktılar.
           </p>
@@ -385,7 +398,20 @@ const Home = () => {
       <div className="bg-gray-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="flex justify-center mb-6">
-            <School className="w-12 h-12 text-blue-400" />
+            <img 
+              src="https://cv.ide.k12.tr/images/ideokullari_logo.png" 
+              alt="İDE Okulları Logo"
+              className="w-12 h-12 object-contain filter brightness-0 invert"
+              onError={(e) => {
+                // Fallback if logo fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  parent.innerHTML = '<div class="w-12 h-12 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>';
+                }
+              }}
+            />
           </div>
           <h3 className="text-2xl font-bold mb-4">İDE Okulları Ders Programı Sistemi</h3>
           <p className="text-gray-400 max-w-2xl mx-auto leading-relaxed">

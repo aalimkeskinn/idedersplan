@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Building, Calendar, Users, BookOpen, Eye, Download, Filter, ArrowUp, EyeOff, Trash2 } from 'lucide-react';
+import { Building, Calendar, Users, BookOpen, Download, Filter, Trash2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -28,7 +28,6 @@ const ClassSchedules = () => {
 
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('');
-  const [showPreview, setShowPreview] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
@@ -53,15 +52,6 @@ const ClassSchedules = () => {
       }
     }
   }, [location.search, classes]);
-
-  // FIXED: Reset preview when class changes
-  useEffect(() => {
-    console.log('🔄 Sınıf değişti, önizleme sıfırlanıyor:', { 
-      selectedClassId, 
-      previousPreview: showPreview 
-    });
-    setShowPreview(false);
-  }, [selectedClassId]);
 
   const sortedClasses = [...classes].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
@@ -191,37 +181,6 @@ const ClassSchedules = () => {
     }
   };
 
-  // FIXED: Improved toggle preview function with better state management
-  const togglePreview = () => {
-    const newPreviewState = !showPreview;
-    
-    console.log('🔄 Önizleme toggle edildi:', { 
-      currentState: showPreview, 
-      newState: newPreviewState,
-      selectedClass: selectedClassId 
-    });
-    
-    setShowPreview(newPreviewState);
-    
-    // Show appropriate toast message
-    if (newPreviewState) {
-      info('👁️ Önizleme Açıldı', 'Program önizlemesi aşağıda görüntüleniyor');
-      
-      // Scroll to preview after a short delay
-      setTimeout(() => {
-        const previewElement = document.getElementById('schedule-preview');
-        if (previewElement) {
-          previewElement.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          });
-        }
-      }, 300);
-    } else {
-      info('🙈 Önizleme Kapatıldı', 'Program önizlemesi gizlendi');
-    }
-  };
-
   // NEW: Delete all class schedules function
   const handleDeleteAllSchedules = () => {
     const classesWithSchedules = filteredClasses.filter(classItem => 
@@ -273,7 +232,6 @@ const ClassSchedules = () => {
             // Reset selected class if it was deleted
             if (selectedClassId && classesWithSchedules.some(c => c.id === selectedClassId)) {
               setSelectedClassId('');
-              setShowPreview(false);
             }
           } else {
             error('❌ Silme Hatası', 'Hiçbir program silinemedi');
@@ -419,17 +377,13 @@ const ClassSchedules = () => {
     }
   };
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   const filteredClasses = getFilteredClasses();
   const classesWithSchedules = filteredClasses.filter(classItem => 
     calculateWeeklyHours(classItem.id) > 0
   );
   const selectedClass = classes.find(c => c.id === selectedClassId);
 
-  // FIXED: Check if selected class has schedule
+  // Check if selected class has schedule
   const selectedClassHasSchedule = selectedClass ? calculateWeeklyHours(selectedClass.id) > 0 : false;
 
   return (
@@ -443,7 +397,7 @@ const ClassSchedules = () => {
           </div>
         </div>
         <div className="flex items-center space-x-3">
-          {/* NEW: Delete All Button */}
+          {/* Delete All Button */}
           {classesWithSchedules.length > 0 && (
             <Button
               onClick={handleDeleteAllSchedules}
@@ -484,7 +438,7 @@ const ClassSchedules = () => {
 
       {/* Filters and Class Selection */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select
             label="Seviye Filtresi"
             value={selectedLevel}
@@ -516,29 +470,6 @@ const ClassSchedules = () => {
               label: `${classItem.name} (${classItem.level})`
             }))}
           />
-
-          {/* FIXED: Better condition for showing preview controls */}
-          {selectedClass && selectedClassHasSchedule && (
-            <div className="flex items-end space-x-2">
-              <Button
-                onClick={togglePreview}
-                icon={showPreview ? EyeOff : Eye}
-                variant="secondary"
-                className="flex-1"
-              >
-                {showPreview ? 'Önizlemeyi Gizle' : 'Önizleme Göster'}
-              </Button>
-              <Button
-                onClick={scrollToTop}
-                icon={ArrowUp}
-                variant="secondary"
-                size="sm"
-                className="px-3"
-              >
-                Yukarı
-              </Button>
-            </div>
-          )}
         </div>
       </div>
 
@@ -598,14 +529,6 @@ const ClassSchedules = () => {
               </div>
               {selectedClassHasSchedule && (
                 <div className="flex items-center space-x-2">
-                  <Button
-                    onClick={togglePreview}
-                    icon={showPreview ? EyeOff : Eye}
-                    variant="secondary"
-                    size="sm"
-                  >
-                    {showPreview ? 'Önizlemeyi Gizle' : 'Önizleme'}
-                  </Button>
                   <Button
                     onClick={() => downloadSingleClassPDF(selectedClass)}
                     icon={Download}
@@ -804,41 +727,6 @@ const ClassSchedules = () => {
         </div>
       )}
 
-      {/* FIXED: Preview Section with proper conditional rendering and unique ID */}
-      {selectedClass && selectedClassHasSchedule && showPreview && (
-        <div id="schedule-preview" className="bg-gray-100 p-6 rounded-lg mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center">
-              <Eye className="w-6 h-6 mr-2 text-emerald-600" />
-              📄 Program Önizlemesi
-            </h3>
-            <div className="flex items-center space-x-3">
-              <span className="text-sm text-gray-600 bg-white px-3 py-1 rounded-full border">
-                {selectedClass.name} - {selectedClass.level}
-              </span>
-              <Button
-                onClick={togglePreview}
-                icon={EyeOff}
-                variant="secondary"
-                size="sm"
-              >
-                Kapat
-              </Button>
-            </div>
-          </div>
-          <div style={{ overflow: 'auto', width: '100%' }}>
-            <div style={{ transform: 'scale(1.2)', transformOrigin: 'top left', width: 'fit-content', margin: '0 auto' }}>
-              <ClassSchedulePrintView
-                classItem={selectedClass}
-                schedule={getClassSchedule(selectedClass.id)}
-                teachers={teachers}
-                subjects={subjects}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* All Classes Overview */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -888,7 +776,6 @@ const ClassSchedules = () => {
                       <>
                         <Button
                           onClick={() => handleViewClass(classItem.id)}
-                          icon={Eye}
                           variant={isSelected ? "primary" : "secondary"}
                           size="sm"
                         >

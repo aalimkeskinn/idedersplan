@@ -78,7 +78,7 @@ export const PRIMARY_SCHOOL_TIME_PERIODS: TimePeriod[] = [
   { period: '10', startTime: '15:25', endTime: '16:00' }
 ];
 
-// Ortaokul için ders saatleri (10 ders + molalar)
+// UPDATED: Ortaokul için ders saatleri (1. ve 2. ders arasına 20 dakikalık kahvaltı eklendi)
 export const MIDDLE_SCHOOL_TIME_PERIODS: TimePeriod[] = [
   { period: 'prep', startTime: '08:30', endTime: '08:40', isBreak: true, breakType: 'prep', breakDuration: 10 },
   { period: '1', startTime: '08:40', endTime: '09:15' },

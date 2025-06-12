@@ -152,7 +152,7 @@ const Schedules = () => {
     }
   }, [selectedClassId, classes, schedules, mode]);
 
-  // Initialize schedule with fixed periods (preparation, lunch, and afternoon breakfast)
+  // Initialize schedule with fixed periods (preparation, lunch, breakfast, and afternoon breakfast)
   const initializeScheduleWithFixedPeriods = (level?: 'Anaokulu' | 'İlkokul' | 'Ortaokul'): Schedule['schedule'] => {
     const schedule: Schedule['schedule'] = {};
     
@@ -172,6 +172,12 @@ const Schedules = () => {
           subjectId: 'fixed-prep',
           classId: 'fixed-period'
         };
+        
+        // NEW: Add breakfast between 1st and 2nd period for middle school
+        schedule[day]['breakfast'] = {
+          subjectId: 'fixed-breakfast',
+          classId: 'fixed-period'
+        };
       }
       
       // Add fixed lunch period
@@ -189,7 +195,7 @@ const Schedules = () => {
         };
       }
       
-      // FIXED: Add fixed afternoon breakfast between 8th and 9th period
+      // Add fixed afternoon breakfast between 8th and 9th period
       schedule[day]['afternoon-breakfast'] = {
         subjectId: 'fixed-afternoon-breakfast',
         classId: 'fixed-period'
@@ -224,6 +230,14 @@ const Schedules = () => {
         }
       }
       
+      // NEW: Add breakfast between 1st and 2nd period for middle school
+      if (level === 'Ortaokul' && !schedule[day]['breakfast']) {
+        schedule[day]['breakfast'] = {
+          subjectId: 'fixed-breakfast',
+          classId: 'fixed-period'
+        };
+      }
+      
       // Add fixed lunch period if not exists
       const lunchPeriod = (level === 'İlkokul' || level === 'Anaokulu') ? '5' : '6';
       if (!schedule[day][lunchPeriod]) {
@@ -233,7 +247,7 @@ const Schedules = () => {
         };
       }
       
-      // FIXED: Add fixed afternoon breakfast if not exists
+      // Add fixed afternoon breakfast if not exists
       if (!schedule[day]['afternoon-breakfast']) {
         schedule[day]['afternoon-breakfast'] = {
           subjectId: 'fixed-afternoon-breakfast',
@@ -272,13 +286,13 @@ const Schedules = () => {
     return teachers;
   };
 
-  // Check if a period is fixed (preparation, lunch, or afternoon breakfast)
+  // Check if a period is fixed (preparation, lunch, breakfast, or afternoon breakfast)
   const isFixedPeriod = (day: string, period: string): boolean => {
     const slot = currentSchedule[day]?.[period];
     return slot?.classId === 'fixed-period';
   };
 
-  // FIXED: Get fixed period display info with correct text
+  // Get fixed period display info with correct text
   const getFixedPeriodInfo = (day: string, period: string, level?: 'Anaokulu' | 'İlkokul' | 'Ortaokul') => {
     const slot = currentSchedule[day]?.[period];
     if (!slot || slot.classId !== 'fixed-period') return null;
@@ -292,7 +306,7 @@ const Schedules = () => {
     } else if (slot.subjectId === 'fixed-breakfast') {
       return {
         title: 'Kahvaltı',
-        subtitle: '08:30-08:50',
+        subtitle: level === 'Ortaokul' ? '09:15-09:35' : '08:30-08:50',
         color: 'bg-orange-100 border-orange-300 text-orange-800'
       };
     } else if (slot.subjectId === 'fixed-lunch') {
@@ -803,7 +817,7 @@ const Schedules = () => {
                   <Clock className="w-3 h-3 mr-1" />
                   {(selectedTeacher || selectedClass)?.level === 'Ortaokul' ? 'Ortaokul Saatleri' : 'Genel Saatler'}
                 </div>
-                <div className="text-xs text-green-600 mt-1">🔒 Yemek</div>
+                <div className="text-xs text-green-600 mt-1">🔒 Yemek • 🥐 Kahvaltı</div>
               </div>
             )}
           </div>
@@ -856,7 +870,7 @@ const Schedules = () => {
                     • {(selectedTeacher || selectedClass)?.level === 'Ortaokul' ? 'Ortaokul zaman dilimi' : 'Genel zaman dilimi'}
                   </span>
                   <span className="ml-2 text-green-600">
-                    • 🔒 Yemek
+                    • 🔒 Yemek • 🥐 Kahvaltı
                   </span>
                 </p>
               </div>
@@ -915,7 +929,7 @@ const Schedules = () => {
                               {fixedInfo?.title || ((selectedTeacher || selectedClass)?.level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı')}
                             </div>
                             <div className="text-xs mt-1">
-                              {fixedInfo?.subtitle || '🔒 Yemek'}
+                              {fixedInfo?.subtitle || '🔒 Sabit'}
                             </div>
                           </div>
                         </div>
@@ -932,7 +946,10 @@ const Schedules = () => {
                     (selectedTeacher || selectedClass)?.level === 'Ortaokul' && period === '6'
                   );
                   
-                  // FIXED: İkindi kahvaltısını 8. ders sonrasına yerleştir
+                  // Show breakfast between 1st and 2nd period for middle school
+                  const showBreakfastAfter = (selectedTeacher || selectedClass)?.level === 'Ortaokul' && period === '1';
+                  
+                  // Show afternoon breakfast after 8th period
                   const showAfternoonBreakAfter = period === '8';
                   
                   return (
@@ -982,7 +999,7 @@ const Schedules = () => {
                                       </div>
                                     )}
                                     {isFixed && (
-                                      <div className="text-xs mt-1">🔒 Yemek</div>
+                                      <div className="text-xs mt-1">🔒 Sabit</div>
                                     )}
                                   </div>
                                 ) : (
@@ -996,7 +1013,41 @@ const Schedules = () => {
                         })}
                       </tr>
 
-                      {/* FIXED: İkindi Kahvaltısı 8. ders sonrasında göster */}
+                      {/* NEW: Breakfast between 1st and 2nd period for middle school */}
+                      {showBreakfastAfter && (
+                        <tr className="bg-orange-50">
+                          <td className="px-4 py-3 font-medium text-gray-900 bg-orange-100">
+                            <div className="text-center">
+                              <div className="font-bold text-lg text-orange-800">Kahvaltı</div>
+                              <div className="text-xs text-orange-600 mt-1 flex items-center justify-center">
+                                <Clock className="w-3 h-3 mr-1" />
+                                09:15-09:35
+                              </div>
+                            </div>
+                          </td>
+                          {DAYS.map(day => {
+                            const entity = mode === 'teacher' ? selectedTeacher : selectedClass;
+                            const fixedInfo = getFixedPeriodInfo(day, 'breakfast', entity?.level);
+                            
+                            return (
+                              <td key={`${day}-breakfast`} className="px-2 py-2">
+                                <div className={`w-full min-h-[80px] p-3 rounded-lg border-2 ${fixedInfo?.color || 'bg-orange-100 border-orange-300'} cursor-not-allowed`}>
+                                  <div className="text-center">
+                                    <div className="font-medium text-lg">
+                                      {fixedInfo?.title || 'Kahvaltı'}
+                                    </div>
+                                    <div className="text-xs mt-1">
+                                      {fixedInfo?.subtitle || '🔒 Sabit'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )}
+
+                      {/* İkindi Kahvaltısı 8. ders sonrasında */}
                       {showAfternoonBreakAfter && (
                         <tr className="bg-yellow-50">
                           <td className="px-4 py-3 font-medium text-gray-900 bg-yellow-100">
@@ -1020,7 +1071,7 @@ const Schedules = () => {
                                       {fixedInfo?.title || 'İkindi Kahvaltısı'}
                                     </div>
                                     <div className="text-xs mt-1">
-                                      {fixedInfo?.subtitle || '🔒 Yemek'}
+                                      {fixedInfo?.subtitle || '🔒 Sabit'}
                                     </div>
                                   </div>
                                 </div>
@@ -1056,7 +1107,8 @@ const Schedules = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
             <h4 className="text-sm font-medium text-blue-800 mb-2">🔒 Otomatik Sabit Saatler:</h4>
             <div className="text-xs text-blue-700 space-y-1">
-              <p>• <strong>Hazırlık:</strong> İlkokul 08:30-08:50, Ortaokul 08:30-08:40</p>
+              <p>• <strong>Hazırlık:</strong> Ortaokul 08:30-08:40</p>
+              <p>• <strong>Kahvaltı:</strong> İlkokul/Anaokul 08:30-08:50, Ortaokul 09:15-09:35</p>
               <p>• <strong>Yemek:</strong> İlkokul 5. ders (11:50-12:25), Ortaokul 6. ders (12:30-13:05)</p>
               <p>• <strong>İkindi Kahvaltısı:</strong> 8. ders sonrası (14:35-14:45)</p>
             </div>

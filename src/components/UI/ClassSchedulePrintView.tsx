@@ -14,10 +14,11 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
   teachers,
   subjects
 }) => {
-  // Check if a period is fixed (preparation, lunch, or afternoon breakfast)
+  // Check if a period is fixed (preparation, lunch, breakfast, or afternoon breakfast)
   const isFixedPeriod = (day: string, period: string): boolean => {
     // For class schedules, we need to check if this is a fixed period based on the period and level
     if (period === 'prep') return true;
+    if (classItem.level === 'Ortaokul' && period === 'breakfast') return true;
     if ((classItem.level === 'İlkokul' || classItem.level === 'Anaokulu') && period === '5') return true;
     if (classItem.level === 'Ortaokul' && period === '6') return true;
     if (period === 'afternoon-breakfast') return true;
@@ -28,9 +29,15 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
   const getFixedPeriodInfo = (period: string, level?: 'Anaokulu' | 'İlkokul' | 'Ortaokul') => {
     if (period === 'prep') {
       return {
-        title: 'Hazırlık',
+        title: level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı',
         subtitle: level === 'Ortaokul' ? '08:30-08:40' : '08:30-08:50',
         color: 'bg-blue-100 border-blue-300 text-blue-800'
+      };
+    } else if (period === 'breakfast') {
+      return {
+        title: 'Kahvaltı',
+        subtitle: '09:15-09:35',
+        color: 'bg-orange-100 border-orange-300 text-orange-800'
       };
     } else if ((level === 'İlkokul' || level === 'Anaokulu') && period === '5') {
       return {
@@ -95,7 +102,7 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
       backgroundColor: 'white',
       color: '#000000'
     }}>
-      {/* Header - CLEANED: Removed PDF button */}
+      {/* Header */}
       <div style={{ 
         marginBottom: '8mm',
         paddingBottom: '4mm',
@@ -150,7 +157,7 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
           </tr>
         </thead>
         <tbody>
-          {/* Hazırlık Period */}
+          {/* Hazırlık/Kahvaltı Period */}
           <tr style={{ backgroundColor: '#f0f8ff' }}>
             <td style={{ 
               border: '1px solid #000000',
@@ -159,18 +166,22 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
               fontWeight: 'bold',
               backgroundColor: '#e6f3ff'
             }}>
-              Hazırlık
+              {classItem.level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı'}
             </td>
-            {DAYS.map(day => (
-              <td key={`${day}-prep`} style={{ 
-                border: '1px solid #000000',
-                padding: '8px 4px',
-                textAlign: 'center',
-                backgroundColor: '#f0f8ff'
-              }}>
-                Hazırlık
-              </td>
-            ))}
+            {DAYS.map(day => {
+              const fixedInfo = getFixedPeriodInfo('prep', classItem.level);
+              
+              return (
+                <td key={`${day}-prep`} style={{ 
+                  border: '1px solid #000000',
+                  padding: '8px 4px',
+                  textAlign: 'center',
+                  backgroundColor: '#f0f8ff'
+                }}>
+                  {fixedInfo?.title || (classItem.level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı')}
+                </td>
+              );
+            })}
           </tr>
 
           {PERIODS.map((period, periodIndex) => {
@@ -180,6 +191,9 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
             ) || (
               classItem.level === 'Ortaokul' && period === '6'
             );
+            
+            // Show breakfast between 1st and 2nd period for middle school
+            const showBreakfastAfter = classItem.level === 'Ortaokul' && period === '1';
             
             const showAfternoonBreakAfter = period === '8';
             
@@ -252,6 +266,35 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
                     );
                   })}
                 </tr>
+
+                {/* NEW: Breakfast between 1st and 2nd period for middle school */}
+                {showBreakfastAfter && (
+                  <tr style={{ backgroundColor: '#fff8f0' }}>
+                    <td style={{ 
+                      border: '1px solid #000000',
+                      padding: '8px 4px',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      backgroundColor: '#ffe6cc'
+                    }}>
+                      Kahvaltı
+                    </td>
+                    {DAYS.map(day => {
+                      const fixedInfo = getFixedPeriodInfo('breakfast', classItem.level);
+                      
+                      return (
+                        <td key={`${day}-breakfast`} style={{ 
+                          border: '1px solid #000000',
+                          padding: '8px 4px',
+                          textAlign: 'center',
+                          backgroundColor: '#fff8f0'
+                        }}>
+                          {fixedInfo?.title || 'Kahvaltı'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                )}
 
                 {/* İkindi Kahvaltısı 8. ders sonrasında */}
                 {showAfternoonBreakAfter && (

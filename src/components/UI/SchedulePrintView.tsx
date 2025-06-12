@@ -23,7 +23,7 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
     return { classItem };
   };
 
-  // Check if a period is fixed (preparation, lunch, or afternoon breakfast)
+  // Check if a period is fixed (preparation, lunch, breakfast, or afternoon breakfast)
   const isFixedPeriod = (day: string, period: string): boolean => {
     const slot = schedule.schedule[day]?.[period];
     return slot?.classId === 'fixed-period';
@@ -43,7 +43,7 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
     } else if (slot.subjectId === 'fixed-breakfast') {
       return {
         title: 'Kahvaltı',
-        subtitle: '08:30-08:50',
+        subtitle: level === 'Ortaokul' ? '09:15-09:35' : '08:30-08:50',
         color: 'bg-orange-100 border-orange-300 text-orange-800'
       };
     } else if (slot.subjectId === 'fixed-lunch') {
@@ -97,7 +97,7 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
       backgroundColor: 'white',
       color: '#000000'
     }}>
-      {/* Header - CLEANED: Removed PDF button */}
+      {/* Header */}
       <div style={{ 
         marginBottom: '8mm',
         paddingBottom: '4mm',
@@ -152,7 +152,7 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
           </tr>
         </thead>
         <tbody>
-          {/* Hazırlık Period */}
+          {/* Hazırlık/Kahvaltı Period */}
           <tr style={{ backgroundColor: '#f0f8ff' }}>
             <td style={{ 
               border: '1px solid #000000',
@@ -161,18 +161,22 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
               fontWeight: 'bold',
               backgroundColor: '#e6f3ff'
             }}>
-              Hazırlık
+              {teacher.level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı'}
             </td>
-            {DAYS.map(day => (
-              <td key={`${day}-prep`} style={{ 
-                border: '1px solid #000000',
-                padding: '8px 4px',
-                textAlign: 'center',
-                backgroundColor: '#f0f8ff'
-              }}>
-                Hazırlık
-              </td>
-            ))}
+            {DAYS.map(day => {
+              const fixedInfo = getFixedPeriodInfo(day, 'prep', teacher.level);
+              
+              return (
+                <td key={`${day}-prep`} style={{ 
+                  border: '1px solid #000000',
+                  padding: '8px 4px',
+                  textAlign: 'center',
+                  backgroundColor: '#f0f8ff'
+                }}>
+                  {fixedInfo?.title || (teacher.level === 'Ortaokul' ? 'Hazırlık' : 'Kahvaltı')}
+                </td>
+              );
+            })}
           </tr>
 
           {PERIODS.map((period, periodIndex) => {
@@ -182,6 +186,9 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
             ) || (
               teacher.level === 'Ortaokul' && period === '6'
             );
+            
+            // Show breakfast between 1st and 2nd period for middle school
+            const showBreakfastAfter = teacher.level === 'Ortaokul' && period === '1';
             
             const showAfternoonBreakAfter = period === '8';
             
@@ -236,6 +243,35 @@ const SchedulePrintView: React.FC<SchedulePrintViewProps> = ({
                     );
                   })}
                 </tr>
+
+                {/* NEW: Breakfast between 1st and 2nd period for middle school */}
+                {showBreakfastAfter && (
+                  <tr style={{ backgroundColor: '#fff8f0' }}>
+                    <td style={{ 
+                      border: '1px solid #000000',
+                      padding: '8px 4px',
+                      textAlign: 'center',
+                      fontWeight: 'bold',
+                      backgroundColor: '#ffe6cc'
+                    }}>
+                      Kahvaltı
+                    </td>
+                    {DAYS.map(day => {
+                      const fixedInfo = getFixedPeriodInfo(day, 'breakfast', teacher.level);
+                      
+                      return (
+                        <td key={`${day}-breakfast`} style={{ 
+                          border: '1px solid #000000',
+                          padding: '8px 4px',
+                          textAlign: 'center',
+                          backgroundColor: '#fff8f0'
+                        }}>
+                          {fixedInfo?.title || 'Kahvaltı'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                )}
 
                 {/* İkindi Kahvaltısı 8. ders sonrasında */}
                 {showAfternoonBreakAfter && (

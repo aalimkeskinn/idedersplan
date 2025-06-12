@@ -169,40 +169,25 @@ const Home = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
-      {/* Hero Section - REDUCED HEIGHT */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-emerald-600 text-white">
-        <div className="absolute inset-0 bg-black opacity-10"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
-            <div className="flex justify-center mb-6">
-              <div className="p-3 bg-white bg-opacity-20 rounded-full backdrop-blur-sm">
-                <School className="w-12 h-12 text-white" />
-              </div>
-            </div>
-            <h1 className="text-3xl md:text-5xl font-bold mb-4">
-              İDE Okulları
-              <span className="block text-xl md:text-2xl font-normal mt-2 text-blue-100">
-                Ders Programı Yönetim Sistemi
-              </span>
-            </h1>
-            <p className="text-lg md:text-xl text-blue-100 mb-6 max-w-3xl mx-auto">
-              Okul ders programlarını kolayca oluşturun, yönetin ve PDF olarak indirin. 
-              Çakışma kontrolü, otomatik saatler ve profesyonel çıktılar.
-            </p>
-            {/* REMOVED: Öğretmenler button, kept only Hemen Başla */}
-            <div className="flex justify-center">
-              <Button
-                onClick={() => navigate('/schedules')}
-                variant="secondary"
-                size="lg"
-                className="bg-white text-blue-600 hover:bg-blue-50"
-              >
-                Hemen Başla
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero Section - SIMPLIFIED: Only icon, title and description */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center">
+          <div className="flex justify-center mb-6">
+            <div className="p-3 bg-blue-100 rounded-full">
+              <School className="w-12 h-12 text-blue-600" />
             </div>
           </div>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            İDE Okulları
+            <span className="block text-xl md:text-2xl font-normal mt-2 text-gray-600">
+              Ders Programı Yönetim Sistemi
+            </span>
+          </h1>
+          <p className="text-lg md:text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            Okul ders programlarını kolayca oluşturun, yönetin ve PDF olarak indirin. 
+            Çakışma kontrolü, otomatik saatler ve profesyonel çıktılar.
+          </p>
         </div>
       </div>
 
@@ -242,7 +227,7 @@ const Home = () => {
       </div>
 
       {/* Step by Step Guide */}
-      <div className="bg-gray-50 py-16">
+      <div className="bg-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -260,7 +245,7 @@ const Home = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-8">
               {steps.map((step, index) => (
                 <div key={index} className="relative">
-                  <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 text-center relative z-10">
+                  <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 text-center relative z-10 border border-gray-100">
                     <div className={`${step.color} w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-white font-bold text-xl shadow-lg`}>
                       {step.number}
                     </div>

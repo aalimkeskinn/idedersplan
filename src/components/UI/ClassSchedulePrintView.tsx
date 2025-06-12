@@ -137,8 +137,27 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
         </div>
       </div>
 
-      {/* Class Info */}
+      {/* Class Info - UPDATED: Added prominent class name display */}
       <div className="bg-gray-50 border border-emerald-200 rounded-lg mb-2" style={{ padding: '6px', flexShrink: 0 }}>
+        {/* PROMINENT CLASS NAME SECTION */}
+        <div style={{ 
+          textAlign: 'center', 
+          marginBottom: '6px', 
+          padding: '4px',
+          backgroundColor: '#059669',
+          borderRadius: '4px'
+        }}>
+          <h2 style={{ 
+            margin: 0, 
+            color: 'white', 
+            fontSize: '16px', 
+            fontWeight: 'bold',
+            letterSpacing: '1px'
+          }}>
+            {classItem.name} SINIFI
+          </h2>
+        </div>
+        
         <div className="grid grid-cols-4 gap-3" style={{ fontSize: '9px' }}>
           <div>
             <p style={{ margin: 0, color: '#6B7280', fontSize: '8px', fontWeight: '500' }}>Sınıf</p>

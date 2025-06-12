@@ -170,27 +170,28 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
-      {/* Hero Section */}
+      {/* Hero Section - REDUCED HEIGHT */}
       <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-emerald-600 text-white">
         <div className="absolute inset-0 bg-black opacity-10"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
-            <div className="flex justify-center mb-8">
-              <div className="p-4 bg-white bg-opacity-20 rounded-full backdrop-blur-sm">
-                <School className="w-16 h-16 text-white" />
+            <div className="flex justify-center mb-6">
+              <div className="p-3 bg-white bg-opacity-20 rounded-full backdrop-blur-sm">
+                <School className="w-12 h-12 text-white" />
               </div>
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">
+            <h1 className="text-3xl md:text-5xl font-bold mb-4">
               İDE Okulları
-              <span className="block text-2xl md:text-3xl font-normal mt-2 text-blue-100">
+              <span className="block text-xl md:text-2xl font-normal mt-2 text-blue-100">
                 Ders Programı Yönetim Sistemi
               </span>
             </h1>
-            <p className="text-xl md:text-2xl text-blue-100 mb-8 max-w-3xl mx-auto">
+            <p className="text-lg md:text-xl text-blue-100 mb-6 max-w-3xl mx-auto">
               Okul ders programlarını kolayca oluşturun, yönetin ve PDF olarak indirin. 
               Çakışma kontrolü, otomatik saatler ve profesyonel çıktılar.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {/* REMOVED: Öğretmenler button, kept only Hemen Başla */}
+            <div className="flex justify-center">
               <Button
                 onClick={() => navigate('/schedules')}
                 variant="secondary"
@@ -199,15 +200,6 @@ const Home = () => {
               >
                 Hemen Başla
                 <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-              <Button
-                onClick={() => navigate('/teachers')}
-                variant="primary"
-                size="lg"
-                className="bg-blue-500 hover:bg-blue-600 border-white"
-              >
-                Öğretmenler
-                <Users className="ml-2 w-5 h-5" />
               </Button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth';
 import { useToast } from './hooks/useToast';
 import Layout from './components/Layout/Layout';
 import Login from './components/Auth/Login';
+import Home from './pages/Home';
 import Teachers from './pages/Teachers';
 import Classes from './pages/Classes';
 import Subjects from './pages/Subjects';
@@ -52,7 +53,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/" element={<Layout />}>
-              <Route index element={<Navigate to="/teachers" replace />} />
+              <Route index element={<Home />} />
               <Route path="teachers" element={<Teachers />} />
               <Route path="classes" element={<Classes />} />
               <Route path="subjects" element={<Subjects />} />

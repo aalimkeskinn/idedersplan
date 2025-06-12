@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, Building, BookOpen, Calendar, LogOut, Eye, Menu, X, GraduationCap } from 'lucide-react';
+import { Users, Building, BookOpen, Calendar, LogOut, Eye, Menu, X, GraduationCap, Home } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 const Sidebar = () => {
@@ -12,6 +12,7 @@ const Sidebar = () => {
   };
 
   const navItems = [
+    { to: '/', icon: Home, label: 'Anasayfa', color: 'ide-primary' },
     { to: '/subjects', icon: BookOpen, label: 'Dersler', color: 'ide-orange' },
     { to: '/teachers', icon: Users, label: 'Öğretmenler', color: 'ide-primary' },
     { to: '/classes', icon: Building, label: 'Sınıflar', color: 'ide-secondary' },

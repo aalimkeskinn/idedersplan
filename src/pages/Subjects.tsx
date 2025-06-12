@@ -2,18 +2,30 @@ import React, { useState } from 'react';
 import { Plus, Edit, Trash2, BookOpen } from 'lucide-react';
 import { Subject, EDUCATION_LEVELS } from '../types';
 import { useFirestore } from '../hooks/useFirestore';
+import { useToast } from '../hooks/useToast';
+import { useConfirmation } from '../hooks/useConfirmation';
 import Button from '../components/UI/Button';
 import Modal from '../components/UI/Modal';
 import Input from '../components/UI/Input';
 import Select from '../components/UI/Select';
+import ConfirmationModal from '../components/UI/ConfirmationModal';
 
 const Subjects = () => {
   const { data: subjects, loading, add, update, remove } = useFirestore<Subject>('subjects');
+  const { success, error, warning } = useToast();
+  const { 
+    confirmation, 
+    showConfirmation, 
+    hideConfirmation,
+    confirmDelete 
+  } = useConfirmation();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [levelFilter, setLevelFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [bulkSubjects, setBulkSubjects] = useState([
     { name: '', branch: '', level: '', weeklyHours: '' }
   ]);
@@ -41,6 +53,56 @@ const Subjects = () => {
   };
 
   const sortedSubjects = getFilteredSubjects().sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+
+  // NEW: Delete all subjects function
+  const handleDeleteAllSubjects = () => {
+    if (subjects.length === 0) {
+      warning('⚠️ Silinecek Ders Yok', 'Sistemde silinecek ders bulunamadı');
+      return;
+    }
+
+    confirmDelete(
+      `${subjects.length} Ders`,
+      async () => {
+        setIsDeletingAll(true);
+        
+        try {
+          let deletedCount = 0;
+          
+          console.log('🗑️ Tüm dersler siliniyor:', {
+            totalSubjects: subjects.length
+          });
+
+          // Delete each subject
+          for (const subject of subjects) {
+            try {
+              await remove(subject.id);
+              deletedCount++;
+              console.log(`✅ Ders silindi: ${subject.name}`);
+            } catch (err) {
+              console.error(`❌ Ders silinemedi: ${subject.name}`, err);
+            }
+          }
+
+          if (deletedCount > 0) {
+            success('🗑️ Dersler Silindi', `${deletedCount} ders başarıyla silindi`);
+            
+            // Reset filters
+            setLevelFilter('');
+            setBranchFilter('');
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir ders silinemedi');
+          }
+
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Dersler silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingAll(false);
+        }
+      }
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,8 +159,15 @@ const Subjects = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Bu dersi silmek istediğinizden emin misiniz?')) {
-      await remove(id);
+    const subject = subjects.find(s => s.id === id);
+    if (subject) {
+      confirmDelete(
+        subject.name,
+        async () => {
+          await remove(id);
+          success('🗑️ Ders Silindi', `${subject.name} başarıyla silindi`);
+        }
+      );
     }
   };
 
@@ -148,7 +217,7 @@ const Subjects = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 space-y-4 lg:space-y-0">
         <div className="flex items-center">
           <BookOpen className="w-8 h-8 text-indigo-600 mr-3" />
           <div>
@@ -156,11 +225,25 @@ const Subjects = () => {
             <p className="text-gray-600">{subjects.length} ders kayıtlı ({sortedSubjects.length} gösteriliyor)</p>
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+          {/* NEW: Delete All Button */}
+          {subjects.length > 0 && (
+            <Button
+              onClick={handleDeleteAllSubjects}
+              icon={Trash2}
+              variant="danger"
+              disabled={isDeletingAll}
+              className="w-full sm:w-auto"
+            >
+              {isDeletingAll ? 'Siliniyor...' : `Tümünü Sil (${subjects.length})`}
+            </Button>
+          )}
+          
           <Button
             onClick={() => setIsBulkModalOpen(true)}
             icon={Plus}
             variant="secondary"
+            className="w-full sm:w-auto"
           >
             Toplu Ekle
           </Button>
@@ -168,6 +251,7 @@ const Subjects = () => {
             onClick={() => setIsModalOpen(true)}
             icon={Plus}
             variant="primary"
+            className="w-full sm:w-auto"
           >
             Yeni Ders
           </Button>
@@ -452,6 +536,19 @@ const Subjects = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmation.isOpen}
+        onClose={hideConfirmation}
+        onConfirm={confirmation.onConfirm}
+        title={confirmation.title}
+        message={confirmation.message}
+        type={confirmation.type}
+        confirmText={confirmation.confirmText}
+        cancelText={confirmation.cancelText}
+        confirmVariant={confirmation.confirmVariant}
+      />
     </div>
   );
 };

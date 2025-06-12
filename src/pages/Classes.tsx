@@ -3,19 +3,31 @@ import { Plus, Edit, Trash2, Building, Eye, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Class, EDUCATION_LEVELS, Schedule } from '../types';
 import { useFirestore } from '../hooks/useFirestore';
+import { useToast } from '../hooks/useToast';
+import { useConfirmation } from '../hooks/useConfirmation';
 import Button from '../components/UI/Button';
 import Modal from '../components/UI/Modal';
 import Input from '../components/UI/Input';
 import Select from '../components/UI/Select';
+import ConfirmationModal from '../components/UI/ConfirmationModal';
 
 const Classes = () => {
   const navigate = useNavigate();
   const { data: classes, loading, add, update, remove } = useFirestore<Class>('classes');
   const { data: schedules } = useFirestore<Schedule>('schedules');
+  const { success, error, warning } = useToast();
+  const { 
+    confirmation, 
+    showConfirmation, 
+    hideConfirmation,
+    confirmDelete 
+  } = useConfirmation();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [levelFilter, setLevelFilter] = useState('');
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [bulkClasses, setBulkClasses] = useState([
     { name: '', level: '' }
   ]);
@@ -68,6 +80,55 @@ const Classes = () => {
 
   const sortedClasses = getFilteredClasses().sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
+  // NEW: Delete all classes function
+  const handleDeleteAllClasses = () => {
+    if (classes.length === 0) {
+      warning('⚠️ Silinecek Sınıf Yok', 'Sistemde silinecek sınıf bulunamadı');
+      return;
+    }
+
+    confirmDelete(
+      `${classes.length} Sınıf`,
+      async () => {
+        setIsDeletingAll(true);
+        
+        try {
+          let deletedCount = 0;
+          
+          console.log('🗑️ Tüm sınıflar siliniyor:', {
+            totalClasses: classes.length
+          });
+
+          // Delete each class
+          for (const classItem of classes) {
+            try {
+              await remove(classItem.id);
+              deletedCount++;
+              console.log(`✅ Sınıf silindi: ${classItem.name}`);
+            } catch (err) {
+              console.error(`❌ Sınıf silinemedi: ${classItem.name}`, err);
+            }
+          }
+
+          if (deletedCount > 0) {
+            success('🗑️ Sınıflar Silindi', `${deletedCount} sınıf başarıyla silindi`);
+            
+            // Reset filters
+            setLevelFilter('');
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir sınıf silinemedi');
+          }
+
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Sınıflar silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingAll(false);
+        }
+      }
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -114,8 +175,15 @@ const Classes = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Bu sınıfı silmek istediğinizden emin misiniz?')) {
-      await remove(id);
+    const classItem = classes.find(c => c.id === id);
+    if (classItem) {
+      confirmDelete(
+        classItem.name,
+        async () => {
+          await remove(id);
+          success('🗑️ Sınıf Silindi', `${classItem.name} başarıyla silindi`);
+        }
+      );
     }
   };
 
@@ -155,7 +223,7 @@ const Classes = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 space-y-4 lg:space-y-0">
         <div className="flex items-center">
           <Building className="w-8 h-8 text-emerald-600 mr-3" />
           <div>
@@ -163,11 +231,25 @@ const Classes = () => {
             <p className="text-gray-600">{classes.length} sınıf kayıtlı ({sortedClasses.length} gösteriliyor)</p>
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+          {/* NEW: Delete All Button */}
+          {classes.length > 0 && (
+            <Button
+              onClick={handleDeleteAllClasses}
+              icon={Trash2}
+              variant="danger"
+              disabled={isDeletingAll}
+              className="w-full sm:w-auto"
+            >
+              {isDeletingAll ? 'Siliniyor...' : `Tümünü Sil (${classes.length})`}
+            </Button>
+          )}
+          
           <Button
             onClick={() => setIsBulkModalOpen(true)}
             icon={Plus}
             variant="secondary"
+            className="w-full sm:w-auto"
           >
             Toplu Ekle
           </Button>
@@ -175,6 +257,7 @@ const Classes = () => {
             onClick={() => setIsModalOpen(true)}
             icon={Plus}
             variant="primary"
+            className="w-full sm:w-auto"
           >
             Yeni Sınıf
           </Button>
@@ -432,6 +515,19 @@ const Classes = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmation.isOpen}
+        onClose={hideConfirmation}
+        onConfirm={confirmation.onConfirm}
+        title={confirmation.title}
+        message={confirmation.message}
+        type={confirmation.type}
+        confirmText={confirmation.confirmText}
+        cancelText={confirmation.cancelText}
+        confirmVariant={confirmation.confirmVariant}
+      />
     </div>
   );
 };

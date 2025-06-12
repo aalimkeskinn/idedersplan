@@ -2,20 +2,32 @@ import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Users, Search, X } from 'lucide-react';
 import { Teacher, EDUCATION_LEVELS, Subject } from '../types';
 import { useFirestore } from '../hooks/useFirestore';
+import { useToast } from '../hooks/useToast';
+import { useConfirmation } from '../hooks/useConfirmation';
 import Button from '../components/UI/Button';
 import Modal from '../components/UI/Modal';
 import Input from '../components/UI/Input';
 import Select from '../components/UI/Select';
+import ConfirmationModal from '../components/UI/ConfirmationModal';
 
 const Teachers = () => {
   const { data: teachers, loading, add, update, remove } = useFirestore<Teacher>('teachers');
   const { data: subjects } = useFirestore<Subject>('subjects');
+  const { success, error, warning } = useToast();
+  const { 
+    confirmation, 
+    showConfirmation, 
+    hideConfirmation,
+    confirmDelete 
+  } = useConfirmation();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [levelFilter, setLevelFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [bulkTeachers, setBulkTeachers] = useState([
     { name: '', branch: '', level: '' }
   ]);
@@ -45,6 +57,57 @@ const Teachers = () => {
   };
 
   const sortedTeachers = getFilteredTeachers().sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+
+  // NEW: Delete all teachers function
+  const handleDeleteAllTeachers = () => {
+    if (teachers.length === 0) {
+      warning('⚠️ Silinecek Öğretmen Yok', 'Sistemde silinecek öğretmen bulunamadı');
+      return;
+    }
+
+    confirmDelete(
+      `${teachers.length} Öğretmen`,
+      async () => {
+        setIsDeletingAll(true);
+        
+        try {
+          let deletedCount = 0;
+          
+          console.log('🗑️ Tüm öğretmenler siliniyor:', {
+            totalTeachers: teachers.length
+          });
+
+          // Delete each teacher
+          for (const teacher of teachers) {
+            try {
+              await remove(teacher.id);
+              deletedCount++;
+              console.log(`✅ Öğretmen silindi: ${teacher.name}`);
+            } catch (err) {
+              console.error(`❌ Öğretmen silinemedi: ${teacher.name}`, err);
+            }
+          }
+
+          if (deletedCount > 0) {
+            success('🗑️ Öğretmenler Silindi', `${deletedCount} öğretmen başarıyla silindi`);
+            
+            // Reset filters and search
+            setLevelFilter('');
+            setBranchFilter('');
+            setSearchQuery('');
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir öğretmen silinemedi');
+          }
+
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Öğretmenler silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingAll(false);
+        }
+      }
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,8 +157,15 @@ const Teachers = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Bu öğretmeni silmek istediğinizden emin misiniz?')) {
-      await remove(id);
+    const teacher = teachers.find(t => t.id === id);
+    if (teacher) {
+      confirmDelete(
+        teacher.name,
+        async () => {
+          await remove(id);
+          success('🗑️ Öğretmen Silindi', `${teacher.name} başarıyla silindi`);
+        }
+      );
     }
   };
 
@@ -165,7 +235,7 @@ const Teachers = () => {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 space-y-4 lg:space-y-0">
         <div className="flex items-center">
           <Users className="w-8 h-8 text-blue-600 mr-3" />
           <div>
@@ -173,11 +243,25 @@ const Teachers = () => {
             <p className="text-gray-600">{teachers.length} öğretmen kayıtlı ({sortedTeachers.length} gösteriliyor)</p>
           </div>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+          {/* NEW: Delete All Button */}
+          {teachers.length > 0 && (
+            <Button
+              onClick={handleDeleteAllTeachers}
+              icon={Trash2}
+              variant="danger"
+              disabled={isDeletingAll}
+              className="w-full sm:w-auto"
+            >
+              {isDeletingAll ? 'Siliniyor...' : `Tümünü Sil (${teachers.length})`}
+            </Button>
+          )}
+          
           <Button
             onClick={() => setIsBulkModalOpen(true)}
             icon={Plus}
             variant="secondary"
+            className="w-full sm:w-auto"
           >
             Toplu Ekle
           </Button>
@@ -185,6 +269,7 @@ const Teachers = () => {
             onClick={() => setIsModalOpen(true)}
             icon={Plus}
             variant="primary"
+            className="w-full sm:w-auto"
           >
             Yeni Öğretmen
           </Button>
@@ -503,6 +588,19 @@ const Teachers = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmation.isOpen}
+        onClose={hideConfirmation}
+        onConfirm={confirmation.onConfirm}
+        title={confirmation.title}
+        message={confirmation.message}
+        type={confirmation.type}
+        confirmText={confirmation.confirmText}
+        cancelText={confirmation.cancelText}
+        confirmVariant={confirmation.confirmVariant}
+      />
     </div>
   );
 };

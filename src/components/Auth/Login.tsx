@@ -30,7 +30,8 @@ const Login = () => {
       <div className="max-w-md w-full bg-white rounded-xl shadow-ide-2xl p-8 border border-ide-gray-200">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <div className="p-4 bg-gradient-to-br from-ide-primary-500 to-ide-secondary-500 rounded-full shadow-ide-lg">
+            {/* FIXED: Logo background stays white */}
+            <div className="p-4 bg-white rounded-full shadow-ide-lg border border-gray-100">
               <img 
                 src="https://cv.ide.k12.tr/images/ideokullari_logo.png" 
                 alt="İDE Okulları Logo"
@@ -41,7 +42,7 @@ const Login = () => {
                   target.style.display = 'none';
                   const parent = target.parentElement;
                   if (parent) {
-                    parent.innerHTML = '<div class="w-12 h-12 text-white flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>';
+                    parent.innerHTML = '<div class="w-12 h-12 text-blue-600 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>';
                   }
                 }}
               />

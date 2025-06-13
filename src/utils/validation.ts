@@ -12,7 +12,133 @@ export interface ConflictCheckResult {
   message: string;
 }
 
-// Real-time conflict detection for slot assignment - FIXED VERSION
+// SECURITY: Input sanitization function
+export const sanitizeInput = (input: string): string => {
+  if (typeof input !== 'string') {
+    return '';
+  }
+  
+  // Remove potentially dangerous characters
+  return input
+    .trim()
+    .replace(/[<>\"'&]/g, '') // Remove HTML/script injection chars
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/on\w+=/gi, '') // Remove event handlers
+    .substring(0, 500); // Limit length
+};
+
+// SECURITY: Email validation with domain restriction
+export const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const sanitizedEmail = sanitizeInput(email);
+  
+  // SECURITY: Only allow @ide.k12.tr domain
+  return emailRegex.test(sanitizedEmail) && sanitizedEmail.endsWith('@ide.k12.tr');
+};
+
+// SECURITY: Teacher validation with sanitization
+export const validateTeacher = (teacher: Partial<Teacher>): string[] => {
+  const errors: string[] = [];
+  
+  // Sanitize inputs
+  const name = teacher.name ? sanitizeInput(teacher.name) : '';
+  const branch = teacher.branch ? sanitizeInput(teacher.branch) : '';
+  
+  // Validate name
+  if (!name || name.length < 2) {
+    errors.push(VALIDATION_ERRORS.MIN_LENGTH('Ad', 2));
+  }
+  
+  if (name.length > 100) {
+    errors.push(VALIDATION_ERRORS.MAX_LENGTH('Ad', 100));
+  }
+  
+  // Check for suspicious patterns
+  if (name && /<script|javascript:|on\w+=/i.test(name)) {
+    errors.push('Geçersiz karakter tespit edildi');
+  }
+  
+  // Validate branch
+  if (!branch || branch.length < 2) {
+    errors.push(VALIDATION_ERRORS.MIN_LENGTH('Branş', 2));
+  }
+  
+  // Validate level
+  const validLevels = ['Anaokulu', 'İlkokul', 'Ortaokul'];
+  if (!teacher.level || !validLevels.includes(teacher.level)) {
+    errors.push(VALIDATION_ERRORS.INVALID_SELECTION('seviye'));
+  }
+  
+  return errors;
+};
+
+// SECURITY: Class validation with sanitization
+export const validateClass = (classItem: Partial<Class>): string[] => {
+  const errors: string[] = [];
+  
+  // Sanitize inputs
+  const name = classItem.name ? sanitizeInput(classItem.name) : '';
+  
+  // Validate name
+  if (!name || name.length < 1) {
+    errors.push(VALIDATION_ERRORS.MIN_LENGTH('Sınıf adı', 1));
+  }
+  
+  if (name.length > 50) {
+    errors.push(VALIDATION_ERRORS.MAX_LENGTH('Sınıf adı', 50));
+  }
+  
+  // Check for suspicious patterns
+  if (name && /<script|javascript:|on\w+=/i.test(name)) {
+    errors.push('Geçersiz karakter tespit edildi');
+  }
+  
+  // Validate level
+  const validLevels = ['Anaokulu', 'İlkokul', 'Ortaokul'];
+  if (!classItem.level || !validLevels.includes(classItem.level)) {
+    errors.push(VALIDATION_ERRORS.INVALID_SELECTION('seviye'));
+  }
+  
+  return errors;
+};
+
+// SECURITY: Subject validation with sanitization
+export const validateSubject = (subject: Partial<Subject>): string[] => {
+  const errors: string[] = [];
+  
+  // Sanitize inputs
+  const name = subject.name ? sanitizeInput(subject.name) : '';
+  const branch = subject.branch ? sanitizeInput(subject.branch) : '';
+  
+  // Validate name
+  if (!name || name.length < 2) {
+    errors.push(VALIDATION_ERRORS.MIN_LENGTH('Ders adı', 2));
+  }
+  
+  if (name.length > 100) {
+    errors.push(VALIDATION_ERRORS.MAX_LENGTH('Ders adı', 100));
+  }
+  
+  // Validate branch
+  if (!branch || branch.length < 2) {
+    errors.push(VALIDATION_ERRORS.MIN_LENGTH('Branş', 2));
+  }
+  
+  // Validate weekly hours
+  if (!subject.weeklyHours || subject.weeklyHours < 1 || subject.weeklyHours > 10) {
+    errors.push('Haftalık ders saati 1-10 arasında olmalıdır');
+  }
+  
+  // Check for suspicious patterns
+  if ((name && /<script|javascript:|on\w+=/i.test(name)) || 
+      (branch && /<script|javascript:|on\w+=/i.test(branch))) {
+    errors.push('Geçersiz karakter tespit edildi');
+  }
+  
+  return errors;
+};
+
+// Real-time conflict detection for slot assignment - SECURE VERSION
 export const checkSlotConflict = (
   mode: 'teacher' | 'class',
   day: string,
@@ -23,10 +149,25 @@ export const checkSlotConflict = (
   teachers: Teacher[],
   classes: Class[]
 ): ConflictCheckResult => {
+  
+  // SECURITY: Input validation
+  if (!day || !period || !targetId || !currentEntityId) {
+    return { hasConflict: true, message: 'Geçersiz parametre' };
+  }
+  
+  // SECURITY: Sanitize inputs
+  const sanitizedDay = sanitizeInput(day);
+  const sanitizedPeriod = sanitizeInput(period);
+  
+  // SECURITY: Validate day and period
+  if (!DAYS.includes(sanitizedDay) || !PERIODS.includes(sanitizedPeriod)) {
+    return { hasConflict: true, message: 'Geçersiz gün veya ders saati' };
+  }
+
   console.log('🔍 Çakışma kontrolü başlatıldı:', {
     mode,
-    day,
-    period,
+    day: sanitizedDay,
+    period: sanitizedPeriod,
     targetId,
     currentEntityId,
     schedulesCount: allSchedules.length
@@ -35,7 +176,7 @@ export const checkSlotConflict = (
   if (mode === 'teacher') {
     // Teacher mode: Check if class is already assigned to another teacher at this time
     const conflictingSchedules = allSchedules.filter(schedule => {
-      const slot = schedule.schedule[day]?.[period];
+      const slot = schedule.schedule[sanitizedDay]?.[sanitizedPeriod];
       const hasConflict = schedule.teacherId !== currentEntityId && slot?.classId === targetId;
       
       if (hasConflict) {
@@ -55,7 +196,7 @@ export const checkSlotConflict = (
       const conflictingTeacher = teachers.find(t => t.id === conflictingSchedule.teacherId);
       const className = classes.find(c => c.id === targetId)?.name || 'Bilinmeyen Sınıf';
       
-      const message = `${className} sınıfı ${day} günü ${period}. ders saatinde ${conflictingTeacher?.name || 'başka bir öğretmen'} ile çakışıyor`;
+      const message = `${className} sınıfı ${sanitizedDay} günü ${sanitizedPeriod}. ders saatinde ${conflictingTeacher?.name || 'başka bir öğretmen'} ile çakışıyor`;
       
       console.log('❌ Teacher mode çakışma mesajı:', message);
       
@@ -75,11 +216,11 @@ export const checkSlotConflict = (
     });
     
     if (teacherSchedule) {
-      const existingSlot = teacherSchedule.schedule[day]?.[period];
+      const existingSlot = teacherSchedule.schedule[sanitizedDay]?.[sanitizedPeriod];
       
       console.log('🔍 Mevcut slot kontrol ediliyor:', {
-        day,
-        period,
+        day: sanitizedDay,
+        period: sanitizedPeriod,
         existingSlot,
         existingClassId: existingSlot?.classId,
         currentClassId: currentEntityId
@@ -89,7 +230,7 @@ export const checkSlotConflict = (
         const teacherName = teachers.find(t => t.id === targetId)?.name || 'Bilinmeyen Öğretmen';
         const conflictingClass = classes.find(c => c.id === existingSlot.classId)?.name || 'Bilinmeyen Sınıf';
         
-        const message = `${teacherName} öğretmeni ${day} günü ${period}. ders saatinde ${conflictingClass} sınıfı ile çakışıyor`;
+        const message = `${teacherName} öğretmeni ${sanitizedDay} günü ${sanitizedPeriod}. ders saatinde ${conflictingClass} sınıfı ile çakışıyor`;
         
         console.log('❌ Class mode çakışma mesajı:', message);
         
@@ -105,7 +246,7 @@ export const checkSlotConflict = (
   return { hasConflict: false, message: '' };
 };
 
-// Enhanced schedule validation with detailed conflict detection
+// Enhanced schedule validation with detailed conflict detection - SECURE VERSION
 export const validateSchedule = (
   mode: 'teacher' | 'class',
   currentSchedule: Schedule['schedule'],
@@ -117,6 +258,18 @@ export const validateSchedule = (
 ): ValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
+
+  // SECURITY: Input validation
+  if (!mode || !currentSchedule || !selectedId) {
+    errors.push('Geçersiz program verisi');
+    return { isValid: false, errors, warnings };
+  }
+
+  // SECURITY: Validate mode
+  if (!['teacher', 'class'].includes(mode)) {
+    errors.push('Geçersiz program modu');
+    return { isValid: false, errors, warnings };
+  }
 
   console.log('🔍 Program doğrulama başlatıldı:', {
     mode,
@@ -200,7 +353,7 @@ export const validateSchedule = (
   };
 };
 
-// Check level and branch compatibility
+// Check level and branch compatibility - SECURE VERSION
 const checkCompatibility = (
   slot: any,
   teachers: Teacher[],
@@ -208,6 +361,11 @@ const checkCompatibility = (
   subjects: Subject[]
 ): string[] => {
   const warnings: string[] = [];
+
+  // SECURITY: Input validation
+  if (!slot || typeof slot !== 'object') {
+    return warnings;
+  }
 
   if (slot.teacherId && slot.classId) {
     const teacher = teachers.find(t => t.id === slot.teacherId);
@@ -236,12 +394,17 @@ const checkCompatibility = (
   return warnings;
 };
 
-// Calculate weekly hours for a schedule
+// Calculate weekly hours for a schedule - SECURE VERSION
 const calculateWeeklyHours = (
   schedule: Schedule['schedule'],
   mode: 'teacher' | 'class'
 ): number => {
   let totalHours = 0;
+  
+  // SECURITY: Input validation
+  if (!schedule || typeof schedule !== 'object') {
+    return 0;
+  }
   
   DAYS.forEach(day => {
     PERIODS.forEach(period => {
@@ -254,15 +417,20 @@ const calculateWeeklyHours = (
     });
   });
   
-  return totalHours;
+  return Math.min(totalHours, 50); // SECURITY: Cap at reasonable limit
 };
 
-// Calculate daily hours for each day
+// Calculate daily hours for each day - SECURE VERSION
 const calculateDailyHours = (
   schedule: Schedule['schedule'],
   mode: 'teacher' | 'class'
 ): { [day: string]: number } => {
   const dailyHours: { [day: string]: number } = {};
+  
+  // SECURITY: Input validation
+  if (!schedule || typeof schedule !== 'object') {
+    return dailyHours;
+  }
   
   DAYS.forEach(day => {
     let dayHours = 0;
@@ -274,7 +442,7 @@ const calculateDailyHours = (
         dayHours++;
       }
     });
-    dailyHours[day] = dayHours;
+    dailyHours[day] = Math.min(dayHours, 10); // SECURITY: Cap at reasonable limit
   });
   
   return dailyHours;

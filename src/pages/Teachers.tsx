@@ -228,22 +228,26 @@ const Teachers = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Yükleniyor...</div>
+        <div className="mobile-loading">
+          <div className="mobile-loading-spinner"></div>
+          <div className="mobile-loading-text">Yükleniyor...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 space-y-4 lg:space-y-0">
+    <div className="container-mobile">
+      {/* CRITICAL: Mobile-optimized header */}
+      <div className="header-mobile">
         <div className="flex items-center">
           <Users className="w-8 h-8 text-blue-600 mr-3" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Öğretmenler</h1>
-            <p className="text-gray-600">{teachers.length} öğretmen kayıtlı ({sortedTeachers.length} gösteriliyor)</p>
+            <h1 className="text-responsive-xl font-bold text-gray-900">Öğretmenler</h1>
+            <p className="text-responsive-sm text-gray-600">{teachers.length} öğretmen kayıtlı ({sortedTeachers.length} gösteriliyor)</p>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+        <div className="button-group-mobile">
           {/* NEW: Delete All Button */}
           {teachers.length > 0 && (
             <Button
@@ -276,11 +280,11 @@ const Teachers = () => {
         </div>
       </div>
 
-      {/* Search and Filters */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      {/* CRITICAL: Mobile-optimized search and filters */}
+      <div className="mobile-card mobile-spacing mb-6">
         {/* Search */}
-        <div className="mb-4">
-          <label className="block text-sm font-semibold text-gray-800 mb-2">
+        <div className="mobile-form-group">
+          <label className="mobile-form-label">
             🔍 Öğretmen Ara
           </label>
           <div className="relative">
@@ -291,7 +295,7 @@ const Teachers = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               placeholder="Öğretmen adı veya branş ara... (Enter ile ara)"
-              className="w-full pl-10 pr-10 py-3 text-base border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+              className="mobile-form-input pl-10 pr-10"
               title="Enter ile ara, ESC ile temizle"
             />
             {searchQuery && (
@@ -305,14 +309,22 @@ const Teachers = () => {
             )}
           </div>
           {searchQuery && (
-            <p className="mt-2 text-sm text-blue-600">
-              🔍 "{searchQuery}" için {sortedTeachers.length} sonuç bulundu
-            </p>
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-sm text-blue-600">
+                🔍 "{searchQuery}" için {sortedTeachers.length} sonuç bulundu
+              </p>
+              <button
+                onClick={clearSearch}
+                className="text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                Temizle
+              </button>
+            </div>
           )}
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="responsive-grid-2 gap-responsive">
           <Select
             label="Seviye Filtresi"
             value={levelFilter}
@@ -329,7 +341,7 @@ const Teachers = () => {
       </div>
 
       {sortedTeachers.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
+        <div className="text-center py-12 mobile-card">
           <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             {teachers.length === 0 ? 'Henüz öğretmen eklenmemiş' : 
@@ -339,7 +351,7 @@ const Teachers = () => {
             {teachers.length === 0 ? 'İlk öğretmeninizi ekleyerek başlayın' : 
              searchQuery ? `"${searchQuery}" araması için sonuç bulunamadı` : 'Farklı filtre kriterleri deneyin'}
           </p>
-          <div className="flex justify-center space-x-2">
+          <div className="button-group-mobile">
             {teachers.length === 0 && (
               <>
                 <Button
@@ -359,7 +371,7 @@ const Teachers = () => {
               </>
             )}
             {(searchQuery || levelFilter || branchFilter) && (
-              <div className="flex space-x-2">
+              <div className="button-group-mobile">
                 {searchQuery && (
                   <Button onClick={clearSearch} variant="secondary">
                     Aramayı Temizle
@@ -381,67 +393,118 @@ const Teachers = () => {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ad Soyad
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Branş
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Seviye
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  İşlemler
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sortedTeachers.map((teacher) => (
-                <tr key={teacher.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{teacher.name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{teacher.branch}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      teacher.level === 'Anaokulu' ? 'bg-green-100 text-green-800' :
-                      teacher.level === 'İlkokul' ? 'bg-blue-100 text-blue-800' :
-                      'bg-purple-100 text-purple-800'
-                    }`}>
-                      {teacher.level}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      <Button
-                        onClick={() => handleEdit(teacher)}
-                        icon={Edit}
-                        size="sm"
-                        variant="secondary"
-                      >
-                        Düzenle
-                      </Button>
-                      <Button
-                        onClick={() => handleDelete(teacher.id)}
-                        icon={Trash2}
-                        size="sm"
-                        variant="danger"
-                      >
-                        Sil
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* CRITICAL: Mobile table cards for small screens */}
+          <div className="mobile-table-cards">
+            {sortedTeachers.map((teacher) => (
+              <div key={teacher.id} className="mobile-table-card">
+                <div className="mobile-table-card-header">
+                  {teacher.name}
+                </div>
+                <div className="mobile-table-card-row">
+                  <span className="mobile-table-card-label">Branş</span>
+                  <span className="mobile-table-card-value">{teacher.branch}</span>
+                </div>
+                <div className="mobile-table-card-row">
+                  <span className="mobile-table-card-label">Seviye</span>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    teacher.level === 'Anaokulu' ? 'bg-green-100 text-green-800' :
+                    teacher.level === 'İlkokul' ? 'bg-blue-100 text-blue-800' :
+                    'bg-purple-100 text-purple-800'
+                  }`}>
+                    {teacher.level}
+                  </span>
+                </div>
+                <div className="mobile-table-card-row">
+                  <span className="mobile-table-card-label">İşlemler</span>
+                  <div className="flex space-x-2">
+                    <Button
+                      onClick={() => handleEdit(teacher)}
+                      icon={Edit}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      Düzenle
+                    </Button>
+                    <Button
+                      onClick={() => handleDelete(teacher.id)}
+                      icon={Trash2}
+                      size="sm"
+                      variant="danger"
+                    >
+                      Sil
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* CRITICAL: Desktop table */}
+          <div className="desktop-table mobile-card overflow-hidden">
+            <div className="table-responsive">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ad Soyad
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Branş
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Seviye
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      İşlemler
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedTeachers.map((teacher) => (
+                    <tr key={teacher.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{teacher.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">{teacher.branch}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          teacher.level === 'Anaokulu' ? 'bg-green-100 text-green-800' :
+                          teacher.level === 'İlkokul' ? 'bg-blue-100 text-blue-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {teacher.level}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            onClick={() => handleEdit(teacher)}
+                            icon={Edit}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            Düzenle
+                          </Button>
+                          <Button
+                            onClick={() => handleDelete(teacher.id)}
+                            icon={Trash2}
+                            size="sm"
+                            variant="danger"
+                          >
+                            Sil
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Single Teacher Modal */}
@@ -475,7 +538,7 @@ const Teachers = () => {
             required
           />
 
-          <div className="flex justify-end space-x-3 mt-6">
+          <div className="button-group-mobile mt-6">
             <Button
               type="button"
               onClick={resetForm}
@@ -571,7 +634,7 @@ const Teachers = () => {
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3">
+          <div className="button-group-mobile">
             <Button
               type="button"
               onClick={() => setIsBulkModalOpen(false)}

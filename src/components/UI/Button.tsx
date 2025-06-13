@@ -36,6 +36,7 @@ const Button: React.FC<ButtonProps> = ({
   };
   
   const sizes = {
+    // CRITICAL: Mobile-friendly sizes with proper touch targets
     sm: 'px-4 py-3 text-sm min-h-[44px] btn-touch', // Mobile-friendly
     md: 'px-5 py-3.5 text-sm min-h-[48px] btn-touch', // Mobile-friendly
     lg: 'px-6 py-4 text-base min-h-[52px] btn-touch' // Mobile-friendly
@@ -46,7 +47,7 @@ const Button: React.FC<ButtonProps> = ({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className} touch-enhanced`}
     >
       {Icon && <Icon size={size === 'sm' ? 18 : size === 'lg' ? 22 : 20} className="mr-2 flex-shrink-0" />}
       <span className="truncate">{children}</span>

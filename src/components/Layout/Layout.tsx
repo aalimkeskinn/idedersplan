@@ -7,8 +7,8 @@ const Layout = () => {
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
       <main className="flex-1 overflow-auto lg:ml-0">
-        {/* CRITICAL: Mobile-optimized main content with safe areas */}
-        <div className="mobile-spacing safe-top safe-bottom pt-20 lg:pt-6">
+        {/* FIXED: Normal content spacing - no special mobile adjustments */}
+        <div className="pt-20 lg:pt-0">
           <Outlet />
         </div>
       </main>

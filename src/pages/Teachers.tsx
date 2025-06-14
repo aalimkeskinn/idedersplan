@@ -280,32 +280,36 @@ const Teachers = () => {
         </div>
       </div>
 
-      {/* CRITICAL: Mobile-optimized search and filters */}
+      {/* FIXED: Mobile-optimized search and filters */}
       <div className="mobile-card mobile-spacing mb-6">
-        {/* Search */}
+        {/* FIXED: Search with proper styling */}
         <div className="mobile-form-group">
           <label className="mobile-form-label">
             🔍 Öğretmen Ara
           </label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               placeholder="Öğretmen adı veya branş ara... (Enter ile ara)"
-              className="mobile-form-input pl-10 pr-10"
+              className="block w-full pl-10 pr-10 py-3 text-base border-2 border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
               title="Enter ile ara, ESC ile temizle"
             />
             {searchQuery && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors btn-touch"
-                title="Aramayı temizle"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <button
+                  onClick={clearSearch}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="Aramayı temizle"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             )}
           </div>
           {searchQuery && (

@@ -65,93 +65,91 @@ const Home = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Minimal Hero Section */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* FIXED: Hero Section - Compact and centered */}
+      <div className="flex-shrink-0 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
-          <div className="flex justify-center mb-3">
-            <div className="p-2 bg-white rounded-lg shadow-sm">
+          <div className="flex justify-center mb-4">
+            <div className="p-3 bg-white rounded-lg shadow-sm">
               <img 
                 src="https://cv.ide.k12.tr/images/ideokullari_logo.png" 
                 alt="İDE Okulları Logo"
-                className="w-12 h-12 object-contain"
+                className="w-16 h-16 object-contain"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                   const parent = target.parentElement;
                   if (parent) {
-                    parent.innerHTML = '<div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>';
+                    parent.innerHTML = '<div class="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>';
                   }
                 }}
               />
             </div>
           </div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
             İDE Okulları Ders Programı Sistemi
           </h1>
-          <p className="text-sm md:text-base text-gray-600 mb-4 max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-gray-600 mb-6 max-w-3xl mx-auto">
             Okul ders programlarını kolayca oluşturun, yönetin ve PDF olarak indirin. 
             Çakışma kontrolü, otomatik saatler ve profesyonel çıktılar.
           </p>
         </div>
       </div>
 
-      {/* Minimal Features Grid */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              onClick={() => navigate(feature.path)}
-              className="group cursor-pointer bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-200 border border-gray-100 hover:border-gray-200"
-            >
-              <div className={`${feature.bgColor} w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-105 transition-transform duration-200`}>
-                <feature.icon className={`w-5 h-5 ${feature.color}`} />
+      {/* FIXED: Features Grid - Scrollable content area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feature, index) => (
+              <div
+                key={index}
+                onClick={() => navigate(feature.path)}
+                className="group cursor-pointer bg-white rounded-xl p-6 shadow-sm hover:shadow-lg transition-all duration-200 border border-gray-100 hover:border-gray-200 transform hover:scale-105"
+              >
+                <div className={`${feature.bgColor} w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-200`}>
+                  <feature.icon className={`w-6 h-6 ${feature.color}`} />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                  {feature.description}
+                </p>
+                <div className="flex items-center text-blue-600 text-sm font-medium group-hover:translate-x-1 transition-transform duration-200">
+                  Başla <ArrowRight className="ml-1 w-4 h-4" />
+                </div>
               </div>
-              <h3 className="text-base font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-                {feature.title}
-              </h3>
-              <p className="text-sm text-gray-600 leading-relaxed mb-3">
-                {feature.description}
-              </p>
-              <div className="flex items-center text-blue-600 text-sm font-medium group-hover:translate-x-1 transition-transform duration-200">
-                Başla <ArrowRight className="ml-1 w-3 h-3" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+            ))}
+          </div>
 
-      {/* Minimal Quick Info */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <div className="text-lg font-bold text-gray-900">Çakışma Kontrolü</div>
-              <div className="text-xs text-gray-600">Otomatik çakışma tespiti</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-gray-900">PDF Çıktı</div>
-              <div className="text-xs text-gray-600">Profesyonel görünüm</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-gray-900">Otomatik Saatler</div>
-              <div className="text-xs text-gray-600">Yemek ve mola saatleri</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-gray-900">Güvenli Saklama</div>
-              <div className="text-xs text-gray-600">Firebase altyapısı</div>
+          {/* FIXED: Quick Info - Compact */}
+          <div className="mt-8 bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
+              <div>
+                <div className="text-xl font-bold text-gray-900">Çakışma Kontrolü</div>
+                <div className="text-sm text-gray-600">Otomatik çakışma tespiti</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-gray-900">PDF Çıktı</div>
+                <div className="text-sm text-gray-600">Profesyonel görünüm</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-gray-900">Otomatik Saatler</div>
+                <div className="text-sm text-gray-600">Yemek ve mola saatleri</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-gray-900">Güvenli Saklama</div>
+                <div className="text-sm text-gray-600">Firebase altyapısı</div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Minimal Footer */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="text-center">
-          <p className="text-xs text-gray-500">
-            Modern, kullanıcı dostu ve güvenilir ders programı yönetim sistemi
-          </p>
+          {/* FIXED: Footer - Compact */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-500">
+              Modern, kullanıcı dostu ve güvenilir ders programı yönetim sistemi
+            </p>
+          </div>
         </div>
       </div>
     </div>

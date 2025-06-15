@@ -216,22 +216,26 @@ const Classes = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Yükleniyor...</div>
+        <div className="mobile-loading">
+          <div className="mobile-loading-spinner"></div>
+          <div className="mobile-loading-text">Yükleniyor...</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 space-y-4 lg:space-y-0">
+    <div className="container-mobile">
+      {/* FIXED: Mobile-optimized header with consistent spacing */}
+      <div className="header-mobile">
         <div className="flex items-center">
           <Building className="w-8 h-8 text-emerald-600 mr-3" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Sınıflar</h1>
-            <p className="text-gray-600">{classes.length} sınıf kayıtlı ({sortedClasses.length} gösteriliyor)</p>
+            <h1 className="text-responsive-xl font-bold text-gray-900">Sınıflar</h1>
+            <p className="text-responsive-sm text-gray-600">{classes.length} sınıf kayıtlı ({sortedClasses.length} gösteriliyor)</p>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+        <div className="button-group-mobile">
           {/* NEW: Delete All Button */}
           {classes.length > 0 && (
             <Button
@@ -265,8 +269,8 @@ const Classes = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+      <div className="mobile-card mobile-spacing mb-6">
+        <div className="responsive-grid-1 gap-responsive">
           <Select
             label="Seviye Filtresi"
             value={levelFilter}
@@ -277,7 +281,7 @@ const Classes = () => {
       </div>
 
       {sortedClasses.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
+        <div className="text-center py-12 mobile-card">
           <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             {classes.length === 0 ? 'Henüz sınıf eklenmemiş' : 'Filtrelere uygun sınıf bulunamadı'}
@@ -285,7 +289,7 @@ const Classes = () => {
           <p className="text-gray-500 mb-4">
             {classes.length === 0 ? 'İlk sınıfınızı ekleyerek başlayın' : 'Farklı filtre kriterleri deneyin'}
           </p>
-          <div className="flex justify-center space-x-2">
+          <div className="button-group-mobile">
             {classes.length === 0 && (
               <>
                 <Button
@@ -307,13 +311,13 @@ const Classes = () => {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="responsive-grid gap-responsive">
           {sortedClasses.map((classItem) => {
             const classHasSchedule = hasSchedule(classItem.id);
             const weeklyHours = getWeeklyHours(classItem.id);
             
             return (
-              <div key={classItem.id} className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
+              <div key={classItem.id} className="mobile-card mobile-spacing hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900">{classItem.name}</h3>
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -413,7 +417,7 @@ const Classes = () => {
             required
           />
 
-          <div className="flex justify-end space-x-3 mt-6">
+          <div className="button-group-mobile mt-6">
             <Button
               type="button"
               onClick={resetForm}
@@ -498,7 +502,7 @@ const Classes = () => {
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3">
+          <div className="button-group-mobile">
             <Button
               type="button"
               onClick={() => setIsBulkModalOpen(false)}

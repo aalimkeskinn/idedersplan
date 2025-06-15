@@ -387,16 +387,17 @@ const ClassSchedules = () => {
   const selectedClassHasSchedule = selectedClass ? calculateWeeklyHours(selectedClass.id) > 0 : false;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="container-mobile">
+      {/* FIXED: Mobile-optimized header with consistent spacing */}
+      <div className="header-mobile">
         <div className="flex items-center">
           <Building className="w-8 h-8 text-emerald-600 mr-3" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Sınıf Ders Programları</h1>
-            <p className="text-gray-600">Sınıf bazında ders programlarını görüntüleyin</p>
+            <h1 className="text-responsive-xl font-bold text-gray-900">Sınıf Ders Programları</h1>
+            <p className="text-responsive-sm text-gray-600">Sınıf bazında ders programlarını görüntüleyin</p>
           </div>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="button-group-mobile">
           {/* Delete All Button */}
           {classesWithSchedules.length > 0 && (
             <Button
@@ -404,7 +405,7 @@ const ClassSchedules = () => {
               icon={Trash2}
               variant="danger"
               disabled={isDeletingAll}
-              className="hidden lg:flex"
+              className="w-full sm:w-auto"
             >
               {isDeletingAll ? 'Siliniyor...' : `Tüm Programları Sil (${classesWithSchedules.length})`}
             </Button>
@@ -415,30 +416,16 @@ const ClassSchedules = () => {
             icon={Download}
             variant="primary"
             disabled={classesWithSchedules.length === 0 || isGeneratingAll}
+            className="w-full sm:w-auto"
           >
             {isGeneratingAll ? 'PDF Oluşturuluyor...' : `Tüm Programları İndir (${classesWithSchedules.length})`}
           </Button>
         </div>
       </div>
 
-      {/* Mobile Delete Button */}
-      {classesWithSchedules.length > 0 && (
-        <div className="lg:hidden mb-4">
-          <Button
-            onClick={handleDeleteAllSchedules}
-            icon={Trash2}
-            variant="danger"
-            disabled={isDeletingAll}
-            className="w-full"
-          >
-            {isDeletingAll ? 'Siliniyor...' : `Tüm Programları Sil (${classesWithSchedules.length})`}
-          </Button>
-        </div>
-      )}
-
       {/* Filters and Class Selection */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mobile-card mobile-spacing mb-6">
+        <div className="responsive-grid-2 gap-responsive">
           <Select
             label="Seviye Filtresi"
             value={selectedLevel}
@@ -474,8 +461,8 @@ const ClassSchedules = () => {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-6">
+      <div className="responsive-grid gap-responsive mb-6">
+        <div className="mobile-card mobile-spacing">
           <div className="flex items-center">
             <Building className="w-8 h-8 text-emerald-600 mr-3" />
             <div>
@@ -484,7 +471,7 @@ const ClassSchedules = () => {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="mobile-card mobile-spacing">
           <div className="flex items-center">
             <Calendar className="w-8 h-8 text-blue-600 mr-3" />
             <div>
@@ -493,7 +480,7 @@ const ClassSchedules = () => {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="mobile-card mobile-spacing">
           <div className="flex items-center">
             <Users className="w-8 h-8 text-purple-600 mr-3" />
             <div>
@@ -502,7 +489,7 @@ const ClassSchedules = () => {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="mobile-card mobile-spacing">
           <div className="flex items-center">
             <BookOpen className="w-8 h-8 text-indigo-600 mr-3" />
             <div>
@@ -515,7 +502,7 @@ const ClassSchedules = () => {
 
       {/* Selected Class Schedule */}
       {selectedClass && (
-        <div ref={scheduleViewRef} className="bg-white rounded-lg shadow overflow-hidden mb-6 scroll-mt-6">
+        <div ref={scheduleViewRef} className="mobile-card overflow-hidden mb-6 scroll-mt-6">
           <div className="p-4 bg-emerald-50 border-b border-emerald-200">
             <div className="flex items-center justify-between">
               <div>
@@ -544,7 +531,7 @@ const ClassSchedules = () => {
           </div>
           
           {selectedClassHasSchedule ? (
-            <div className="overflow-x-auto">
+            <div className="table-responsive">
               <table className="min-w-full">
                 <thead className="bg-emerald-50">
                   <tr>
@@ -744,8 +731,8 @@ const ClassSchedules = () => {
           const isSelected = selectedClassId === classItem.id;
           
           return (
-            <div key={classItem.id} className={`bg-white rounded-lg shadow overflow-hidden transition-all duration-200 ${
-              isSelected ? 'ring-2 ring-emerald-500 shadow-lg' : 'hover:shadow-md'
+            <div key={classItem.id} className={`mobile-card mobile-spacing hover:shadow-md transition-shadow ${
+              isSelected ? 'ring-2 ring-emerald-500 shadow-lg' : ''
             }`}>
               <div className="p-4 bg-gray-50 border-b">
                 <div className="flex items-center justify-between">
@@ -835,7 +822,7 @@ const ClassSchedules = () => {
       </div>
 
       {filteredClasses.length === 0 && (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
+        <div className="text-center py-12 mobile-card">
           <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Sınıf Bulunamadı</h3>
           <p className="text-gray-500 mb-4">Seçilen filtrelere uygun sınıf bulunmuyor</p>

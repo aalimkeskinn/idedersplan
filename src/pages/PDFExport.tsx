@@ -109,13 +109,14 @@ const PDFExport = () => {
   const teacherSchedule = schedules.find(s => s.teacherId === selectedTeacherId);
 
   return (
-    <div className="mobile-spacing">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container-mobile">
+      {/* FIXED: Mobile-optimized header with consistent spacing */}
+      <div className="header-mobile">
         <div className="flex items-center">
           <FileText className="w-8 h-8 text-orange-600 mr-3" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">PDF Çıktı</h1>
-            <p className="text-gray-600">Öğretmen ders programlarını PDF olarak indirin</p>
+            <h1 className="text-responsive-xl font-bold text-gray-900">PDF Çıktı</h1>
+            <p className="text-responsive-sm text-gray-600">Öğretmen ders programlarını PDF olarak indirin</p>
           </div>
         </div>
       </div>

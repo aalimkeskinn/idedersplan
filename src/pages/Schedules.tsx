@@ -729,13 +729,14 @@ const Schedules = () => {
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="container-mobile">
+      {/* FIXED: Mobile-optimized header with consistent spacing */}
+      <div className="header-mobile">
         <div className="flex items-center">
           <Calendar className="w-8 h-8 text-purple-600 mr-3" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Program Oluşturucu</h1>
-            <p className="text-gray-600">
+            <h1 className="text-responsive-xl font-bold text-gray-900">Program Oluşturucu</h1>
+            <p className="text-responsive-sm text-gray-600">
               {mode === 'teacher' ? 'Öğretmen bazlı' : 'Sınıf bazlı'} ders programları düzenleyin
               {hasUnsavedChanges && (
                 <span className="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
@@ -748,7 +749,7 @@ const Schedules = () => {
       </div>
 
       {/* Mode Selector */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <div className="mobile-card mobile-spacing mb-6">
         <div className="flex items-center justify-center mb-6">
           <div className="flex bg-gray-100 rounded-lg p-1">
             <button
@@ -825,7 +826,7 @@ const Schedules = () => {
           {/* Action Buttons - 4 columns */}
           <div className="lg:col-span-4">
             {(selectedTeacher || selectedClass) && (
-              <div className="flex justify-end space-x-2">
+              <div className="button-group-mobile">
                 <Button
                   onClick={resetSchedule}
                   icon={RotateCcw}
@@ -851,7 +852,7 @@ const Schedules = () => {
       </div>
 
       {(selectedTeacher || selectedClass) && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="mobile-card overflow-hidden">
           <div className="p-4 bg-gray-50 border-b">
             <div className="flex items-center justify-between">
               <div>
@@ -883,7 +884,7 @@ const Schedules = () => {
             </div>
           </div>
           
-          <div className="overflow-x-auto">
+          <div className="table-responsive">
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
@@ -1090,7 +1091,7 @@ const Schedules = () => {
       )}
 
       {!selectedTeacher && !selectedClass && (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
+        <div className="text-center py-12 mobile-card">
           <div className="flex justify-center mb-4">
             {mode === 'teacher' ? (
               <Users className="w-16 h-16 text-gray-300" />

@@ -382,16 +382,17 @@ const AllSchedules = () => {
   );
 
   return (
-    <div className="mobile-spacing">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 space-y-4 lg:space-y-0">
+    <div className="container-mobile">
+      {/* FIXED: Mobile-optimized header with consistent spacing */}
+      <div className="header-mobile">
         <div className="flex items-center">
           <Calendar className="w-8 h-8 text-indigo-600 mr-3" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Öğretmen Ders Programları</h1>
-            <p className="text-gray-600">Okuldaki tüm öğretmen programlarını görüntüleyin</p>
+            <h1 className="text-responsive-xl font-bold text-gray-900">Öğretmen Ders Programları</h1>
+            <p className="text-responsive-sm text-gray-600">Okuldaki tüm öğretmen programlarını görüntüleyin</p>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+        <div className="button-group-mobile">
           {/* NEW: Delete All Button */}
           {teachersWithSchedules.length > 0 && (
             <Button
@@ -418,7 +419,7 @@ const AllSchedules = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white rounded-lg shadow mobile-card mobile-spacing mb-6">
+      <div className="mobile-card mobile-spacing mb-6">
         {/* Global Search */}
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-800 mb-2">
@@ -460,7 +461,7 @@ const AllSchedules = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="responsive-grid gap-responsive">
           <Select
             label="Seviye Filtresi"
             value={selectedLevel}

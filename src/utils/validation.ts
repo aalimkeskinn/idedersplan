@@ -138,7 +138,7 @@ export const validateSubject = (subject: Partial<Subject>): string[] => {
   return errors;
 };
 
-// Real-time conflict detection for slot assignment - SECURE VERSION
+// FIXED: Real-time conflict detection for slot assignment - IMPROVED VERSION
 export const checkSlotConflict = (
   mode: 'teacher' | 'class',
   day: string,
@@ -164,7 +164,7 @@ export const checkSlotConflict = (
     return { hasConflict: true, message: 'Geçersiz gün veya ders saati' };
   }
 
-  console.log('🔍 Çakışma kontrolü başlatıldı:', {
+  console.log('🔍 IMPROVED Çakışma kontrolü başlatıldı:', {
     mode,
     day: sanitizedDay,
     period: sanitizedPeriod,
@@ -174,10 +174,17 @@ export const checkSlotConflict = (
   });
 
   if (mode === 'teacher') {
-    // Teacher mode: Check if class is already assigned to another teacher at this time
+    // FIXED: Teacher mode - Check if class is already assigned to another teacher at this time
     const conflictingSchedules = allSchedules.filter(schedule => {
+      // Skip current teacher's schedule
+      if (schedule.teacherId === currentEntityId) {
+        return false;
+      }
+      
       const slot = schedule.schedule[sanitizedDay]?.[sanitizedPeriod];
-      const hasConflict = schedule.teacherId !== currentEntityId && slot?.classId === targetId;
+      
+      // Check if this slot has the same class assigned
+      const hasConflict = slot?.classId === targetId && slot.classId !== 'fixed-period';
       
       if (hasConflict) {
         console.log('⚠️ Teacher mode çakışma bulundu:', {
@@ -194,9 +201,9 @@ export const checkSlotConflict = (
     if (conflictingSchedules.length > 0) {
       const conflictingSchedule = conflictingSchedules[0];
       const conflictingTeacher = teachers.find(t => t.id === conflictingSchedule.teacherId);
-      const className = classes.find(c => c.id === targetId)?.name || 'Bilinmeyen Sınıf';
+      const classItem = classes.find(c => c.id === targetId);
       
-      const message = `${className} sınıfı ${sanitizedDay} günü ${sanitizedPeriod}. ders saatinde ${conflictingTeacher?.name || 'başka bir öğretmen'} ile çakışıyor`;
+      const message = `${classItem?.name || 'Sınıf'} ${sanitizedDay} günü ${sanitizedPeriod}. ders saatinde ${conflictingTeacher?.name || 'başka bir öğretmen'} ile çakışıyor`;
       
       console.log('❌ Teacher mode çakışma mesajı:', message);
       
@@ -206,7 +213,7 @@ export const checkSlotConflict = (
       };
     }
   } else {
-    // Class mode: Check if teacher is already assigned to another class at this time
+    // FIXED: Class mode - Check if teacher is already assigned to another class at this time
     const teacherSchedule = allSchedules.find(s => s.teacherId === targetId);
     
     console.log('🔍 Class mode - öğretmen programı kontrol ediliyor:', {
@@ -223,14 +230,19 @@ export const checkSlotConflict = (
         period: sanitizedPeriod,
         existingSlot,
         existingClassId: existingSlot?.classId,
-        currentClassId: currentEntityId
+        currentClassId: currentEntityId,
+        isFixedPeriod: existingSlot?.classId === 'fixed-period'
       });
       
-      if (existingSlot?.classId && existingSlot.classId !== currentEntityId) {
-        const teacherName = teachers.find(t => t.id === targetId)?.name || 'Bilinmeyen Öğretmen';
-        const conflictingClass = classes.find(c => c.id === existingSlot.classId)?.name || 'Bilinmeyen Sınıf';
+      // FIXED: Check if teacher is already assigned to a different class (not fixed period)
+      if (existingSlot?.classId && 
+          existingSlot.classId !== currentEntityId && 
+          existingSlot.classId !== 'fixed-period') {
         
-        const message = `${teacherName} öğretmeni ${sanitizedDay} günü ${sanitizedPeriod}. ders saatinde ${conflictingClass} sınıfı ile çakışıyor`;
+        const teacher = teachers.find(t => t.id === targetId);
+        const conflictingClass = classes.find(c => c.id === existingSlot.classId);
+        
+        const message = `${teacher?.name || 'Öğretmen'} ${sanitizedDay} günü ${sanitizedPeriod}. ders saatinde ${conflictingClass?.name || 'başka bir sınıf'} ile çakışıyor`;
         
         console.log('❌ Class mode çakışma mesajı:', message);
         
@@ -246,7 +258,7 @@ export const checkSlotConflict = (
   return { hasConflict: false, message: '' };
 };
 
-// Enhanced schedule validation with detailed conflict detection - SECURE VERSION
+// FIXED: Enhanced schedule validation with detailed conflict detection - IMPROVED VERSION
 export const validateSchedule = (
   mode: 'teacher' | 'class',
   currentSchedule: Schedule['schedule'],
@@ -271,7 +283,7 @@ export const validateSchedule = (
     return { isValid: false, errors, warnings };
   }
 
-  console.log('🔍 Program doğrulama başlatıldı:', {
+  console.log('🔍 IMPROVED Program doğrulama başlatıldı:', {
     mode,
     selectedId,
     scheduleSlots: Object.keys(currentSchedule).length
@@ -294,41 +306,59 @@ export const validateSchedule = (
     }
   });
 
-  // Comprehensive conflict detection
+  // FIXED: Comprehensive conflict detection with better filtering
+  const conflictMap = new Map<string, string[]>(); // Track conflicts per slot
+  
   DAYS.forEach(day => {
     PERIODS.forEach(period => {
       const slot = currentSchedule[day]?.[period];
-      if (!slot) return;
+      if (!slot || slot.classId === 'fixed-period') return;
+
+      const slotKey = `${day}-${period}`;
 
       if (mode === 'teacher' && slot.classId) {
-        const conflictResult = checkSlotConflict(
-          'teacher',
-          day,
-          period,
-          slot.classId,
-          selectedId,
-          allSchedules,
-          teachers,
-          classes
-        );
+        // Check if this class is assigned to another teacher at the same time
+        const conflictingSchedules = allSchedules.filter(schedule => {
+          // Skip current teacher's schedule
+          if (schedule.teacherId === selectedId) return false;
+          
+          const otherSlot = schedule.schedule[day]?.[period];
+          return otherSlot?.classId === slot.classId && otherSlot.classId !== 'fixed-period';
+        });
         
-        if (conflictResult.hasConflict) {
-          errors.push(conflictResult.message);
+        if (conflictingSchedules.length > 0) {
+          const conflictingTeacher = teachers.find(t => t.id === conflictingSchedules[0].teacherId);
+          const className = classes.find(c => c.id === slot.classId)?.name || 'Bilinmeyen Sınıf';
+          
+          const conflictMessage = `${className} sınıfı ${day} günü ${period}. ders saatinde ${conflictingTeacher?.name || 'başka bir öğretmen'} ile çakışıyor`;
+          
+          if (!conflictMap.has(slotKey)) {
+            conflictMap.set(slotKey, []);
+          }
+          conflictMap.get(slotKey)!.push(conflictMessage);
         }
-      } else if (mode === 'class' && slot.teacherId) {
-        const conflictResult = checkSlotConflict(
-          'class',
-          day,
-          period,
-          slot.teacherId,
-          selectedId,
-          allSchedules,
-          teachers,
-          classes
-        );
         
-        if (conflictResult.hasConflict) {
-          errors.push(conflictResult.message);
+      } else if (mode === 'class' && slot.teacherId) {
+        // Check if this teacher is assigned to another class at the same time
+        const teacherSchedule = allSchedules.find(s => s.teacherId === slot.teacherId);
+        
+        if (teacherSchedule) {
+          const existingSlot = teacherSchedule.schedule[day]?.[period];
+          
+          if (existingSlot?.classId && 
+              existingSlot.classId !== selectedId && 
+              existingSlot.classId !== 'fixed-period') {
+            
+            const teacher = teachers.find(t => t.id === slot.teacherId);
+            const conflictingClass = classes.find(c => c.id === existingSlot.classId);
+            
+            const conflictMessage = `${teacher?.name || 'Öğretmen'} ${day} günü ${period}. ders saatinde ${conflictingClass?.name || 'başka bir sınıf'} ile çakışıyor`;
+            
+            if (!conflictMap.has(slotKey)) {
+              conflictMap.set(slotKey, []);
+            }
+            conflictMap.get(slotKey)!.push(conflictMessage);
+          }
         }
       }
 
@@ -338,18 +368,26 @@ export const validateSchedule = (
     });
   });
 
-  console.log('📊 Doğrulama sonuçları:', {
+  // Add all unique conflicts to errors
+  const allConflicts: string[] = [];
+  conflictMap.forEach(conflicts => {
+    allConflicts.push(...conflicts);
+  });
+  errors.push(...allConflicts);
+
+  console.log('📊 IMPROVED Doğrulama sonuçları:', {
     isValid: errors.length === 0,
     errorsCount: errors.length,
     warningsCount: warnings.length,
+    conflictsFound: allConflicts.length,
     errors,
     warnings
   });
 
   return {
     isValid: errors.length === 0,
-    errors: [...new Set(errors)],
-    warnings: [...new Set(warnings)]
+    errors: [...new Set(errors)], // Remove duplicates
+    warnings: [...new Set(warnings)] // Remove duplicates
   };
 };
 
@@ -367,7 +405,7 @@ const checkCompatibility = (
     return warnings;
   }
 
-  if (slot.teacherId && slot.classId) {
+  if (slot.teacherId && slot.classId && slot.classId !== 'fixed-period') {
     const teacher = teachers.find(t => t.id === slot.teacherId);
     const classItem = classes.find(c => c.id === slot.classId);
 
@@ -409,10 +447,13 @@ const calculateWeeklyHours = (
   DAYS.forEach(day => {
     PERIODS.forEach(period => {
       const slot = schedule[day]?.[period];
-      if (mode === 'teacher' && slot?.classId) {
-        totalHours++;
-      } else if (mode === 'class' && slot?.teacherId) {
-        totalHours++;
+      // Don't count fixed periods
+      if (slot && slot.classId !== 'fixed-period') {
+        if (mode === 'teacher' && slot.classId) {
+          totalHours++;
+        } else if (mode === 'class' && slot.teacherId) {
+          totalHours++;
+        }
       }
     });
   });
@@ -436,10 +477,13 @@ const calculateDailyHours = (
     let dayHours = 0;
     PERIODS.forEach(period => {
       const slot = schedule[day]?.[period];
-      if (mode === 'teacher' && slot?.classId) {
-        dayHours++;
-      } else if (mode === 'class' && slot?.teacherId) {
-        dayHours++;
+      // Don't count fixed periods
+      if (slot && slot.classId !== 'fixed-period') {
+        if (mode === 'teacher' && slot.classId) {
+          dayHours++;
+        } else if (mode === 'class' && slot.teacherId) {
+          dayHours++;
+        }
       }
     });
     dailyHours[day] = Math.min(dayHours, 10); // SECURITY: Cap at reasonable limit

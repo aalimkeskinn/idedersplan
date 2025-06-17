@@ -12,7 +12,8 @@ import {
   Trash2,
   AlertTriangle,
   Edit,
-  Plus
+  Plus,
+  Database
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFirestore } from '../hooks/useFirestore';

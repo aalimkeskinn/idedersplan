@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Save, RotateCcw, Info } from 'lucide-react';
+import { Clock, Save, RotateCcw, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { DAYS, PERIODS, getTimeForPeriod, formatTimeRange } from '../../types';
 import { TimeConstraint, CONSTRAINT_TYPES, ConstraintType } from '../../types/constraints';
 import Button from '../UI/Button';
@@ -156,129 +156,163 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">
-            {entityName} - Zaman Kısıtlamaları
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            <span className="font-medium text-green-600">Varsayılan: Tüm saatler "Tercih Edilen"</span> • 
-            Zaman dilimlerine tıklayarak kısıtlama değiştirin
-          </p>
-        </div>
-        <div className="flex items-center space-x-3">
-          {hasUnsavedChanges && (
-            <span className="text-sm text-yellow-600 font-medium">
-              Kaydedilmemiş değişiklikler
-            </span>
-          )}
-          <Button
-            onClick={resetToPreferred}
-            icon={RotateCcw}
-            variant="secondary"
-            size="sm"
-            title="Tüm saatleri 'Tercih Edilen' yap"
-          >
-            Varsayılana Dön
-          </Button>
-          <Button
-            onClick={onSave}
-            icon={Save}
-            variant="primary"
-            size="sm"
-            disabled={!hasUnsavedChanges}
-          >
-            Kaydet
-          </Button>
+      {/* PROFESSIONAL: Clean header */}
+      <div className="p-6 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {entityName} - Zaman Kısıtlamaları
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              <span className="inline-flex items-center text-green-600 font-medium">
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Varsayılan: Tüm saatler "Tercih Edilen"
+              </span>
+              <span className="mx-2">•</span>
+              Zaman dilimlerine tıklayarak kısıtlama değiştirin
+            </p>
+          </div>
+          <div className="flex items-center space-x-3">
+            {hasUnsavedChanges && (
+              <span className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-full bg-yellow-100 text-yellow-800">
+                <AlertTriangle className="w-4 h-4 mr-1" />
+                Kaydedilmedi
+              </span>
+            )}
+            <Button
+              onClick={resetToPreferred}
+              icon={RotateCcw}
+              variant="secondary"
+              size="sm"
+              title="Tüm saatleri 'Tercih Edilen' yap"
+            >
+              Sıfırla
+            </Button>
+            <Button
+              onClick={onSave}
+              icon={Save}
+              variant="primary"
+              size="sm"
+              disabled={!hasUnsavedChanges}
+            >
+              Kaydet
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Constraint Type Selector - Only for non-preferred types */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-medium text-gray-700">Kısıtlama Türü Seçin:</h4>
-          <div className="text-xs text-gray-500">
-            Toplam: {constraints.filter(c => c.entityId === entityId).length} kısıtlama
-          </div>
-        </div>
-        
-        {/* Show current distribution */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          {Object.entries(CONSTRAINT_TYPES).map(([type, config]) => (
-            <div
-              key={type}
-              className={`p-3 rounded-lg border-2 text-center ${config.color}`}
-            >
-              <div className="flex items-center justify-center space-x-2 mb-1">
-                <span className="text-lg">{config.icon}</span>
-                <span className="font-medium text-sm">{config.label}</span>
-              </div>
-              <div className="text-lg font-bold">
-                {getConstraintCount(type as ConstraintType)}
-              </div>
-              <p className="text-xs opacity-75">saat</p>
+      {/* PROFESSIONAL: Constraint type selector */}
+      <div className="p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Current Distribution */}
+          <div className="lg:col-span-1">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Mevcut Dağılım</h4>
+            <div className="space-y-3">
+              {Object.entries(CONSTRAINT_TYPES).map(([type, config]) => {
+                const count = getConstraintCount(type as ConstraintType);
+                return (
+                  <div
+                    key={type}
+                    className={`p-3 rounded-lg border-2 ${config.color}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg">{config.icon}</span>
+                        <span className="font-medium text-sm">{config.label}</span>
+                      </div>
+                      <span className="text-lg font-bold">{count}</span>
+                    </div>
+                    <p className="text-xs opacity-75 mt-1">{config.description}</p>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* Selector for changing constraint type */}
-        <div className="bg-white rounded-lg p-3 border border-gray-200">
-          <h5 className="text-sm font-medium text-gray-700 mb-2">Değiştirmek için kısıtlama türü seçin:</h5>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setSelectedConstraintType('unavailable')}
-              className={`p-2 rounded-lg border-2 transition-all duration-200 text-left ${
-                selectedConstraintType === 'unavailable'
-                  ? 'bg-red-100 border-red-300 text-red-800'
-                  : 'bg-white border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <span>🚫</span>
-                <span className="text-sm font-medium">Müsait Değil</span>
+          {/* Constraint Type Selector */}
+          <div className="lg:col-span-1">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Değiştirmek İçin Seçin</h4>
+            <div className="space-y-2">
+              <button
+                onClick={() => setSelectedConstraintType('unavailable')}
+                className={`w-full p-3 rounded-lg border-2 transition-all duration-200 text-left ${
+                  selectedConstraintType === 'unavailable'
+                    ? 'bg-red-100 border-red-300 text-red-800 ring-2 ring-red-500 ring-opacity-50'
+                    : 'bg-white border-gray-200 hover:border-red-300 hover:bg-red-50'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <XCircle className="w-5 h-5" />
+                  <div>
+                    <div className="font-medium">Müsait Değil</div>
+                    <div className="text-xs opacity-75">Program oluşturmayı engeller</div>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => setSelectedConstraintType('restricted')}
+                className={`w-full p-3 rounded-lg border-2 transition-all duration-200 text-left ${
+                  selectedConstraintType === 'restricted'
+                    ? 'bg-yellow-100 border-yellow-300 text-yellow-800 ring-2 ring-yellow-500 ring-opacity-50'
+                    : 'bg-white border-gray-200 hover:border-yellow-300 hover:bg-yellow-50'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  <div>
+                    <div className="font-medium">Kısıtlı</div>
+                    <div className="text-xs opacity-75">Uyarı verir ama engel olmaz</div>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Instructions */}
+          <div className="lg:col-span-1">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Nasıl Kullanılır</h4>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-start space-x-2">
+                <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-blue-700 space-y-1">
+                  <p><strong>1.</strong> Yukarıdan kısıtlama türü seçin</p>
+                  <p><strong>2.</strong> Zaman tablosunda istediğiniz saate tıklayın</p>
+                  <p><strong>3.</strong> Kısıtlı saate tekrar tıklayarak "tercih edilen"e dönebilirsiniz</p>
+                  <p><strong>4.</strong> Değişiklikleri kaydetmeyi unutmayın!</p>
+                </div>
               </div>
-            </button>
-            <button
-              onClick={() => setSelectedConstraintType('restricted')}
-              className={`p-2 rounded-lg border-2 transition-all duration-200 text-left ${
-                selectedConstraintType === 'restricted'
-                  ? 'bg-yellow-100 border-yellow-300 text-yellow-800'
-                  : 'bg-white border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <span>⚠️</span>
-                <span className="text-sm font-medium">Kısıtlı</span>
-              </div>
-            </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Time Grid */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* PROFESSIONAL: Time Grid */}
+      <div className="border-t border-gray-200">
         <div className="table-responsive">
           <table className="min-w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10">
                   Ders Saati
                 </th>
                 {DAYS.map(day => (
                   <th key={day} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                    {day}
+                    <div className="font-bold">{day}</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {constraints.filter(c => c.entityId === entityId && c.day === day && c.constraintType !== 'preferred').length} kısıtlı
+                    </div>
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 bg-white">
               {PERIODS.map((period, index) => {
                 const timeInfo = getTimeInfo(period);
                 
                 return (
                   <tr key={period} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-3 font-medium text-gray-900 bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900 bg-gray-50 sticky left-0 z-10 border-r border-gray-200">
                       <div className="text-center">
                         <div className="font-bold text-sm">{period}. Ders</div>
                         <div className="text-xs text-gray-600 mt-1 flex items-center justify-center">
@@ -295,20 +329,25 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
                         <td key={`${day}-${period}`} className="px-2 py-2">
                           <button
                             onClick={() => handleSlotClick(day, period)}
-                            className={`w-full min-h-[60px] p-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                            className={`w-full min-h-[70px] p-3 rounded-lg border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
                               constraintConfig.color
-                            } hover:opacity-80 hover:scale-105`}
+                            } hover:opacity-80 hover:scale-105 hover:shadow-md`}
                             title={
                               constraint?.constraintType === 'preferred' 
-                                ? `Tercih edilen saat - Değiştirmek için tıklayın`
-                                : `${constraintConfig.label} - Tercih edilene dönmek için tıklayın`
+                                ? `✅ Tercih edilen saat - Değiştirmek için tıklayın`
+                                : `${constraintConfig.icon} ${constraintConfig.label} - Tercih edilene dönmek için tıklayın`
                             }
                           >
                             <div className="text-center">
-                              <div className="text-lg mb-1">{constraintConfig.icon}</div>
-                              <div className="text-xs font-medium">
+                              <div className="text-xl mb-1">{constraintConfig.icon}</div>
+                              <div className="text-xs font-medium leading-tight">
                                 {constraintConfig.label}
                               </div>
+                              {constraint?.constraintType !== 'preferred' && (
+                                <div className="text-xs opacity-75 mt-1">
+                                  Tıkla → Tercih edilen
+                                </div>
+                              )}
                             </div>
                           </button>
                         </td>
@@ -322,22 +361,37 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
         </div>
       </div>
 
-      {/* Enhanced Legend */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start space-x-2">
-          <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-          <div>
-            <h4 className="text-sm font-medium text-blue-800 mb-2">Nasıl Kullanılır:</h4>
-            <ul className="text-xs text-blue-700 space-y-1">
-              <li>• <strong>Varsayılan:</strong> Tüm zaman dilimleri "Tercih Edilen" olarak başlar</li>
-              <li>• <strong>Değiştirmek için:</strong> Yukarıdan kısıtlama türü seçin, sonra zaman dilimine tıklayın</li>
-              <li>• <strong>Geri almak için:</strong> Kısıtlı saate tekrar tıklayın (tercih edilene döner)</li>
-              <li>• <strong>Yeşil (✅):</strong> Tercih edilen zaman dilimleri</li>
-              <li>• <strong>Kırmızı (🚫):</strong> Kesinlikle müsait değil</li>
-              <li>• <strong>Sarı (⚠️):</strong> Sınırlı kullanım</li>
-              <li>• <strong>Önemli:</strong> Değişiklikleri kaydetmeyi unutmayın!</li>
-            </ul>
+      {/* PROFESSIONAL: Summary */}
+      <div className="p-6 bg-gray-50 border-t border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-6">
+            <div className="text-center">
+              <div className="text-lg font-bold text-green-600">{getConstraintCount('preferred')}</div>
+              <div className="text-xs text-gray-600">Tercih Edilen</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-red-600">{getConstraintCount('unavailable')}</div>
+              <div className="text-xs text-gray-600">Müsait Değil</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-yellow-600">{getConstraintCount('restricted')}</div>
+              <div className="text-xs text-gray-600">Kısıtlı</div>
+            </div>
           </div>
+          
+          {hasUnsavedChanges && (
+            <div className="flex items-center space-x-3">
+              <span className="text-sm text-yellow-600 font-medium">Değişiklikler kaydedilmedi</span>
+              <Button
+                onClick={onSave}
+                icon={Save}
+                variant="primary"
+                size="sm"
+              >
+                Kaydet
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

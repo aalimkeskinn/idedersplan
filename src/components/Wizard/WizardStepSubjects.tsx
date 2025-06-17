@@ -22,6 +22,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    branch: '',
     shortName: '',
     distributionType: '',
     canSplit: false,
@@ -29,8 +30,10 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     photo: '',
     classrooms: '',
     phoneNumber: '',
-    assignedTeacher: ''
+    assignedTeacher: [] as string[]
   });
+
+  const teacherList: Teacher[] = teachers as Teacher[];
 
   // Auto-generate short name from subject name
   const generateShortName = (name: string): string => {
@@ -107,9 +110,9 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     { value: '12', label: '12' }
   ];
 
-  const filteredSubjects = selectedLevel 
-    ? subjects.filter(subject => subject.level === selectedLevel)
-    : subjects;
+  const filteredSubjects = subjects.filter(subject => 
+    !selectedLevel || subject.level === selectedLevel
+  );
 
   const selectedSubjects = subjects.filter(subject => 
     data.selectedSubjects.includes(subject.id)
@@ -196,48 +199,15 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     }
   };
 
-  // CRITICAL: Get teachers filtered by subject branch
-  const getTeachersForSubject = (subjectBranch: string) => {
-    return teachers
-      .filter(teacher => teacher.branch === subjectBranch)
-      .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
-      .map(teacher => ({
-        value: teacher.id,
-        label: `${teacher.name} (${teacher.level})`
-      }));
-  };
-
-  // Get assigned teacher for a subject
-  const getAssignedTeacher = (subjectId: string) => {
-    const subject = subjects.find(s => s.id === subjectId);
-    return (subject as any)?.assignedTeacher || '';
-  };
-
-  // Handle teacher assignment
-  const handleTeacherAssignment = (subjectId: string, teacherId: string) => {
-    // This would typically update the subject's assigned teacher
-    // For now, we'll just log it since the current structure doesn't support this
-    console.log('🎯 Öğretmen atama:', { subjectId, teacherId });
-    
-    // You might want to update the subject in Firebase here
-    const subject = subjects.find(s => s.id === subjectId);
-    if (subject) {
-      updateSubject(subjectId, {
-        ...subject,
-        assignedTeacher: teacherId
-      });
-    }
-  };
-
   // New Subject Modal Functions
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const subjectData = {
       name: formData.name,
-      branch: formData.name, // Using name as branch for simplicity
-      level: 'İlkokul', // Default level
-      weeklyHours: 4, // Default weekly hours
+      branch: formData.branch || formData.name,
+      level: 'İlkokul' as 'Anaokulu' | 'İlkokul' | 'Ortaokul',
+      weeklyHours: 4,
       shortName: formData.shortName || generateShortName(formData.name),
       color: formData.color || generateColor(),
       assignedTeacher: formData.assignedTeacher,
@@ -260,6 +230,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const resetForm = () => {
     setFormData({
       name: '',
+      branch: '',
       shortName: '',
       distributionType: '',
       canSplit: false,
@@ -267,7 +238,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
       photo: '',
       classrooms: '',
       phoneNumber: '',
-      assignedTeacher: ''
+      assignedTeacher: []
     });
     setEditingSubject(null);
     setIsModalOpen(false);
@@ -276,6 +247,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const handleEdit = (subject: Subject) => {
     setFormData({
       name: subject.name,
+      branch: (subject as any).branch || subject.name,
       shortName: (subject as any).shortName || generateShortName(subject.name),
       distributionType: (subject as any).distributionType || '',
       canSplit: false,
@@ -283,7 +255,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
       photo: '',
       classrooms: (subject as any).classrooms || '',
       phoneNumber: '',
-      assignedTeacher: (subject as any).assignedTeacher || ''
+      assignedTeacher: Array.isArray((subject as any).assignedTeacher) ? (subject as any).assignedTeacher : ((subject as any).assignedTeacher ? [(subject as any).assignedTeacher] : [])
     });
     setEditingSubject(subject);
     setIsModalOpen(true);
@@ -320,6 +292,24 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
       }));
     }
   }, [formData.name, editingSubject]);
+
+  // Modal açıldığında branşa uygun öğretmenleri otomatik seçili yap
+  React.useEffect(() => {
+    if (isModalOpen && formData.branch) {
+      const branchedTeachers = teacherList
+        .filter((teacher: Teacher) =>
+          typeof teacher.name === 'string' &&
+          typeof teacher.branch === 'string' &&
+          teacher.branch === formData.branch
+        )
+        .map((teacher: Teacher) => teacher.id);
+      setFormData(prev => ({
+        ...prev,
+        assignedTeacher: branchedTeachers
+      }));
+    }
+    // eslint-disable-next-line
+  }, [isModalOpen, formData.branch]);
 
   return (
     <div className="space-y-6">
@@ -372,7 +362,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                         : 'bg-white border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-sm">{subject.name}</p>
                         <p className="text-xs text-gray-600">
@@ -433,8 +423,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                 {selectedSubjects.map(subject => {
                   const hours = data.subjectHours[subject.id] || subject.weeklyHours;
                   const priority = data.subjectPriorities[subject.id] || 'medium';
-                  const assignedTeacher = getAssignedTeacher(subject.id);
-                  const teacherOptions = getTeachersForSubject(subject.branch);
                   
                   return (
                     <div key={subject.id} className="p-3 bg-gray-50 rounded-lg">
@@ -453,7 +441,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                       </div>
                       
                       {/* Hours Configuration */}
-                      <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Haftalık Saat
@@ -497,36 +485,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                             ))}
                           </select>
                         </div>
-                      </div>
-
-                      {/* CRITICAL: Teacher Assignment with Branch Filtering */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          🎯 Öğretmen Ata ({subject.branch} branşı)
-                        </label>
-                        {teacherOptions.length > 0 ? (
-                          <select
-                            value={assignedTeacher}
-                            onChange={(e) => handleTeacherAssignment(subject.id, e.target.value)}
-                            className="w-full text-xs p-2 border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="">Öğretmen seçin...</option>
-                            {teacherOptions.map(option => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
-                            ⚠️ {subject.branch} branşında öğretmen bulunamadı
-                          </div>
-                        )}
-                        {assignedTeacher && (
-                          <div className="mt-1 text-xs text-green-600">
-                            ✅ Öğretmen atandı
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
@@ -575,26 +533,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
               })}
             </div>
           </div>
-
-          {/* Teacher Assignment Summary */}
-          <div className="mt-4 pt-4 border-t border-blue-200">
-            <p className="text-xs text-blue-700 mb-2">Öğretmen Atama Durumu:</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-              {selectedSubjects.map(subject => {
-                const assignedTeacher = getAssignedTeacher(subject.id);
-                const teacher = teachers.find(t => t.id === assignedTeacher);
-                
-                return (
-                  <div key={subject.id} className="flex items-center justify-between bg-white rounded p-2">
-                    <span className="font-medium">{subject.name}</span>
-                    <span className={assignedTeacher ? 'text-green-600' : 'text-gray-500'}>
-                      {teacher ? `✅ ${teacher.name}` : '⚪ Atanmadı'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </div>
       )}
 
@@ -607,8 +545,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
             <ul className="space-y-1 text-xs">
               <li>• Haftalık toplam saat sayısı 25-35 arasında olması önerilir</li>
               <li>• Yüksek öncelikli dersler daha iyi zaman dilimlerine yerleştirilir</li>
-              <li>• <strong>🎯 Öğretmen atama:</strong> Her ders için aynı branştaki öğretmenler otomatik filtrelenir</li>
-              <li>• Öğretmen ataması yapılan dersler program oluşturma sırasında öncelik alır</li>
+              <li>• Ders saatleri daha sonra öğretmen atamalarında kullanılır</li>
               <li>• Seviye filtresi ile ilgili dersleri daha kolay bulabilirsiniz</li>
             </ul>
           </div>
@@ -702,18 +639,41 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
             />
           </div>
 
-          <Select
-            label="Öğretmen Ata"
-            value={formData.assignedTeacher}
-            onChange={(value) => setFormData({ ...formData, assignedTeacher: value })}
-            options={[
-              { value: '', label: 'Seçiniz...' },
-              ...teachers.map(teacher => ({
-                value: teacher.id,
-                label: teacher.name
-              }))
-            ]}
-          />
+          {/* Öğretmen Ata - Checkbox Listesi */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-ide-gray-800 mb-2">Öğretmen Ata</label>
+            <div className="grid grid-cols-1 gap-2">
+              {teacherList
+                .filter((teacher: Teacher) =>
+                  typeof teacher.name === 'string' &&
+                  typeof teacher.branch === 'string' &&
+                  teacher.branch === formData.branch
+                )
+                .map((teacher: Teacher) => (
+                  <label key={teacher.id} className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.assignedTeacher.includes(teacher.id)}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setFormData({
+                            ...formData,
+                            assignedTeacher: [...formData.assignedTeacher, teacher.id]
+                          });
+                        } else {
+                          setFormData({
+                            ...formData,
+                            assignedTeacher: formData.assignedTeacher.filter(id => id !== teacher.id)
+                          });
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-800">{teacher.name}</span>
+                  </label>
+                ))}
+            </div>
+          </div>
 
           <div className="button-group-mobile mt-6">
             <Button

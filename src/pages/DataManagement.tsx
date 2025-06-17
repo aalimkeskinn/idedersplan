@@ -12,7 +12,8 @@ import {
   BarChart3,
   Settings,
   Download,
-  Upload
+  Upload,
+  MapPin
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFirestore } from '../hooks/useFirestore';
@@ -35,6 +36,19 @@ interface ScheduleTemplate {
   status: 'draft' | 'published' | 'archived';
 }
 
+// Classroom interface
+interface Classroom {
+  id: string;
+  name: string;
+  type: string;
+  capacity: number;
+  floor: string;
+  building: string;
+  equipment: string[];
+  shortName?: string;
+  color?: string;
+}
+
 const DataManagement = () => {
   const navigate = useNavigate();
   const { data: teachers, remove: removeTeacher } = useFirestore<Teacher>('teachers');
@@ -42,6 +56,7 @@ const DataManagement = () => {
   const { data: subjects, remove: removeSubject } = useFirestore<Subject>('subjects');
   const { data: schedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
   const { data: templates, remove: removeTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
+  const { data: classrooms, remove: removeClassroom } = useFirestore<Classroom>('classrooms');
   const { success, error, warning } = useToast();
   const { 
     confirmation, 
@@ -55,6 +70,7 @@ const DataManagement = () => {
   const [isDeletingSubjects, setIsDeletingSubjects] = useState(false);
   const [isDeletingSchedules, setIsDeletingSchedules] = useState(false);
   const [isDeletingTemplates, setIsDeletingTemplates] = useState(false);
+  const [isDeletingClassrooms, setIsDeletingClassrooms] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   // Delete all teachers
@@ -257,9 +273,49 @@ const DataManagement = () => {
     );
   };
 
+  // Delete all classrooms
+  const handleDeleteAllClassrooms = () => {
+    if (classrooms.length === 0) {
+      warning('⚠️ Silinecek Derslik Yok', 'Sistemde silinecek derslik bulunamadı');
+      return;
+    }
+
+    confirmDelete(
+      `${classrooms.length} Derslik`,
+      async () => {
+        setIsDeletingClassrooms(true);
+        
+        try {
+          let deletedCount = 0;
+          
+          for (const classroom of classrooms) {
+            try {
+              await removeClassroom(classroom.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Derslik silinemedi: ${classroom.name}`, err);
+            }
+          }
+
+          if (deletedCount > 0) {
+            success('🗑️ Derslikler Silindi', `${deletedCount} derslik başarıyla silindi`);
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir derslik silinemedi');
+          }
+
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Derslikler silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingClassrooms(false);
+        }
+      }
+    );
+  };
+
   // Delete all data
   const handleDeleteAllData = () => {
-    const totalItems = teachers.length + classes.length + subjects.length + schedules.length + templates.length;
+    const totalItems = teachers.length + classes.length + subjects.length + schedules.length + templates.length + classrooms.length;
     
     if (totalItems === 0) {
       warning('⚠️ Silinecek Veri Yok', 'Sistemde silinecek veri bulunamadı');
@@ -324,6 +380,16 @@ const DataManagement = () => {
             }
           }
 
+          // Delete classrooms
+          for (const classroom of classrooms) {
+            try {
+              await removeClassroom(classroom.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Derslik silinemedi: ${classroom.name}`, err);
+            }
+          }
+
           if (deletedCount > 0) {
             success('🗑️ Tüm Veriler Silindi', `${deletedCount} öğe başarıyla silindi`);
           } else {
@@ -360,7 +426,7 @@ const DataManagement = () => {
     );
   };
 
-  const totalDataCount = teachers.length + classes.length + subjects.length + schedules.length + templates.length;
+  const totalDataCount = teachers.length + classes.length + subjects.length + schedules.length + templates.length + classrooms.length;
   const sortedTemplates = [...templates].sort((a, b) => 
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
@@ -403,7 +469,7 @@ const DataManagement = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
             <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
@@ -553,6 +619,36 @@ const DataManagement = () => {
                 )}
               </div>
             </div>
+
+            <div className="bg-teal-50 rounded-lg p-4 border border-teal-100">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center">
+                  <MapPin className="w-5 h-5 text-teal-600 mr-2" />
+                  <h3 className="font-medium text-teal-900">Derslikler</h3>
+                </div>
+                <span className="text-2xl font-bold text-teal-600">{classrooms.length}</span>
+              </div>
+              <div className="flex justify-between items-center mt-4">
+                <Button
+                  onClick={() => navigate('/schedule-wizard')}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Yönet
+                </Button>
+                {classrooms.length > 0 && (
+                  <Button
+                    onClick={handleDeleteAllClassrooms}
+                    icon={Trash2}
+                    variant="danger"
+                    size="sm"
+                    disabled={isDeletingClassrooms}
+                  >
+                    {isDeletingClassrooms ? 'Siliniyor...' : 'Tümünü Sil'}
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -648,6 +744,106 @@ const DataManagement = () => {
           </div>
         )}
 
+        {/* Classrooms Section */}
+        {classrooms.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <MapPin className="w-6 h-6 text-teal-600 mr-2" />
+                <h2 className="text-lg font-bold text-gray-900">Derslikler</h2>
+              </div>
+              <Button
+                onClick={() => navigate('/schedule-wizard')}
+                icon={Plus}
+                variant="primary"
+                size="sm"
+              >
+                Yeni Derslik
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {classrooms.map((classroom) => (
+                <div
+                  key={classroom.id}
+                  className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-teal-300 hover:shadow-md transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{classroom.name}</h3>
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        classroom.type === 'normal' ? 'bg-blue-100 text-blue-800' :
+                        classroom.type === 'laboratory' ? 'bg-purple-100 text-purple-800' :
+                        classroom.type === 'workshop' ? 'bg-orange-100 text-orange-800' :
+                        classroom.type === 'gym' ? 'bg-green-100 text-green-800' :
+                        classroom.type === 'library' ? 'bg-indigo-100 text-indigo-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {classroom.type === 'normal' ? 'Normal Sınıf' :
+                         classroom.type === 'laboratory' ? 'Laboratuvar' :
+                         classroom.type === 'workshop' ? 'Atölye' :
+                         classroom.type === 'gym' ? 'Spor Salonu' :
+                         classroom.type === 'library' ? 'Kütüphane' :
+                         classroom.type === 'computer' ? 'Bilgisayar Sınıfı' :
+                         classroom.type}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => navigate('/schedule-wizard')}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Düzenle"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => confirmDelete(
+                          classroom.name,
+                          async () => {
+                            try {
+                              await removeClassroom(classroom.id);
+                              success('🗑️ Derslik Silindi', `${classroom.name} başarıyla silindi`);
+                            } catch (err) {
+                              error('❌ Silme Hatası', 'Derslik silinirken bir hata oluştu');
+                            }
+                          }
+                        )}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                        title="Sil"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Kapasite:</span>
+                      <span className="font-medium">{classroom.capacity} kişi</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Konum:</span>
+                      <span className="font-medium">{classroom.building} - {classroom.floor}. Kat</span>
+                    </div>
+                    {classroom.equipment && classroom.equipment.length > 0 && (
+                      <div>
+                        <span className="text-xs text-gray-500">Ekipmanlar:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {classroom.equipment.map((eq) => (
+                            <span key={eq} className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
+                              {eq}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Bulk Data Management */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
@@ -723,7 +919,7 @@ const DataManagement = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <Button
                 onClick={handleDeleteAllTeachers}
                 icon={Trash2}
@@ -772,6 +968,16 @@ const DataManagement = () => {
                 className="w-full"
               >
                 {isDeletingTemplates ? 'Siliniyor...' : `Şablonlar (${templates.length})`}
+              </Button>
+
+              <Button
+                onClick={handleDeleteAllClassrooms}
+                icon={Trash2}
+                variant="danger"
+                disabled={isDeletingClassrooms || classrooms.length === 0}
+                className="w-full"
+              >
+                {isDeletingClassrooms ? 'Siliniyor...' : `Derslikler (${classrooms.length})`}
               </Button>
             </div>
           </div>

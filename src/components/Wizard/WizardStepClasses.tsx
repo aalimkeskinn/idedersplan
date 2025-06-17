@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building, Users, Plus, Minus, AlertTriangle, Edit, Trash2 } from 'lucide-react';
 import { Class, EDUCATION_LEVELS } from '../../types';
 import { useFirestore } from '../../hooks/useFirestore';
@@ -25,6 +25,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   classes
 }) => {
   const { add: addClass, update: updateClass, remove: removeClass } = useFirestore<Class>('classes');
+  const { data: classrooms } = useFirestore('classrooms');
   const [selectedLevel, setSelectedLevel] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
@@ -250,13 +251,24 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
     { value: 'Ortaokul', label: 'Ortaokul' }
   ];
 
+  // Get classroom options for select
+  const classroomOptions = [
+    { value: '', label: 'Seçiniz...' },
+    ...classrooms.map(classroom => ({
+      value: classroom.id,
+      label: classroom.name
+    }))
+  ];
+
+  // Get teacher options for select
+  const teacherOptions = [
+    { value: '', label: 'Seçiniz...' }
+    // Teachers would be added here
+  ];
+
   const filteredClasses = selectedLevel 
     ? classes.filter(c => c.level === selectedLevel)
     : classes;
-
-  const selectedClassItems = classes.filter(c => 
-    classesData.selectedClasses.includes(c.id)
-  );
 
   const groupedClasses = filteredClasses.reduce((acc, classItem) => {
     if (!acc[classItem.level]) {
@@ -406,7 +418,6 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
                               handleCapacityChange(classItem.id, capacity - 1);
                             }}
                             className="w-6 h-6 bg-gray-200 rounded text-xs hover:bg-gray-300"
-                            disabled={capacity <= 1}
                           >
                             -
                           </button>
@@ -432,7 +443,25 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
         ))}
       </div>
 
-      {selectedClassItems.length === 0 && (
+      {classes.length === 0 && (
+        <div className="text-center py-8">
+          <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Sınıf Ekleyin</h3>
+          <p className="text-gray-500">
+            Henüz sınıf eklenmemiş. Yeni sınıf ekleyerek başlayın.
+          </p>
+          <Button
+            onClick={() => setIsModalOpen(true)}
+            icon={Plus}
+            variant="primary"
+            className="mt-4"
+          >
+            Yeni Sınıf Ekle
+          </Button>
+        </div>
+      )}
+
+      {classesData.selectedClasses.length === 0 && classes.length > 0 && (
         <div className="text-center py-8">
           <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Sınıf Seçin</h3>
@@ -442,7 +471,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
         </div>
       )}
 
-      {selectedClassItems.length > 0 && (
+      {classesData.selectedClasses.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-start">
             <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" />
@@ -487,11 +516,11 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
           </div>
 
           {/* Optional Fields */}
-          <Input
+          <Select
             label="Sınıf öğretmeni"
             value={formData.classTeacher}
             onChange={(value) => setFormData({ ...formData, classTeacher: value })}
-            placeholder="Öğretmen seçin"
+            options={teacherOptions}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -503,11 +532,11 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
               disabled
             />
             
-            <Input
+            <Select
               label="Ana derslik"
               value={formData.mainClassroom}
               onChange={(value) => setFormData({ ...formData, mainClassroom: value })}
-              placeholder="Derslik seçin"
+              options={classroomOptions}
             />
           </div>
           

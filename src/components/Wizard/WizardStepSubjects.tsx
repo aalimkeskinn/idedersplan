@@ -22,6 +22,9 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    branch: '',
+    level: '',
+    weeklyHours: '',
     shortName: '',
     distributionType: '',
     canSplit: false,
@@ -35,8 +38,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   // Auto-generate short name from subject name
   const generateShortName = (name: string): string => {
     if (!name) return '';
-    
-    // Take first 2 characters and make uppercase
     return name.substring(0, 2).toUpperCase();
   };
 
@@ -154,7 +155,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   };
 
   const handleHoursChange = (subjectId: string, hours: number) => {
-    // Remove validation to allow any value
     onUpdate({
       ...data,
       subjectHours: {
@@ -202,9 +202,9 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     
     const subjectData = {
       name: formData.name,
-      branch: formData.name, // Using name as branch for simplicity
-      level: 'İlkokul', // Default level
-      weeklyHours: 4, // Default weekly hours
+      branch: formData.branch || formData.name,
+      level: formData.level as 'Anaokulu' | 'İlkokul' | 'Ortaokul',
+      weeklyHours: parseInt(formData.weeklyHours) || 4,
       shortName: formData.shortName || generateShortName(formData.name),
       color: formData.color || generateColor(),
       assignedTeacher: formData.assignedTeacher,
@@ -227,6 +227,9 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const resetForm = () => {
     setFormData({
       name: '',
+      branch: '',
+      level: '',
+      weeklyHours: '',
       shortName: '',
       distributionType: '',
       canSplit: false,
@@ -243,6 +246,9 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const handleEdit = (subject: Subject) => {
     setFormData({
       name: subject.name,
+      branch: subject.branch,
+      level: subject.level,
+      weeklyHours: subject.weeklyHours.toString(),
       shortName: (subject as any).shortName || generateShortName(subject.name),
       distributionType: (subject as any).distributionType || '',
       canSplit: false,
@@ -555,6 +561,35 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
               disabled
             />
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Branş"
+              value={formData.branch}
+              onChange={(value) => setFormData({ ...formData, branch: value })}
+              placeholder="Örn: Matematik"
+              required
+            />
+            
+            <Select
+              label="Seviye"
+              value={formData.level}
+              onChange={(value) => setFormData({ ...formData, level: value })}
+              options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
+              required
+            />
+          </div>
+
+          <Input
+            label="Haftalık Ders Saati"
+            type="number"
+            value={formData.weeklyHours}
+            onChange={(value) => setFormData({ ...formData, weeklyHours: value })}
+            placeholder="4"
+            min="1"
+            max="10"
+            required
+          />
 
           {/* Optional Fields */}
           <Select

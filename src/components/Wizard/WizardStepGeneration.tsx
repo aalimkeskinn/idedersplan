@@ -107,7 +107,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
       fast: 2,
       balanced: 4,
       thorough: 8
-    }[data?.optimizationLevel || 'balanced'];
+    }[currentData.optimizationLevel || 'balanced'];
 
     const subjectCount = wizardData.subjects?.selectedSubjects?.length || 0;
     const classCount = wizardData.classes?.selectedClasses?.length || 0;

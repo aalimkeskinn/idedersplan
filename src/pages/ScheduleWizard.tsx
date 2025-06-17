@@ -73,10 +73,14 @@ interface WizardData {
   constraints: {
     timeConstraints: any[];
     globalRules: {
-      maxDailyHours: number;
+      maxDailyHoursTeacher: number;
+      maxDailyHoursClass: number;
       maxConsecutiveHours: number;
+      avoidConsecutiveSameSubject: boolean;
+      preferMorningHours: boolean;
+      avoidFirstLastPeriod: boolean;
       lunchBreakRequired: boolean;
-      weekendScheduling: boolean;
+      lunchBreakDuration: number;
     };
   };
   generationSettings: {
@@ -105,7 +109,7 @@ interface ScheduleTemplate {
 const ScheduleWizard = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: teachers, add: addTeacher, update: updateTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
+  const { data: teachers } = useFirestore<Teacher>('teachers');
   const { data: classes } = useFirestore<Class>('classes');
   const { data: subjects } = useFirestore<Subject>('subjects');
   const { add: addTemplate, update: updateTemplate, data: templates } = useFirestore<ScheduleTemplate>('schedule-templates');
@@ -147,10 +151,14 @@ const ScheduleWizard = () => {
     constraints: {
       timeConstraints: [],
       globalRules: {
-        maxDailyHours: 8,
+        maxDailyHoursTeacher: 8,
+        maxDailyHoursClass: 9,
         maxConsecutiveHours: 3,
+        avoidConsecutiveSameSubject: true,
+        preferMorningHours: true,
+        avoidFirstLastPeriod: false,
         lunchBreakRequired: true,
-        weekendScheduling: false
+        lunchBreakDuration: 1
       }
     },
     generationSettings: {

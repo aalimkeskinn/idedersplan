@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Save, RotateCcw, Users, Building, ArrowLeftRight, Clock } from 'lucide-react';
+import { Calendar, Save, RotateCcw, Users, Building, ArrowLeftRight, Clock, AlertTriangle } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Teacher, Class, Subject, Schedule, DAYS, PERIODS, getTimeForPeriod, formatTimeRange } from '../types';
+import { TimeConstraint } from '../types/constraints';
 import { useFirestore } from '../hooks/useFirestore';
 import { useToast } from '../hooks/useToast';
 import { useErrorModal } from '../hooks/useErrorModal';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { validateSchedule, checkSlotConflict } from '../utils/validation';
+import { validateScheduleWithConstraints, checkConstraintViolations } from '../utils/scheduleValidation';
 import Button from '../components/UI/Button';
 import Select from '../components/UI/Select';
 import ScheduleSlotModal from '../components/UI/ScheduleSlotModal';
@@ -21,6 +23,7 @@ const Schedules = () => {
   const { data: classes } = useFirestore<Class>('classes');
   const { data: subjects } = useFirestore<Subject>('subjects');
   const { data: schedules, add, update } = useFirestore<Schedule>('schedules');
+  const { data: constraints } = useFirestore<TimeConstraint>('constraints');
   const { success, warning, info } = useToast();
   const { errorModal, showError, hideError } = useErrorModal();
   const { 
@@ -39,6 +42,7 @@ const Schedules = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ day: string; period: string } | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showConstraintWarnings, setShowConstraintWarnings] = useState(true);
 
   const sortedTeachers = [...teachers].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
   const sortedClasses = [...classes].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
@@ -384,8 +388,7 @@ const Schedules = () => {
         return;
       }
 
-      // REAL-TIME CONFLICT CHECK
-      console.log('🔍 Teacher mode çakışma kontrolü yapılıyor...');
+      // ENHANCED: Check both regular conflicts and constraint violations
       const conflictCheck = checkSlotConflict(
         'teacher',
         day,
@@ -397,11 +400,25 @@ const Schedules = () => {
         classes
       );
       
-      console.log('📊 Çakışma kontrolü sonucu:', conflictCheck);
-      
       if (conflictCheck.hasConflict) {
         console.log('❌ Çakışma tespit edildi, ERROR MODAL gösteriliyor');
         showError('❌ Çakışma Tespit Edildi!', conflictCheck.message);
+        return;
+      }
+
+      // Check constraint violations
+      const constraintViolations = checkConstraintViolations(
+        'teacher',
+        day,
+        period,
+        selectedTeacherId,
+        classId,
+        constraints
+      );
+
+      if (constraintViolations.length > 0) {
+        const violationMessage = constraintViolations.join('\n');
+        showError('⚠️ Zaman Kısıtlaması İhlali!', violationMessage);
         return;
       }
       
@@ -438,8 +455,7 @@ const Schedules = () => {
         return;
       }
 
-      // REAL-TIME CONFLICT CHECK
-      console.log('🔍 Class mode çakışma kontrolü yapılıyor...');
+      // ENHANCED: Check both regular conflicts and constraint violations
       const conflictCheck = checkSlotConflict(
         'class',
         day,
@@ -451,11 +467,36 @@ const Schedules = () => {
         classes
       );
       
-      console.log('📊 Çakışma kontrolü sonucu:', conflictCheck);
-      
       if (conflictCheck.hasConflict) {
         console.log('❌ Çakışma tespit edildi, ERROR MODAL gösteriliyor');
         showError('❌ Çakışma Tespit Edildi!', conflictCheck.message);
+        return;
+      }
+
+      // Check constraint violations for both teacher and class
+      const teacherViolations = checkConstraintViolations(
+        'teacher',
+        day,
+        period,
+        teacherId,
+        selectedClassId,
+        constraints
+      );
+
+      const classViolations = checkConstraintViolations(
+        'class',
+        day,
+        period,
+        teacherId,
+        selectedClassId,
+        constraints
+      );
+
+      const allViolations = [...teacherViolations, ...classViolations];
+
+      if (allViolations.length > 0) {
+        const violationMessage = allViolations.join('\n');
+        showError('⚠️ Zaman Kısıtlaması İhlali!', violationMessage);
         return;
       }
       
@@ -523,28 +564,35 @@ const Schedules = () => {
 
     console.log('💾 Program kaydetme işlemi başlatıldı');
 
-    // COMPREHENSIVE VALIDATION
-    const validation = validateSchedule(
+    // ENHANCED: Comprehensive validation with constraints
+    const validation = validateScheduleWithConstraints(
       mode,
       currentSchedule,
       mode === 'teacher' ? selectedTeacherId : selectedClassId,
       schedules,
       teachers,
       classes,
-      subjects
+      subjects,
+      constraints
     );
 
-    console.log('📊 Doğrulama sonuçları:', validation);
+    console.log('📊 Gelişmiş doğrulama sonuçları:', validation);
 
     if (!validation.isValid) {
+      const allErrors = [...validation.errors, ...validation.constraintViolations];
       console.log('❌ Doğrulama başarısız, ERROR MODAL gösteriliyor');
-      showError('🚫 Program Kaydedilemedi!', `Aşağıdaki sorunları düzeltin:\n\n${validation.errors.join('\n')}`);
+      showError('🚫 Program Kaydedilemedi!', `Aşağıdaki sorunları düzeltin:\n\n${allErrors.join('\n')}`);
       return;
     }
 
     // Show warnings if any
     if (validation.warnings.length > 0) {
       warning('⚠️ Uyarılar', validation.warnings.join('\n'));
+    }
+
+    // Show constraint violations as warnings if they exist but don't block saving
+    if (validation.constraintViolations.length > 0 && showConstraintWarnings) {
+      warning('⚠️ Kısıtlama Uyarıları', validation.constraintViolations.join('\n'));
     }
 
     try {
@@ -714,6 +762,45 @@ const Schedules = () => {
         color: 'bg-emerald-50 border-emerald-300 text-emerald-900'
       } : null;
     }
+  };
+
+  // Check if slot has constraint violations
+  const getSlotConstraintStatus = (day: string, period: string) => {
+    const slot = currentSchedule[day]?.[period];
+    if (!slot || slot.classId === 'fixed-period') return null;
+
+    let violations: string[] = [];
+
+    if (mode === 'teacher' && selectedTeacherId && slot.classId) {
+      violations = checkConstraintViolations(
+        'teacher',
+        day,
+        period,
+        selectedTeacherId,
+        slot.classId,
+        constraints
+      );
+    } else if (mode === 'class' && selectedClassId && slot.teacherId) {
+      const teacherViolations = checkConstraintViolations(
+        'teacher',
+        day,
+        period,
+        slot.teacherId,
+        selectedClassId,
+        constraints
+      );
+      const classViolations = checkConstraintViolations(
+        'class',
+        day,
+        period,
+        slot.teacherId,
+        selectedClassId,
+        constraints
+      );
+      violations = [...teacherViolations, ...classViolations];
+    }
+
+    return violations.length > 0 ? violations : null;
   };
 
   // Zaman bilgisini al
@@ -975,20 +1062,27 @@ const Schedules = () => {
                         {DAYS.map(day => {
                           const slotDisplay = getSlotDisplay(day, period);
                           const isFixed = isFixedPeriod(day, period);
+                          const constraintViolations = getSlotConstraintStatus(day, period);
                           
                           return (
                             <td key={`${day}-${period}`} className="px-2 py-2">
                               <button
                                 onClick={() => handleSlotClick(day, period)}
                                 disabled={isFixed}
-                                className={`w-full min-h-[80px] p-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 ${
+                                className={`w-full min-h-[80px] p-3 rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500 relative ${
                                   isFixed
                                     ? `${slotDisplay?.color || 'bg-green-100 border-green-300'} cursor-not-allowed`
                                     : slotDisplay 
-                                    ? `${slotDisplay.color} hover:opacity-80` 
+                                    ? `${slotDisplay.color} hover:opacity-80 ${constraintViolations ? 'ring-2 ring-red-400' : ''}` 
                                     : 'border-gray-300 bg-gray-50 border-dashed hover:border-purple-400 hover:bg-purple-50'
                                 }`}
+                                title={constraintViolations ? `Kısıtlama İhlali: ${constraintViolations.join(', ')}` : undefined}
                               >
+                                {constraintViolations && (
+                                  <div className="absolute top-1 right-1">
+                                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                                  </div>
+                                )}
                                 {slotDisplay ? (
                                   <div className="text-center">
                                     <div className="font-medium text-lg">

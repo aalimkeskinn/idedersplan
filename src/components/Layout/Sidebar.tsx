@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, Building, BookOpen, Calendar, LogOut, Eye, Menu, X, GraduationCap, Home, ChevronRight } from 'lucide-react';
+import { Users, Building, BookOpen, Calendar, LogOut, Eye, Menu, X, GraduationCap, Home, ChevronRight, Clock } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 const Sidebar = () => {
@@ -39,6 +39,13 @@ const Sidebar = () => {
       label: 'Sınıflar', 
       color: 'ide-secondary',
       description: 'Sınıf yönetimi'
+    },
+    { 
+      to: '/constraints', 
+      icon: Clock, 
+      label: 'Zaman Kısıtlamaları', 
+      color: 'ide-accent',
+      description: 'Zaman tablosu kısıtlamaları'
     },
     { 
       to: '/schedules', 

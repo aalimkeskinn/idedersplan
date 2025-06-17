@@ -8,6 +8,7 @@ import Home from './pages/Home';
 import Teachers from './pages/Teachers';
 import Classes from './pages/Classes';
 import Subjects from './pages/Subjects';
+import Constraints from './pages/Constraints';
 import Schedules from './pages/Schedules';
 import AllSchedules from './pages/AllSchedules';
 import ClassSchedules from './pages/ClassSchedules';
@@ -57,6 +58,7 @@ function App() {
               <Route path="teachers" element={<Teachers />} />
               <Route path="classes" element={<Classes />} />
               <Route path="subjects" element={<Subjects />} />
+              <Route path="constraints" element={<Constraints />} />
               <Route path="schedules" element={<Schedules />} />
               <Route path="class-schedules" element={<ClassSchedules />} />
               <Route path="all-schedules" element={<AllSchedules />} />

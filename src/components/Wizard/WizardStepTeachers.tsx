@@ -1,24 +1,25 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Users, Check } from 'lucide-react';
 import { Teacher, EDUCATION_LEVELS } from '../../types';
+import { useFirestore } from '../../hooks/useFirestore';
+import { useToast } from '../../hooks/useToast';
 import Button from '../UI/Button';
 import Modal from '../UI/Modal';
 import Input from '../UI/Input';
 import Select from '../UI/Select';
 
 interface WizardStepTeachersProps {
-  teachers: Teacher[];
-  onTeachersChange: (teachers: Teacher[]) => void;
   selectedTeachers: string[];
   onSelectedTeachersChange: (teacherIds: string[]) => void;
 }
 
 const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
-  teachers,
-  onTeachersChange,
   selectedTeachers,
   onSelectedTeachersChange
 }) => {
+  const { data: teachers, add: addTeacher, update: updateTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
+  const { success, error } = useToast();
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [formData, setFormData] = useState({
@@ -27,30 +28,21 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
     level: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingTeacher) {
-      // Update existing teacher
-      const updatedTeachers = teachers.map(teacher =>
-        teacher.id === editingTeacher.id
-          ? { ...teacher, ...formData }
-          : teacher
-      );
-      onTeachersChange(updatedTeachers);
-    } else {
-      // Add new teacher
-      const newTeacher: Teacher = {
-        id: Date.now().toString(),
-        name: formData.name,
-        branch: formData.branch,
-        level: formData.level as Teacher['level'],
-        createdAt: new Date()
-      };
-      onTeachersChange([...teachers, newTeacher]);
+    try {
+      if (editingTeacher) {
+        await updateTeacher(editingTeacher.id, formData);
+        success('✅ Güncellendi', `${formData.name} başarıyla güncellendi`);
+      } else {
+        await addTeacher(formData as Omit<Teacher, 'id' | 'createdAt'>);
+        success('✅ Eklendi', `${formData.name} başarıyla eklendi`);
+      }
+      resetForm();
+    } catch (err) {
+      error('❌ Hata', 'Öğretmen kaydedilirken bir hata oluştu');
     }
-    
-    resetForm();
   };
 
   const resetForm = () => {
@@ -69,13 +61,20 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    const updatedTeachers = teachers.filter(teacher => teacher.id !== id);
-    onTeachersChange(updatedTeachers);
-    
-    // Remove from selected if it was selected
-    const updatedSelected = selectedTeachers.filter(teacherId => teacherId !== id);
-    onSelectedTeachersChange(updatedSelected);
+  const handleDelete = async (id: string) => {
+    const teacher = teachers.find(t => t.id === id);
+    if (teacher && window.confirm(`${teacher.name} öğretmenini silmek istediğinizden emin misiniz?`)) {
+      try {
+        await removeTeacher(id);
+        success('🗑️ Silindi', `${teacher.name} başarıyla silindi`);
+        
+        // Remove from selected if it was selected
+        const updatedSelected = selectedTeachers.filter(teacherId => teacherId !== id);
+        onSelectedTeachersChange(updatedSelected);
+      } catch (err) {
+        error('❌ Hata', 'Öğretmen silinirken bir hata oluştu');
+      }
+    }
   };
 
   const handleTeacherToggle = (teacherId: string) => {
@@ -103,6 +102,17 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Users className="w-8 h-8 text-blue-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Öğretmen Seçimi</h3>
+        <p className="text-gray-600">
+          Programa dahil edilecek öğretmenleri seçin
+        </p>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center">

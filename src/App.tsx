@@ -14,6 +14,7 @@ import AllSchedules from './pages/AllSchedules';
 import ClassSchedules from './pages/ClassSchedules';
 import PDFExport from './pages/PDFExport';
 import DataManagement from './pages/DataManagement';
+import Classrooms from './pages/Classrooms';
 import ToastContainer from './components/UI/ToastContainer';
 
 function App() {
@@ -65,6 +66,7 @@ function App() {
               <Route path="all-schedules" element={<AllSchedules />} />
               <Route path="pdf" element={<PDFExport />} />
               <Route path="data-management" element={<DataManagement />} />
+              <Route path="classrooms" element={<Classrooms />} />
             </Route>
           </Routes>
         </Router>

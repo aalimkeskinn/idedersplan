@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Plus, Edit, Trash2, Monitor, Wifi, Volume2 } from 'lucide-react';
 import { Classroom } from '../../types/wizard';
 import { WizardData } from '../../types/wizard';
+import { useFirestore } from '../../hooks/useFirestore';
 import Button from '../UI/Button';
 import Modal from '../UI/Modal';
 import Input from '../UI/Input';
@@ -16,6 +17,7 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
   data,
   onUpdate
 }) => {
+  const { data: classroomsData } = useFirestore('classrooms');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [formData, setFormData] = useState({
@@ -28,6 +30,15 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
     floors: '',
     nearbyClassrooms: ''
   });
+
+  // Initialize classrooms from Firebase data if available
+  useEffect(() => {
+    if (classroomsData.length > 0 && (!data.classrooms || data.classrooms.length === 0)) {
+      onUpdate({
+        classrooms: classroomsData
+      });
+    }
+  }, [classroomsData, data.classrooms, onUpdate]);
 
   const classrooms = data.classrooms || [];
 
@@ -240,7 +251,7 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
                   <span>Konum:</span>
                   <span className="font-medium">{classroom.building} - {classroom.floor}. Kat</span>
                 </div>
-                {classroom.equipment.length > 0 && (
+                {classroom.equipment && classroom.equipment.length > 0 && (
                   <div>
                     <span className="text-xs text-gray-500">Ekipmanlar:</span>
                     <div className="flex flex-wrap gap-1 mt-1">

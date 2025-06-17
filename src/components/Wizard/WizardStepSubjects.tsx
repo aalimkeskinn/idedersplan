@@ -545,11 +545,17 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
+            <Select
               label="Derslikler"
               value={formData.classrooms}
               onChange={(value) => setFormData({ ...formData, classrooms: value })}
-              placeholder="Dersin tanımlanmış kartlarına uygula"
+              options={[
+                { value: '', label: 'Seçiniz...' },
+                ...classrooms.map(classroom => ({
+                  value: classroom.id,
+                  label: classroom.name
+                }))
+              ]}
             />
             
             <Input

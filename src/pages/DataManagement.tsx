@@ -314,7 +314,7 @@ const DataManagement = () => {
   };
 
   // Delete all data
-  const handleDeleteAllData = () => {
+  const handleDeleteAllData = () =>  {
     const totalItems = teachers.length + classes.length + subjects.length + schedules.length + templates.length + classrooms.length;
     
     if (totalItems === 0) {
@@ -630,7 +630,7 @@ const DataManagement = () => {
               </div>
               <div className="flex justify-between items-center mt-4">
                 <Button
-                  onClick={() => navigate('/schedule-wizard')}
+                  onClick={() => navigate('/classrooms')}
                   variant="secondary"
                   size="sm"
                 >
@@ -753,7 +753,7 @@ const DataManagement = () => {
                 <h2 className="text-lg font-bold text-gray-900">Derslikler</h2>
               </div>
               <Button
-                onClick={() => navigate('/schedule-wizard')}
+                onClick={() => navigate('/classrooms')}
                 icon={Plus}
                 variant="primary"
                 size="sm"
@@ -790,7 +790,7 @@ const DataManagement = () => {
                     </div>
                     <div className="flex items-center space-x-1">
                       <button
-                        onClick={() => navigate('/schedule-wizard')}
+                        onClick={() => navigate('/classrooms')}
                         className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
                         title="Düzenle"
                       >

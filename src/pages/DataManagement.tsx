@@ -14,13 +14,7 @@ import {
   Download,
   Upload,
   MapPin,
-  FileSpreadsheet,
-  CheckCircle,
-  XCircle,
-  HardDrive,
-  Server,
-  Activity,
-  Shield
+  FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFirestore } from '../hooks/useFirestore';
@@ -61,14 +55,13 @@ interface Classroom {
 
 const DataManagement = () => {
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { data: teachers, add: addTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
+  const { data: teachers, remove: removeTeacher, add: addTeacher } = useFirestore<Teacher>('teachers');
   const { data: classes, remove: removeClass } = useFirestore<Class>('classes');
-  const { data: subjects, add: addSubject, remove: removeSubject } = useFirestore<Subject>('subjects');
+  const { data: subjects, remove: removeSubject, add: addSubject } = useFirestore<Subject>('subjects');
   const { data: schedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
   const { data: templates, remove: removeTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { data: classrooms, remove: removeClassroom } = useFirestore<Classroom>('classrooms');
-  const { success, error, warning, info } = useToast();
+  const { success, error, warning } = useToast();
   const { 
     confirmation, 
     showConfirmation, 
@@ -84,14 +77,25 @@ const DataManagement = () => {
   const [isDeletingClassrooms, setIsDeletingClassrooms] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
   
-  // Excel import states
+  // CSV İçe Aktarma için state'ler
   const [isTeacherImportModalOpen, setIsTeacherImportModalOpen] = useState(false);
   const [isSubjectImportModalOpen, setIsSubjectImportModalOpen] = useState(false);
-  const [excelData, setExcelData] = useState<any[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState<string>('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importStats, setImportStats] = useState({ total: 0, success: 0, failed: 0, duplicates: 0 });
-  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [csvData, setCsvData] = useState<string[][]>([]);
+  const [csvFileName, setCsvFileName] = useState('');
+  const [selectedLevel, setSelectedLevel] = useState('İlkokul');
+  const [importStatus, setImportStatus] = useState<{
+    total: number;
+    success: number;
+    error: number;
+    duplicates: number;
+  }>({
+    total: 0,
+    success: 0,
+    error: 0,
+    duplicates: 0
+  });
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Delete all teachers
   const handleDeleteAllTeachers = () => {
@@ -445,252 +449,193 @@ const DataManagement = () => {
       }
     );
   };
-
-  // Excel import functions
-  const handleTeacherExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  
+  // CSV dosyasını yükleme ve işleme
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'teacher' | 'subject') => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    
+    setCsvFileName(file.name);
+    
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const data = event.target?.result as string;
-        const rows = data.split('\n');
+        const text = event.target?.result as string;
         
-        // Parse CSV/TSV data
-        const parsedData = rows.map(row => {
-          // Handle both comma and tab delimiters
-          const delimiter = row.includes('\t') ? '\t' : ',';
-          return row.split(delimiter);
-        }).filter(row => row.length >= 3 && row[0] && row[1] && row[2]); // Ensure we have at least 3 columns with data
+        // CSV dosyasını işle (Türkçe karakter desteğiyle)
+        const rows = text.split('\n')
+          .map(row => row.trim())
+          .filter(row => row.length > 0)
+          .map(row => {
+            // CSV ayrıştırma (basit virgülle ayrılmış değerler)
+            // Türkçe karakterleri koruyarak
+            return row.split(',').map(cell => cell.trim());
+          });
         
-        // Remove header row if it exists
-        if (parsedData.length > 0 && 
-            (parsedData[0][0].toLowerCase() === 'adi' || 
-             parsedData[0][0].toLowerCase() === 'ad' || 
-             parsedData[0][0].toLowerCase() === 'isim')) {
-          parsedData.shift();
+        setCsvData(rows);
+        
+        if (type === 'teacher') {
+          setIsTeacherImportModalOpen(true);
+        } else {
+          setIsSubjectImportModalOpen(true);
         }
-        
-        setExcelData(parsedData.map(row => ({
-          firstName: row[0]?.trim() || '',
-          lastName: row[1]?.trim() || '',
-          role: row[2]?.trim() || ''
-        })));
-        
-        setIsTeacherImportModalOpen(true);
-        
-        // Reset file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        
       } catch (err) {
-        console.error('Excel parse error:', err);
-        error('❌ Dosya Hatası', 'Excel dosyası okunamadı. Lütfen geçerli bir CSV veya Excel dosyası yükleyin.');
+        console.error('CSV dosyası işlenirken hata:', err);
+        error('❌ Dosya Hatası', 'CSV dosyası işlenirken bir hata oluştu');
       }
     };
     
-    reader.readAsText(file);
-  };
-
-  const handleSubjectExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = event.target?.result as string;
-        const rows = data.split('\n');
-        
-        // Parse CSV/TSV data
-        const parsedData = rows.map(row => {
-          // Handle both comma and tab delimiters
-          const delimiter = row.includes('\t') ? '\t' : ',';
-          return row.split(delimiter);
-        }).filter(row => row.length >= 1 && row[0]); // Ensure we have at least 1 column with data
-        
-        // Remove header row if it exists
-        if (parsedData.length > 0 && 
-            (parsedData[0][0].toLowerCase() === 'ders' || 
-             parsedData[0][0].toLowerCase() === 'dersler' || 
-             parsedData[0][0].toLowerCase() === 'a')) {
-          parsedData.shift();
-        }
-        
-        setExcelData(parsedData.map(row => ({
-          name: row[0]?.trim() || ''
-        })));
-        
-        setIsSubjectImportModalOpen(true);
-        
-        // Reset file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        
-      } catch (err) {
-        console.error('Excel parse error:', err);
-        error('❌ Dosya Hatası', 'Excel dosyası okunamadı. Lütfen geçerli bir CSV veya Excel dosyası yükleyin.');
-      }
-    };
+    reader.readAsText(file, 'UTF-8');
     
-    reader.readAsText(file);
+    // Dosya seçiciyi sıfırla (aynı dosyayı tekrar seçebilmek için)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
-
-  const importTeachersFromExcel = async () => {
-    if (!selectedLevel) {
-      warning('⚠️ Seviye Seçilmedi', 'Lütfen öğretmenler için bir eğitim seviyesi seçin');
+  
+  // Öğretmenleri CSV'den içe aktar
+  const importTeachersFromCsv = async () => {
+    if (csvData.length === 0) {
+      error('❌ Veri Yok', 'İçe aktarılacak veri bulunamadı');
       return;
     }
     
-    setIsImporting(true);
-    setImportStats({ total: excelData.length, success: 0, failed: 0, duplicates: 0 });
-    setImportErrors([]);
-    
-    const errors: string[] = [];
-    let successCount = 0;
-    let failedCount = 0;
-    let duplicateCount = 0;
+    const status = {
+      total: csvData.length,
+      success: 0,
+      error: 0,
+      duplicates: 0
+    };
     
     try {
-      for (const row of excelData) {
-        try {
-          // Check if teacher already exists
-          const fullName = `${row.firstName} ${row.lastName}`.trim();
-          const existingTeacher = teachers.find(t => 
-            t.name.toLowerCase() === fullName.toLowerCase() && 
-            t.branch.toLowerCase() === row.role.toLowerCase()
-          );
+      for (const row of csvData) {
+        // CSV formatı: ADI, SOYADI, GÖREVİ
+        if (row.length >= 3) {
+          const firstName = row[0].trim();
+          const lastName = row[1].trim();
+          const branch = row[2].trim();
           
-          if (existingTeacher) {
-            duplicateCount++;
-            continue;
+          if (firstName && lastName && branch) {
+            const fullName = `${firstName} ${lastName}`;
+            
+            // Çift kayıt kontrolü
+            const existingTeacher = teachers.find(t => 
+              t.name.toLowerCase() === fullName.toLowerCase() && 
+              t.branch.toLowerCase() === branch.toLowerCase()
+            );
+            
+            if (existingTeacher) {
+              status.duplicates++;
+              continue;
+            }
+            
+            try {
+              await addTeacher({
+                name: fullName,
+                branch: branch,
+                level: selectedLevel as 'Anaokulu' | 'İlkokul' | 'Ortaokul'
+              });
+              
+              status.success++;
+            } catch (err) {
+              console.error(`Öğretmen eklenirken hata: ${fullName}`, err);
+              status.error++;
+            }
           }
-          
-          // Add new teacher
-          await addTeacher({
-            name: fullName,
-            branch: row.role,
-            level: selectedLevel as 'Anaokulu' | 'İlkokul' | 'Ortaokul'
-          });
-          
-          successCount++;
-          
-        } catch (err) {
-          failedCount++;
-          errors.push(`${row.firstName} ${row.lastName}: ${(err as Error).message}`);
         }
       }
       
-      setImportStats({
-        total: excelData.length,
-        success: successCount,
-        failed: failedCount,
-        duplicates: duplicateCount
-      });
+      setImportStatus(status);
       
-      setImportErrors(errors);
+      if (status.success > 0) {
+        success('✅ İçe Aktarma Başarılı', `${status.success} öğretmen başarıyla eklendi`);
+      }
       
-      if (successCount > 0) {
-        success('✅ İçe Aktarma Başarılı', `${successCount} öğretmen içe aktarıldı, ${duplicateCount} öğretmen zaten mevcut`);
-      } else if (duplicateCount > 0) {
-        warning('⚠️ Yeni Öğretmen Yok', `${duplicateCount} öğretmen zaten sistemde mevcut`);
-      } else {
-        error('❌ İçe Aktarma Başarısız', 'Hiçbir öğretmen içe aktarılamadı');
+      if (status.duplicates > 0) {
+        warning('⚠️ Çift Kayıtlar', `${status.duplicates} öğretmen zaten sistemde mevcut`);
+      }
+      
+      if (status.error > 0) {
+        error('❌ İçe Aktarma Hataları', `${status.error} öğretmen eklenirken hata oluştu`);
       }
       
     } catch (err) {
+      console.error('Toplu içe aktarma hatası:', err);
       error('❌ İçe Aktarma Hatası', 'Öğretmenler içe aktarılırken bir hata oluştu');
     } finally {
-      setIsImporting(false);
+      setIsTeacherImportModalOpen(false);
     }
   };
-
-  const importSubjectsFromExcel = async () => {
-    if (!selectedLevel) {
-      warning('⚠️ Seviye Seçilmedi', 'Lütfen dersler için bir eğitim seviyesi seçin');
+  
+  // Dersleri CSV'den içe aktar
+  const importSubjectsFromCsv = async () => {
+    if (csvData.length === 0) {
+      error('❌ Veri Yok', 'İçe aktarılacak veri bulunamadı');
       return;
     }
     
-    setIsImporting(true);
-    setImportStats({ total: excelData.length, success: 0, failed: 0, duplicates: 0 });
-    setImportErrors([]);
-    
-    const errors: string[] = [];
-    let successCount = 0;
-    let failedCount = 0;
-    let duplicateCount = 0;
+    const status = {
+      total: csvData.length,
+      success: 0,
+      error: 0,
+      duplicates: 0
+    };
     
     try {
-      for (const row of excelData) {
-        try {
-          // Check if subject already exists
-          const existingSubject = subjects.find(s => 
-            s.name.toLowerCase() === row.name.toLowerCase() && 
-            s.level === selectedLevel
-          );
+      for (const row of csvData) {
+        // CSV formatı: DERS ADI
+        if (row.length >= 1) {
+          const subjectName = row[0].trim();
           
-          if (existingSubject) {
-            duplicateCount++;
-            continue;
+          if (subjectName) {
+            // Çift kayıt kontrolü
+            const existingSubject = subjects.find(s => 
+              s.name.toLowerCase() === subjectName.toLowerCase() && 
+              s.level === selectedLevel
+            );
+            
+            if (existingSubject) {
+              status.duplicates++;
+              continue;
+            }
+            
+            try {
+              await addSubject({
+                name: subjectName,
+                branch: subjectName, // Branş olarak ders adını kullan
+                level: selectedLevel as 'Anaokulu' | 'İlkokul' | 'Ortaokul',
+                weeklyHours: 4 // Varsayılan haftalık saat
+              });
+              
+              status.success++;
+            } catch (err) {
+              console.error(`Ders eklenirken hata: ${subjectName}`, err);
+              status.error++;
+            }
           }
-          
-          // Add new subject
-          await addSubject({
-            name: row.name,
-            branch: row.name, // Using name as branch for simplicity
-            level: selectedLevel as 'Anaokulu' | 'İlkokul' | 'Ortaokul',
-            weeklyHours: 4 // Default weekly hours
-          });
-          
-          successCount++;
-          
-        } catch (err) {
-          failedCount++;
-          errors.push(`${row.name}: ${(err as Error).message}`);
         }
       }
       
-      setImportStats({
-        total: excelData.length,
-        success: successCount,
-        failed: failedCount,
-        duplicates: duplicateCount
-      });
+      setImportStatus(status);
       
-      setImportErrors(errors);
+      if (status.success > 0) {
+        success('✅ İçe Aktarma Başarılı', `${status.success} ders başarıyla eklendi`);
+      }
       
-      if (successCount > 0) {
-        success('✅ İçe Aktarma Başarılı', `${successCount} ders içe aktarıldı, ${duplicateCount} ders zaten mevcut`);
-      } else if (duplicateCount > 0) {
-        warning('⚠️ Yeni Ders Yok', `${duplicateCount} ders zaten sistemde mevcut`);
-      } else {
-        error('❌ İçe Aktarma Başarısız', 'Hiçbir ders içe aktarılamadı');
+      if (status.duplicates > 0) {
+        warning('⚠️ Çift Kayıtlar', `${status.duplicates} ders zaten sistemde mevcut`);
+      }
+      
+      if (status.error > 0) {
+        error('❌ İçe Aktarma Hataları', `${status.error} ders eklenirken hata oluştu`);
       }
       
     } catch (err) {
+      console.error('Toplu içe aktarma hatası:', err);
       error('❌ İçe Aktarma Hatası', 'Dersler içe aktarılırken bir hata oluştu');
     } finally {
-      setIsImporting(false);
+      setIsSubjectImportModalOpen(false);
     }
-  };
-
-  const closeTeacherImportModal = () => {
-    setIsTeacherImportModalOpen(false);
-    setExcelData([]);
-    setSelectedLevel('');
-    setImportStats({ total: 0, success: 0, failed: 0, duplicates: 0 });
-    setImportErrors([]);
-  };
-
-  const closeSubjectImportModal = () => {
-    setIsSubjectImportModalOpen(false);
-    setExcelData([]);
-    setSelectedLevel('');
-    setImportStats({ total: 0, success: 0, failed: 0, duplicates: 0 });
-    setImportErrors([]);
   };
 
   const totalDataCount = teachers.length + classes.length + subjects.length + schedules.length + templates.length + classrooms.length;
@@ -699,16 +644,14 @@ const DataManagement = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-md border-b border-gray-200">
+      <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Database className="w-8 h-8 text-purple-600" />
-              </div>
-              <div className="ml-3">
+              <Database className="w-8 h-8 text-purple-600 mr-3" />
+              <div>
                 <h1 className="text-xl font-bold text-gray-900">Veri Yönetimi</h1>
                 <p className="text-sm text-gray-600">Sistem verilerini yönetin ve temizleyin</p>
               </div>
@@ -726,118 +669,12 @@ const DataManagement = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* System Health Dashboard */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-8 overflow-hidden">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Activity className="w-6 h-6 text-blue-600" />
-              </div>
-              <h2 className="ml-3 text-lg font-bold text-gray-900">Sistem Sağlığı</h2>
-            </div>
-            <div className="text-sm text-gray-600">
-              Son güncelleme: {new Date().toLocaleTimeString('tr-TR')}
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <HardDrive className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <h3 className="ml-3 font-medium text-blue-900">Veri Bütünlüğü</h3>
-                </div>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Sağlıklı
-                </span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Toplam Veri Öğesi</span>
-                  <span className="text-sm font-medium text-gray-900">{totalDataCount}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Veri Tutarlılığı</span>
-                  <span className="text-sm font-medium text-green-600">%100</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Son Yedekleme</span>
-                  <span className="text-sm font-medium text-gray-900">Otomatik</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-lg p-4 border border-green-100">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Server className="w-5 h-5 text-green-600" />
-                  </div>
-                  <h3 className="ml-3 font-medium text-green-900">Bağlantı Durumu</h3>
-                </div>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Çevrimiçi
-                </span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Firebase Bağlantısı</span>
-                  <span className="text-sm font-medium text-green-600">Aktif</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Gecikme</span>
-                  <span className="text-sm font-medium text-gray-900">~200ms</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Veri Senkronizasyonu</span>
-                  <span className="text-sm font-medium text-green-600">Gerçek Zamanlı</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-100">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Shield className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <h3 className="ml-3 font-medium text-purple-900">Sistem Güvenliği</h3>
-                </div>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Korumalı
-                </span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Kimlik Doğrulama</span>
-                  <span className="text-sm font-medium text-green-600">Aktif</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Veri Şifreleme</span>
-                  <span className="text-sm font-medium text-green-600">Aktif</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Erişim Kontrolü</span>
-                  <span className="text-sm font-medium text-green-600">Aktif</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Data Statistics */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-8 overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <div className="p-2 bg-indigo-100 rounded-lg">
-                <BarChart3 className="w-6 h-6 text-indigo-600" />
-              </div>
-              <h2 className="ml-3 text-lg font-bold text-gray-900">Veri İstatistikleri</h2>
+              <BarChart3 className="w-6 h-6 text-purple-600 mr-2" />
+              <h2 className="text-lg font-bold text-gray-900">Veri İstatistikleri</h2>
             </div>
             <div className="text-sm text-gray-600">
               Toplam {totalDataCount} veri öğesi
@@ -845,13 +682,11 @@ const DataManagement = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 border border-blue-200 shadow-sm transform transition-all duration-200 hover:scale-105 hover:shadow-md">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <Users className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <h3 className="ml-3 font-medium text-blue-900">Öğretmenler</h3>
+                  <Users className="w-5 h-5 text-blue-600 mr-2" />
+                  <h3 className="font-medium text-blue-900">Öğretmenler</h3>
                 </div>
                 <span className="text-2xl font-bold text-blue-600">{teachers.length}</span>
               </div>
@@ -861,25 +696,23 @@ const DataManagement = () => {
                     onClick={() => navigate('/teachers')}
                     variant="secondary"
                     size="sm"
-                    className="bg-white"
                   >
                     Yönet
                   </Button>
                   <Button
                     onClick={() => fileInputRef.current?.click()}
-                    icon={FileSpreadsheet}
                     variant="secondary"
                     size="sm"
-                    className="bg-white"
+                    icon={FileText}
                   >
-                    Excel İçe Aktar
+                    CSV İçe Aktar
                   </Button>
                   <input
                     type="file"
                     ref={fileInputRef}
-                    onChange={handleTeacherExcelUpload}
-                    accept=".csv,.xls,.xlsx,.tsv,.txt"
-                    className="hidden"
+                    accept=".csv"
+                    style={{ display: 'none' }}
+                    onChange={(e) => handleFileChange(e, 'teacher')}
                   />
                 </div>
                 {teachers.length > 0 && (
@@ -896,13 +729,11 @@ const DataManagement = () => {
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-5 border border-emerald-200 shadow-sm transform transition-all duration-200 hover:scale-105 hover:shadow-md">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <Building className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <h3 className="ml-3 font-medium text-emerald-900">Sınıflar</h3>
+                  <Building className="w-5 h-5 text-emerald-600 mr-2" />
+                  <h3 className="font-medium text-emerald-900">Sınıflar</h3>
                 </div>
                 <span className="text-2xl font-bold text-emerald-600">{classes.length}</span>
               </div>
@@ -911,7 +742,6 @@ const DataManagement = () => {
                   onClick={() => navigate('/classes')}
                   variant="secondary"
                   size="sm"
-                  className="bg-white"
                 >
                   Yönet
                 </Button>
@@ -929,13 +759,11 @@ const DataManagement = () => {
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-5 border border-indigo-200 shadow-sm transform transition-all duration-200 hover:scale-105 hover:shadow-md">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-100">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <BookOpen className="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <h3 className="ml-3 font-medium text-indigo-900">Dersler</h3>
+                  <BookOpen className="w-5 h-5 text-indigo-600 mr-2" />
+                  <h3 className="font-medium text-indigo-900">Dersler</h3>
                 </div>
                 <span className="text-2xl font-bold text-indigo-600">{subjects.length}</span>
               </div>
@@ -945,7 +773,6 @@ const DataManagement = () => {
                     onClick={() => navigate('/subjects')}
                     variant="secondary"
                     size="sm"
-                    className="bg-white"
                   >
                     Yönet
                   </Button>
@@ -953,16 +780,15 @@ const DataManagement = () => {
                     onClick={() => {
                       const input = document.createElement('input');
                       input.type = 'file';
-                      input.accept = '.csv,.xls,.xlsx,.tsv,.txt';
-                      input.onchange = (e) => handleSubjectExcelUpload(e as any);
+                      input.accept = '.csv';
+                      input.onchange = (e) => handleFileChange(e as React.ChangeEvent<HTMLInputElement>, 'subject');
                       input.click();
                     }}
-                    icon={FileSpreadsheet}
                     variant="secondary"
                     size="sm"
-                    className="bg-white"
+                    icon={FileText}
                   >
-                    Excel İçe Aktar
+                    CSV İçe Aktar
                   </Button>
                 </div>
                 {subjects.length > 0 && (
@@ -979,13 +805,11 @@ const DataManagement = () => {
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 border border-purple-200 shadow-sm transform transition-all duration-200 hover:scale-105 hover:shadow-md">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <Calendar className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <h3 className="ml-3 font-medium text-purple-900">Programlar</h3>
+                  <Calendar className="w-5 h-5 text-purple-600 mr-2" />
+                  <h3 className="font-medium text-purple-900">Programlar</h3>
                 </div>
                 <span className="text-2xl font-bold text-purple-600">{schedules.length}</span>
               </div>
@@ -994,7 +818,6 @@ const DataManagement = () => {
                   onClick={() => navigate('/all-schedules')}
                   variant="secondary"
                   size="sm"
-                  className="bg-white"
                 >
                   Yönet
                 </Button>
@@ -1012,13 +835,11 @@ const DataManagement = () => {
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-5 border border-orange-200 shadow-sm transform transition-all duration-200 hover:scale-105 hover:shadow-md">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <Settings className="w-5 h-5 text-orange-600" />
-                  </div>
-                  <h3 className="ml-3 font-medium text-orange-900">Şablonlar</h3>
+                  <Settings className="w-5 h-5 text-orange-600 mr-2" />
+                  <h3 className="font-medium text-orange-900">Şablonlar</h3>
                 </div>
                 <span className="text-2xl font-bold text-orange-600">{templates.length}</span>
               </div>
@@ -1027,7 +848,6 @@ const DataManagement = () => {
                   onClick={() => navigate('/schedule-wizard')}
                   variant="secondary"
                   size="sm"
-                  className="bg-white"
                 >
                   Yeni Oluştur
                 </Button>
@@ -1045,13 +865,11 @@ const DataManagement = () => {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl p-5 border border-teal-200 shadow-sm transform transition-all duration-200 hover:scale-105 hover:shadow-md">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-teal-50 rounded-lg p-4 border border-teal-100">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <MapPin className="w-5 h-5 text-teal-600" />
-                  </div>
-                  <h3 className="ml-3 font-medium text-teal-900">Derslikler</h3>
+                  <MapPin className="w-5 h-5 text-teal-600 mr-2" />
+                  <h3 className="font-medium text-teal-900">Derslikler</h3>
                 </div>
                 <span className="text-2xl font-bold text-teal-600">{classrooms.length}</span>
               </div>
@@ -1060,7 +878,6 @@ const DataManagement = () => {
                   onClick={() => navigate('/classrooms')}
                   variant="secondary"
                   size="sm"
-                  className="bg-white"
                 >
                   Yönet
                 </Button>
@@ -1082,13 +899,11 @@ const DataManagement = () => {
 
         {/* Program Templates Section */}
         {templates.length > 0 && (
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-8 overflow-hidden">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Calendar className="w-6 h-6 text-orange-600" />
-                </div>
-                <h2 className="ml-3 text-lg font-bold text-gray-900">Program Şablonları</h2>
+                <Calendar className="w-6 h-6 text-orange-600 mr-2" />
+                <h2 className="text-lg font-bold text-gray-900">Program Şablonları</h2>
               </div>
               <Button
                 onClick={() => navigate('/schedule-wizard')}
@@ -1104,11 +919,11 @@ const DataManagement = () => {
               {sortedTemplates.map((template) => (
                 <div
                   key={template.id}
-                  className="group bg-gradient-to-br from-gray-50 to-orange-50 rounded-lg p-4 border border-orange-200 hover:border-orange-300 hover:shadow-md transition-all duration-200"
+                  className="group bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate group-hover:text-orange-600 transition-colors">
+                      <h3 className="font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
                         {template.name}
                       </h3>
                       <p className="text-sm text-gray-600 mt-1">
@@ -1153,7 +968,7 @@ const DataManagement = () => {
                     </span>
                   </div>
                   
-                  <div className="mt-3 pt-3 border-t border-orange-200">
+                  <div className="mt-3 pt-3 border-t border-gray-200">
                     <div className="flex items-center justify-between text-xs text-gray-500">
                       <div className="flex items-center">
                         <Calendar className="w-3 h-3 mr-1" />
@@ -1163,7 +978,6 @@ const DataManagement = () => {
                         onClick={() => handleEditTemplate(template.id)}
                         variant="secondary"
                         size="sm"
-                        className="bg-white"
                       >
                         Düzenle
                       </Button>
@@ -1177,13 +991,11 @@ const DataManagement = () => {
 
         {/* Classrooms Section */}
         {classrooms.length > 0 && (
-          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-8 overflow-hidden">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <div className="p-2 bg-teal-100 rounded-lg">
-                  <MapPin className="w-6 h-6 text-teal-600" />
-                </div>
-                <h2 className="ml-3 text-lg font-bold text-gray-900">Derslikler</h2>
+                <MapPin className="w-6 h-6 text-teal-600 mr-2" />
+                <h2 className="text-lg font-bold text-gray-900">Derslikler</h2>
               </div>
               <Button
                 onClick={() => navigate('/classrooms')}
@@ -1199,7 +1011,7 @@ const DataManagement = () => {
               {classrooms.slice(0, 6).map((classroom) => (
                 <div
                   key={classroom.id}
-                  className="bg-gradient-to-br from-gray-50 to-teal-50 rounded-lg p-4 border border-teal-200 hover:border-teal-300 hover:shadow-md transition-all duration-200"
+                  className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-teal-300 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
@@ -1289,23 +1101,19 @@ const DataManagement = () => {
         )}
 
         {/* Bulk Data Management */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-8 overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Database className="w-6 h-6 text-purple-600" />
-              </div>
-              <h2 className="ml-3 text-lg font-bold text-gray-900">Toplu Veri Yönetimi</h2>
+              <Database className="w-6 h-6 text-purple-600 mr-2" />
+              <h2 className="text-lg font-bold text-gray-900">Toplu Veri Yönetimi</h2>
             </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 border border-blue-200 shadow-sm">
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
               <div className="flex items-center mb-4">
-                <div className="p-2 bg-white rounded-lg shadow-sm">
-                  <Download className="w-5 h-5 text-blue-600" />
-                </div>
-                <h3 className="ml-3 font-medium text-blue-900">Veri Yedekleme</h3>
+                <Download className="w-5 h-5 text-blue-600 mr-2" />
+                <h3 className="font-medium text-blue-900">Veri Yedekleme</h3>
               </div>
               <p className="text-sm text-blue-700 mb-4">
                 Tüm sistem verilerinizi yedekleyin ve dışa aktarın. Bu işlem tüm öğretmen, sınıf, ders ve program verilerinizi içerir.
@@ -1313,19 +1121,17 @@ const DataManagement = () => {
               <Button
                 variant="primary"
                 icon={Download}
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-600"
+                className="w-full"
                 disabled
               >
                 Tüm Verileri Yedekle (Yakında)
               </Button>
             </div>
             
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 border border-green-200 shadow-sm">
+            <div className="bg-green-50 rounded-lg p-4 border border-green-100">
               <div className="flex items-center mb-4">
-                <div className="p-2 bg-white rounded-lg shadow-sm">
-                  <Upload className="w-5 h-5 text-green-600" />
-                </div>
-                <h3 className="ml-3 font-medium text-green-900">Veri Geri Yükleme</h3>
+                <Upload className="w-5 h-5 text-green-600 mr-2" />
+                <h3 className="font-medium text-green-900">Veri Geri Yükleme</h3>
               </div>
               <p className="text-sm text-green-700 mb-4">
                 Önceden yedeklediğiniz verileri sisteme geri yükleyin. Bu işlem mevcut verilerinizin üzerine yazacaktır.
@@ -1333,7 +1139,7 @@ const DataManagement = () => {
               <Button
                 variant="primary"
                 icon={Upload}
-                className="w-full bg-gradient-to-r from-green-500 to-green-600"
+                className="w-full"
                 disabled
               >
                 Verileri Geri Yükle (Yakında)
@@ -1343,20 +1149,18 @@ const DataManagement = () => {
         </div>
 
         {/* Danger Zone */}
-        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-md border border-red-200 p-6">
+        <div className="bg-red-50 rounded-lg shadow-sm border border-red-200 p-6">
           <div className="flex items-center mb-6">
-            <div className="p-2 bg-white rounded-lg shadow-sm">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
-            </div>
-            <h2 className="ml-3 text-lg font-bold text-red-900">Tehlikeli Bölge</h2>
+            <AlertTriangle className="w-6 h-6 text-red-600 mr-2" />
+            <h2 className="text-lg font-bold text-red-900">Tehlikeli Bölge</h2>
           </div>
           
           <div className="space-y-4">
-            <div className="p-5 bg-white rounded-xl border border-red-200 shadow-sm">
+            <div className="p-4 bg-white rounded-lg border border-red-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-red-900 text-lg">Tüm Verileri Sil</h3>
-                  <p className="text-sm text-red-700 mt-2">
+                  <h3 className="font-medium text-red-900">Tüm Verileri Sil</h3>
+                  <p className="text-sm text-red-700 mt-1">
                     Bu işlem tüm öğretmen, sınıf, ders, program ve şablon verilerinizi kalıcı olarak silecektir. Bu işlem geri alınamaz!
                   </p>
                 </div>
@@ -1365,7 +1169,6 @@ const DataManagement = () => {
                   icon={Trash2}
                   variant="danger"
                   disabled={isDeletingAll || totalDataCount === 0}
-                  className="bg-gradient-to-r from-red-500 to-red-600"
                 >
                   {isDeletingAll ? 'Siliniyor...' : `Tüm Verileri Sil (${totalDataCount})`}
                 </Button>
@@ -1437,211 +1240,135 @@ const DataManagement = () => {
         </div>
       </div>
 
-      {/* Teacher Import Modal */}
+      {/* Öğretmen CSV İçe Aktarma Modal */}
       <Modal
         isOpen={isTeacherImportModalOpen}
-        onClose={closeTeacherImportModal}
-        title="Excel'den Öğretmen İçe Aktar"
+        onClose={() => setIsTeacherImportModalOpen(false)}
+        title="CSV'den Öğretmen İçe Aktar"
         size="lg"
       >
-        <div className="space-y-6">
-          {/* Preview */}
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-              <h3 className="text-sm font-medium text-gray-700">Önizleme ({excelData.length} kayıt)</h3>
-            </div>
-            <div className="max-h-60 overflow-y-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Soyad</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Görev</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {excelData.slice(0, 10).map((row, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.firstName}</td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.lastName}</td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.role}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {excelData.length > 10 && (
-                <div className="px-4 py-2 text-center text-sm text-gray-500">
-                  ... ve {excelData.length - 10} kayıt daha
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Settings */}
-          <div>
-            <Select
-              label="Öğretmen Seviyesi"
-              value={selectedLevel}
-              onChange={setSelectedLevel}
-              options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
-              required
-            />
-            <p className="mt-2 text-sm text-gray-500">
-              Tüm öğretmenler için aynı seviye kullanılacaktır. Daha sonra öğretmen sayfasından düzenleyebilirsiniz.
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-medium text-blue-800 mb-2">CSV Dosyası: {csvFileName}</h4>
+            <p className="text-sm text-blue-700">
+              Toplam {csvData.length} satır bulundu. Lütfen verileri kontrol edin ve eğitim seviyesini seçin.
             </p>
           </div>
-
-          {/* Import Results */}
-          {importStats.total > 0 && (
-            <div className={`p-4 rounded-lg ${
-              importStats.success > 0 ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
-            }`}>
-              <h4 className="font-medium text-gray-900 mb-2">İçe Aktarma Sonuçları</h4>
-              <div className="grid grid-cols-3 gap-4 mb-3">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-green-600">{importStats.success}</div>
-                  <div className="text-xs text-gray-600">Başarılı</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-600">{importStats.duplicates}</div>
-                  <div className="text-xs text-gray-600">Zaten Mevcut</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-red-600">{importStats.failed}</div>
-                  <div className="text-xs text-gray-600">Başarısız</div>
-                </div>
+          
+          <Select
+            label="Eğitim Seviyesi"
+            value={selectedLevel}
+            onChange={setSelectedLevel}
+            options={EDUCATION_LEVELS.map(level => ({
+              value: level,
+              label: level
+            }))}
+            required
+          />
+          
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-gray-50 p-3 border-b border-gray-200">
+              <div className="grid grid-cols-3 gap-4 font-medium text-gray-700">
+                <div>ADI</div>
+                <div>SOYADI</div>
+                <div>GÖREVİ</div>
               </div>
-              
-              {importErrors.length > 0 && (
-                <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200 max-h-40 overflow-y-auto">
-                  <h5 className="text-sm font-medium text-red-800 mb-1">Hatalar:</h5>
-                  <ul className="text-xs text-red-700 space-y-1">
-                    {importErrors.map((error, index) => (
-                      <li key={index}>• {error}</li>
-                    ))}
-                  </ul>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {csvData.slice(0, 10).map((row, index) => (
+                <div key={index} className="p-3 border-b border-gray-200 last:border-b-0">
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>{row[0] || '-'}</div>
+                    <div>{row[1] || '-'}</div>
+                    <div>{row[2] || '-'}</div>
+                  </div>
+                </div>
+              ))}
+              {csvData.length > 10 && (
+                <div className="p-3 text-center text-sm text-gray-500">
+                  ... ve {csvData.length - 10} satır daha
                 </div>
               )}
             </div>
-          )}
-
-          {/* Buttons */}
+          </div>
+          
           <div className="flex justify-end space-x-3">
             <Button
-              onClick={closeTeacherImportModal}
+              onClick={() => setIsTeacherImportModalOpen(false)}
               variant="secondary"
             >
               İptal
             </Button>
             <Button
-              onClick={importTeachersFromExcel}
+              onClick={importTeachersFromCsv}
               variant="primary"
-              disabled={excelData.length === 0 || !selectedLevel || isImporting}
             >
-              {isImporting ? 'İçe Aktarılıyor...' : 'İçe Aktar'}
+              İçe Aktar ({csvData.length} öğretmen)
             </Button>
           </div>
         </div>
       </Modal>
-
-      {/* Subject Import Modal */}
+      
+      {/* Ders CSV İçe Aktarma Modal */}
       <Modal
         isOpen={isSubjectImportModalOpen}
-        onClose={closeSubjectImportModal}
-        title="Excel'den Ders İçe Aktar"
+        onClose={() => setIsSubjectImportModalOpen(false)}
+        title="CSV'den Ders İçe Aktar"
         size="lg"
       >
-        <div className="space-y-6">
-          {/* Preview */}
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-              <h3 className="text-sm font-medium text-gray-700">Önizleme ({excelData.length} kayıt)</h3>
-            </div>
-            <div className="max-h-60 overflow-y-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ders Adı</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {excelData.slice(0, 10).map((row, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.name}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {excelData.length > 10 && (
-                <div className="px-4 py-2 text-center text-sm text-gray-500">
-                  ... ve {excelData.length - 10} kayıt daha
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Settings */}
-          <div>
-            <Select
-              label="Ders Seviyesi"
-              value={selectedLevel}
-              onChange={setSelectedLevel}
-              options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
-              required
-            />
-            <p className="mt-2 text-sm text-gray-500">
-              Tüm dersler için aynı seviye kullanılacaktır. Daha sonra dersler sayfasından düzenleyebilirsiniz.
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-medium text-blue-800 mb-2">CSV Dosyası: {csvFileName}</h4>
+            <p className="text-sm text-blue-700">
+              Toplam {csvData.length} satır bulundu. Lütfen verileri kontrol edin ve eğitim seviyesini seçin.
             </p>
           </div>
-
-          {/* Import Results */}
-          {importStats.total > 0 && (
-            <div className={`p-4 rounded-lg ${
-              importStats.success > 0 ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
-            }`}>
-              <h4 className="font-medium text-gray-900 mb-2">İçe Aktarma Sonuçları</h4>
-              <div className="grid grid-cols-3 gap-4 mb-3">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-green-600">{importStats.success}</div>
-                  <div className="text-xs text-gray-600">Başarılı</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-yellow-600">{importStats.duplicates}</div>
-                  <div className="text-xs text-gray-600">Zaten Mevcut</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-red-600">{importStats.failed}</div>
-                  <div className="text-xs text-gray-600">Başarısız</div>
-                </div>
+          
+          <Select
+            label="Eğitim Seviyesi"
+            value={selectedLevel}
+            onChange={setSelectedLevel}
+            options={EDUCATION_LEVELS.map(level => ({
+              value: level,
+              label: level
+            }))}
+            required
+          />
+          
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-gray-50 p-3 border-b border-gray-200">
+              <div className="grid grid-cols-1 gap-4 font-medium text-gray-700">
+                <div>DERS ADI</div>
               </div>
-              
-              {importErrors.length > 0 && (
-                <div className="mt-3 p-3 bg-red-50 rounded-lg border border-red-200 max-h-40 overflow-y-auto">
-                  <h5 className="text-sm font-medium text-red-800 mb-1">Hatalar:</h5>
-                  <ul className="text-xs text-red-700 space-y-1">
-                    {importErrors.map((error, index) => (
-                      <li key={index}>• {error}</li>
-                    ))}
-                  </ul>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {csvData.slice(0, 10).map((row, index) => (
+                <div key={index} className="p-3 border-b border-gray-200 last:border-b-0">
+                  <div className="grid grid-cols-1 gap-4 text-sm">
+                    <div>{row[0] || '-'}</div>
+                  </div>
+                </div>
+              ))}
+              {csvData.length > 10 && (
+                <div className="p-3 text-center text-sm text-gray-500">
+                  ... ve {csvData.length - 10} satır daha
                 </div>
               )}
             </div>
-          )}
-
-          {/* Buttons */}
+          </div>
+          
           <div className="flex justify-end space-x-3">
             <Button
-              onClick={closeSubjectImportModal}
+              onClick={() => setIsSubjectImportModalOpen(false)}
               variant="secondary"
             >
               İptal
             </Button>
             <Button
-              onClick={importSubjectsFromExcel}
+              onClick={importSubjectsFromCsv}
               variant="primary"
-              disabled={excelData.length === 0 || !selectedLevel || isImporting}
             >
-              {isImporting ? 'İçe Aktarılıyor...' : 'İçe Aktar'}
+              İçe Aktar ({csvData.length} ders)
             </Button>
           </div>
         </div>

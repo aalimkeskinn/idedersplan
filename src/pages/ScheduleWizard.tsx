@@ -320,7 +320,11 @@ const ScheduleWizard = () => {
         return (
           <WizardStepClasses
             data={wizardData}
-            onUpdate={(data) => updateWizardData('classes', data.classes)}
+            onUpdate={(data) => {
+              if (data.classes) {
+                updateWizardData('classes', data.classes);
+              }
+            }}
             classes={classes}
           />
         );
@@ -329,7 +333,11 @@ const ScheduleWizard = () => {
         return (
           <WizardStepClassrooms
             data={wizardData}
-            onUpdate={(data) => updateWizardData('classrooms', data.classrooms)}
+            onUpdate={(data) => {
+              if (data.classrooms) {
+                updateWizardData('classrooms', data.classrooms);
+              }
+            }}
           />
         );
       
@@ -337,7 +345,11 @@ const ScheduleWizard = () => {
         return (
           <WizardStepTeachers
             data={wizardData}
-            onUpdate={(data) => updateWizardData('teachers', data.teachers)}
+            onUpdate={(data) => {
+              if (data.teachers) {
+                updateWizardData('teachers', data.teachers);
+              }
+            }}
             teachers={teachers}
           />
         );
@@ -346,7 +358,11 @@ const ScheduleWizard = () => {
         return (
           <WizardStepConstraints
             data={wizardData}
-            onUpdate={(data) => updateWizardData('constraints', data.constraints)}
+            onUpdate={(data) => {
+              if (data.constraints) {
+                updateWizardData('constraints', data.constraints);
+              }
+            }}
             teachers={teachers}
             classes={classes}
             subjects={subjects}

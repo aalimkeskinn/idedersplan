@@ -433,6 +433,32 @@ const ScheduleWizard = () => {
     return !!teacherConstraint;
   };
 
+  // CRITICAL: Check if a class is unavailable at a specific time slot
+  const isClassUnavailable = (classId: string, day: string, period: string): boolean => {
+    const classConstraint = wizardData.constraints.timeConstraints.find(c => 
+      c.entityType === 'class' && 
+      c.entityId === classId && 
+      c.day === day && 
+      c.period === period && 
+      c.constraintType === 'unavailable'
+    );
+    
+    return !!classConstraint;
+  };
+
+  // NEW: Check if a subject is unavailable at a specific time slot
+  const isSubjectUnavailable = (subjectId: string, day: string, period: string): boolean => {
+    const subjectConstraint = wizardData.constraints.timeConstraints.find(c => 
+      c.entityType === 'subject' && 
+      c.entityId === subjectId && 
+      c.day === day && 
+      c.period === period && 
+      c.constraintType === 'unavailable'
+    );
+    
+    return !!subjectConstraint;
+  };
+
   // Enhanced schedule generation algorithm with constraint checking
   const generateScheduleForTeacher = (
     teacherId: string,
@@ -476,7 +502,7 @@ const ScheduleWizard = () => {
         };
       }
 
-      const lunchPeriod = (teacher.level === 'İlkokul' || teacher.level === 'Anaokulu') ? '5' : '6';
+      const lunchPeriod = (teacher.level === 'İlkokul' || teacher.level === 'Anaokul') ? '5' : '6';
       schedule[day][lunchPeriod] = {
         classId: 'fixed-period',
         subjectId: 'fixed-lunch'
@@ -543,16 +569,12 @@ const ScheduleWizard = () => {
         const randomClass = compatibleClasses[Math.floor(Math.random() * compatibleClasses.length)];
         const randomSubject = compatibleSubjects[Math.floor(Math.random() * compatibleSubjects.length)];
         
-        // Check if class has any unavailable constraints for this slot
-        const classConstraint = wizardData.constraints.timeConstraints.find(c => 
-          c.entityType === 'class' && 
-          c.entityId === randomClass.id && 
-          c.day === randomDay && 
-          c.period === randomPeriod && 
-          c.constraintType === 'unavailable'
-        );
+        // ENHANCED: Check all constraint types before assignment
+        const hasTeacherConstraint = isSlotUnavailable(teacherId, randomDay, randomPeriod);
+        const hasClassConstraint = isClassUnavailable(randomClass.id, randomDay, randomPeriod);
+        const hasSubjectConstraint = isSubjectUnavailable(randomSubject.id, randomDay, randomPeriod);
         
-        if (!classConstraint) {
+        if (!hasTeacherConstraint && !hasClassConstraint && !hasSubjectConstraint) {
           schedule[randomDay][randomPeriod] = {
             classId: randomClass.id,
             subjectId: randomSubject.id
@@ -561,7 +583,13 @@ const ScheduleWizard = () => {
           assignedHours++;
           console.log(`✅ Ders atandı: ${randomDay} ${randomPeriod}. ders - ${randomClass.name} - ${randomSubject.name}`);
         } else {
-          console.log(`⚠️ Sınıf kısıtlaması nedeniyle atama yapılamadı: ${randomDay} ${randomPeriod}. ders - ${randomClass.name}`);
+          // Log which constraint blocked the assignment
+          const constraintReasons = [];
+          if (hasTeacherConstraint) constraintReasons.push(`Öğretmen (${teacher.name})`);
+          if (hasClassConstraint) constraintReasons.push(`Sınıf (${randomClass.name})`);
+          if (hasSubjectConstraint) constraintReasons.push(`Ders (${randomSubject.name})`);
+          
+          console.log(`⚠️ Kısıtlama nedeniyle atama yapılamadı: ${randomDay} ${randomPeriod}. ders - ${constraintReasons.join(', ')} kısıtlaması`);
         }
       } else if (isSlotUnavailable(teacherId, randomDay, randomPeriod)) {
         console.log(`⚠️ Öğretmen kısıtlaması nedeniyle atama yapılamadı: ${randomDay} ${randomPeriod}. ders - ${teacher.name}`);

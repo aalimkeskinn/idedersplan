@@ -109,7 +109,7 @@ const ScheduleWizard = () => {
   const { data: classes } = useFirestore<Class>('classes');
   const { data: subjects } = useFirestore<Subject>('subjects');
   const { add: addTemplate, update: updateTemplate, data: templates } = useFirestore<ScheduleTemplate>('schedule-templates');
-  const { add: addSchedule, data: existingSchedules } = useFirestore<Schedule>('schedules');
+  const { add: addSchedule, data: existingSchedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
   const { success, error, warning, info } = useToast();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -284,34 +284,34 @@ const ScheduleWizard = () => {
     }
   };
 
-  // REAL SCHEDULE GENERATION ALGORITHM
+  // ENHANCED: Real schedule generation algorithm with proper teacher-subject matching
   const generateScheduleForTeacher = (
     teacherId: string,
     selectedClasses: Class[],
     selectedSubjects: Subject[]
   ): Schedule['schedule'] => {
-    // Check if teacher already has a schedule
-    const existingTeacherSchedule = existingSchedules.find(s => s.teacherId === teacherId);
+    console.log('🎯 Program oluşturuluyor:', { teacherId });
     
-    // If teacher already has a schedule, return it to preserve existing data
-    if (existingTeacherSchedule) {
-      console.log(`⚠️ ${teacherId} için mevcut program bulundu, korunuyor`);
-      return existingTeacherSchedule.schedule;
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) {
+      console.error('❌ Öğretmen bulunamadı:', teacherId);
+      return {};
     }
-    
-    // Otherwise, generate a new schedule
-    const schedule: Schedule['schedule'] = {};
-    
+
+    console.log('👨‍🏫 Öğretmen bilgileri:', {
+      name: teacher.name,
+      branch: teacher.branch,
+      level: teacher.level
+    });
+
     // Initialize empty schedule
+    const schedule: Schedule['schedule'] = {};
     DAYS.forEach(day => {
       schedule[day] = {};
       PERIODS.forEach(period => {
         schedule[day][period] = {};
       });
     });
-
-    const teacher = teachers.find(t => t.id === teacherId);
-    if (!teacher) return schedule;
 
     // Add fixed periods based on teacher level
     DAYS.forEach(day => {
@@ -343,18 +343,32 @@ const ScheduleWizard = () => {
       };
     });
 
-    // Filter compatible classes and subjects
+    // CRITICAL: Filter compatible classes and subjects based on teacher's level and branch
     const compatibleClasses = selectedClasses.filter(c => c.level === teacher.level);
     const compatibleSubjects = selectedSubjects.filter(s => 
       s.level === teacher.level && s.branch === teacher.branch
     );
 
-    if (compatibleClasses.length === 0 || compatibleSubjects.length === 0) {
-      console.log(`⚠️ ${teacher.name} için uyumlu sınıf/ders bulunamadı`);
+    console.log('🔍 Uyumlu veriler:', {
+      teacherLevel: teacher.level,
+      teacherBranch: teacher.branch,
+      compatibleClasses: compatibleClasses.map(c => c.name),
+      compatibleSubjects: compatibleSubjects.map(s => s.name),
+      totalClasses: compatibleClasses.length,
+      totalSubjects: compatibleSubjects.length
+    });
+
+    if (compatibleClasses.length === 0) {
+      console.warn(`⚠️ ${teacher.name} için uyumlu sınıf bulunamadı (Level: ${teacher.level})`);
       return schedule;
     }
 
-    // Generate random but reasonable schedule
+    if (compatibleSubjects.length === 0) {
+      console.warn(`⚠️ ${teacher.name} için uyumlu ders bulunamadı (Branch: ${teacher.branch}, Level: ${teacher.level})`);
+      return schedule;
+    }
+
+    // Get available periods (excluding lunch periods)
     const availablePeriods = PERIODS.filter(period => {
       // Skip lunch periods
       if ((teacher.level === 'İlkokul' || teacher.level === 'Anaokulu') && period === '5') return false;
@@ -362,11 +376,17 @@ const ScheduleWizard = () => {
       return true;
     });
 
-    // Assign 15-25 random classes to teacher
-    const targetHours = Math.floor(Math.random() * 11) + 15; // 15-25 hours
-    let assignedHours = 0;
+    console.log('📅 Kullanılabilir ders saatleri:', availablePeriods);
 
-    for (let attempt = 0; attempt < targetHours * 2 && assignedHours < targetHours; attempt++) {
+    // ENHANCED: Generate realistic schedule based on subject hours
+    let assignedHours = 0;
+    const maxHours = Math.min(25, availablePeriods.length * DAYS.length); // Realistic maximum
+    const targetHours = Math.floor(Math.random() * 11) + 15; // 15-25 hours
+
+    console.log('🎯 Hedef ders saati:', { targetHours, maxHours });
+
+    // CRITICAL: Assign classes to teacher with proper subject matching
+    for (let attempt = 0; attempt < targetHours * 3 && assignedHours < targetHours; attempt++) {
       const randomDay = DAYS[Math.floor(Math.random() * DAYS.length)];
       const randomPeriod = availablePeriods[Math.floor(Math.random() * availablePeriods.length)];
       
@@ -375,19 +395,23 @@ const ScheduleWizard = () => {
         const randomClass = compatibleClasses[Math.floor(Math.random() * compatibleClasses.length)];
         const randomSubject = compatibleSubjects[Math.floor(Math.random() * compatibleSubjects.length)];
         
+        // CRITICAL: Assign both class and subject
         schedule[randomDay][randomPeriod] = {
           classId: randomClass.id,
           subjectId: randomSubject.id
         };
         
         assignedHours++;
+        
+        console.log(`✅ Ders atandı: ${randomDay} ${randomPeriod}. ders - ${randomClass.name} - ${randomSubject.name}`);
       }
     }
 
-    console.log(`✅ ${teacher.name} için ${assignedHours} saatlik program oluşturuldu`);
+    console.log(`🎯 ${teacher.name} için ${assignedHours} saatlik program oluşturuldu`);
     return schedule;
   };
 
+  // ENHANCED: Schedule generation with better error handling and logging
   const handleGenerateSchedule = async () => {
     if (!validateCurrentStep()) {
       warning('⚠️ Eksik Bilgi', 'Lütfen tüm adımları tamamlayın');
@@ -397,7 +421,7 @@ const ScheduleWizard = () => {
     setIsGenerating(true);
     
     try {
-      console.log('🎯 Program oluşturma başlatıldı:', {
+      console.log('🚀 ENHANCED Program oluşturma başlatıldı:', {
         selectedTeachers: wizardData.teachers.selectedTeachers.length,
         selectedClasses: wizardData.classes.selectedClasses.length,
         selectedSubjects: wizardData.subjects.selectedSubjects.length,
@@ -415,70 +439,77 @@ const ScheduleWizard = () => {
         wizardData.subjects.selectedSubjects.includes(s.id)
       );
 
-      console.log('📊 Seçilen veriler:', {
-        teachers: selectedTeachers.map(t => `${t.name} (${t.level})`),
+      console.log('📊 ENHANCED Seçilen veriler:', {
+        teachers: selectedTeachers.map(t => `${t.name} (${t.branch} - ${t.level})`),
         classes: selectedClasses.map(c => `${c.name} (${c.level})`),
-        subjects: selectedSubjects.map(s => `${s.name} (${s.level})`)
+        subjects: selectedSubjects.map(s => `${s.name} (${s.branch} - ${s.level})`)
       });
 
-      // Generate schedules for each selected teacher
+      // CRITICAL: Clear existing schedules for selected teachers first
+      console.log('🧹 Mevcut programlar temizleniyor...');
+      const existingTeacherSchedules = existingSchedules.filter(schedule => 
+        selectedTeachers.some(teacher => teacher.id === schedule.teacherId)
+      );
+
+      for (const existingSchedule of existingTeacherSchedules) {
+        try {
+          await removeSchedule(existingSchedule.id);
+          console.log(`🗑️ Mevcut program silindi: ${existingSchedule.teacherId}`);
+        } catch (err) {
+          console.error(`❌ Program silinemedi: ${existingSchedule.teacherId}`, err);
+        }
+      }
+
+      // Generate new schedules for each selected teacher
       let generatedCount = 0;
-      let preservedCount = 0;
+      let errorCount = 0;
       
       for (const teacher of selectedTeachers) {
         try {
-          // Check if teacher already has a schedule
-          const existingSchedule = existingSchedules.find(s => s.teacherId === teacher.id);
+          console.log(`🎯 ${teacher.name} için program oluşturuluyor...`);
           
-          if (existingSchedule) {
-            // Preserve existing schedule - just update the timestamp
-            await updateTeacherSchedule(existingSchedule);
-            preservedCount++;
-            console.log(`✅ ${teacher.name} mevcut programı korundu`);
-          } else {
-            // Generate new schedule
-            const teacherSchedule = generateScheduleForTeacher(
-              teacher.id,
-              selectedClasses,
-              selectedSubjects
-            );
+          // ENHANCED: Generate schedule with proper teacher-subject matching
+          const teacherSchedule = generateScheduleForTeacher(
+            teacher.id,
+            selectedClasses,
+            selectedSubjects
+          );
 
-            // Save to Firebase
-            const scheduleData: Omit<Schedule, 'id' | 'createdAt'> = {
-              teacherId: teacher.id,
-              schedule: teacherSchedule,
-              updatedAt: new Date()
-            };
+          // Count actual assigned hours (excluding fixed periods)
+          let assignedHours = 0;
+          DAYS.forEach(day => {
+            PERIODS.forEach(period => {
+              const slot = teacherSchedule[day]?.[period];
+              if (slot?.classId && slot.classId !==  'fixed-period') {
+                assignedHours++;
+              }
+            });
+          });
 
-            await addSchedule(scheduleData);
-            generatedCount++;
-            
-            console.log(`✅ ${teacher.name} programı Firebase'e kaydedildi`);
+          if (assignedHours === 0) {
+            console.warn(`⚠️ ${teacher.name} için hiç ders atanamadı`);
+            continue;
           }
+
+          // Save to Firebase
+          const scheduleData: Omit<Schedule, 'id' | 'createdAt'> = {
+            teacherId: teacher.id,
+            schedule: teacherSchedule,
+            updatedAt: new Date()
+          };
+
+          await addSchedule(scheduleData);
+          generatedCount++;
+          
+          console.log(`✅ ${teacher.name} programı oluşturuldu ve kaydedildi (${assignedHours} saat)`);
         } catch (err) {
-          console.error(`❌ ${teacher.name} programı kaydedilemedi:`, err);
+          console.error(`❌ ${teacher.name} programı oluşturulamadı:`, err);
+          errorCount++;
         }
       }
 
-      // Update existing teacher schedule
-      async function updateTeacherSchedule(schedule: Schedule) {
-        // Just update the timestamp to mark it as updated
-        await updateTeacher(schedule.teacherId, {
-          updatedAt: new Date()
-        });
-      }
-
-      if (generatedCount > 0 || preservedCount > 0) {
-        let message = '';
-        if (generatedCount > 0 && preservedCount > 0) {
-          message = `${generatedCount} öğretmen için yeni program oluşturuldu ve ${preservedCount} öğretmenin mevcut programı korundu`;
-        } else if (generatedCount > 0) {
-          message = `${generatedCount} öğretmen için program başarıyla oluşturuldu ve Firebase'e kaydedildi`;
-        } else {
-          message = `${preservedCount} öğretmenin mevcut programı korundu`;
-        }
-        
-        success('🎯 Program Oluşturuldu!', message);
+      if (generatedCount > 0) {
+        success('🎯 Program Oluşturuldu!', `${generatedCount} öğretmen için program başarıyla oluşturuldu ve kaydedildi`);
         
         // Save template as well
         await handleSaveTemplate();

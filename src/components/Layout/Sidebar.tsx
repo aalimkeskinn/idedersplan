@@ -20,25 +20,11 @@ const Sidebar = () => {
       description: 'Ana kontrol paneli'
     },
     { 
-      to: '/subjects', 
-      icon: BookOpen, 
-      label: 'Dersler', 
-      color: 'ide-orange',
-      description: 'Ders yönetimi'
-    },
-    { 
-      to: '/teachers', 
-      icon: Users, 
-      label: 'Öğretmenler', 
-      color: 'ide-primary',
-      description: 'Öğretmen kayıtları'
-    },
-    { 
-      to: '/classes', 
-      icon: Building, 
-      label: 'Sınıflar', 
-      color: 'ide-secondary',
-      description: 'Sınıf yönetimi'
+      to: '/schedule-wizard', 
+      icon: Zap, 
+      label: 'Program Sihirbazı', 
+      color: 'ide-accent',
+      description: 'Otomatik program oluştur'
     },
     { 
       to: '/constraints', 
@@ -46,13 +32,6 @@ const Sidebar = () => {
       label: 'Zaman Kısıtlamaları', 
       color: 'ide-accent',
       description: 'Zaman tablosu kısıtlamaları'
-    },
-    { 
-      to: '/schedule-wizard', 
-      icon: Zap, 
-      label: 'Program Sihirbazı', 
-      color: 'ide-accent',
-      description: 'Otomatik program oluştur'
     },
     { 
       to: '/schedules', 

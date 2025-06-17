@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { BookOpen, Plus, Minus, Star, Clock } from 'lucide-react';
-import { Subject } from '../../types';
+import { BookOpen, Plus, Minus, Star, Clock, Edit, Trash2 } from 'lucide-react';
+import { Subject, EDUCATION_LEVELS } from '../../types';
 import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
 import Button from '../UI/Button';
 import Select from '../UI/Select';
+import Modal from '../UI/Modal';
+import Input from '../UI/Input';
 
 interface WizardStepSubjectsProps {
   data: WizardData['subjects'];
@@ -12,8 +14,16 @@ interface WizardStepSubjectsProps {
 }
 
 const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate }) => {
-  const { data: subjects } = useFirestore<Subject>('subjects');
+  const { data: subjects, add: addSubject, update: updateSubject, remove: removeSubject } = useFirestore<Subject>('subjects');
   const [selectedLevel, setSelectedLevel] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    branch: '',
+    level: '',
+    weeklyHours: ''
+  });
 
   const levelOptions = [
     { value: '', label: 'Tüm Seviyeler' },
@@ -116,6 +126,56 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     }
   };
 
+  // New Subject Modal Functions
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const subjectData = {
+      ...formData,
+      weeklyHours: parseInt(formData.weeklyHours)
+    };
+
+    try {
+      if (editingSubject) {
+        await updateSubject(editingSubject.id, subjectData);
+      } else {
+        await addSubject(subjectData as Omit<Subject, 'id' | 'createdAt'>);
+      }
+      resetForm();
+    } catch (error) {
+      console.error("Error saving subject:", error);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({ name: '', branch: '', level: '', weeklyHours: '' });
+    setEditingSubject(null);
+    setIsModalOpen(false);
+  };
+
+  const handleEdit = (subject: Subject) => {
+    setFormData({
+      name: subject.name,
+      branch: subject.branch,
+      level: subject.level,
+      weeklyHours: subject.weeklyHours.toString()
+    });
+    setEditingSubject(subject);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await removeSubject(id);
+      // If the deleted subject was selected, remove it from selection
+      if (data.selectedSubjects.includes(id)) {
+        handleSubjectToggle(id);
+      }
+    } catch (error) {
+      console.error("Error deleting subject:", error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -129,14 +189,23 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
         </p>
       </div>
 
-      {/* Filter */}
-      <div className="max-w-md mx-auto">
-        <Select
-          label="Seviye Filtresi"
-          value={selectedLevel}
-          onChange={setSelectedLevel}
-          options={levelOptions}
-        />
+      {/* Filter and Add Button */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="md:w-1/2">
+          <Select
+            label="Seviye Filtresi"
+            value={selectedLevel}
+            onChange={setSelectedLevel}
+            options={levelOptions}
+          />
+        </div>
+        <Button
+          onClick={() => setIsModalOpen(true)}
+          icon={Plus}
+          variant="primary"
+        >
+          Yeni Ders Ekle
+        </Button>
       </div>
 
       {/* Subject Selection */}
@@ -152,12 +221,11 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                 return (
                   <div
                     key={subject.id}
-                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                    className={`p-3 rounded-lg border-2 transition-all duration-200 ${
                       isSelected
                         ? 'bg-blue-50 border-blue-300 text-blue-800'
                         : 'bg-white border-gray-200 hover:border-gray-300'
                     }`}
-                    onClick={() => handleSubjectToggle(subject.id)}
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -166,10 +234,30 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                           {subject.branch} • {subject.level} • {subject.weeklyHours} saat/hafta
                         </p>
                       </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
-                      }`}>
-                        {isSelected && <Plus className="w-3 h-3 text-white rotate-45" />}
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEdit(subject)}
+                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="Dersi düzenle"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(subject.id)}
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Dersi sil"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleSubjectToggle(subject.id)}
+                          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                            isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+                          }`}
+                          title={isSelected ? "Seçimi kaldır" : "Seç"}
+                        >
+                          {isSelected ? <Minus className="w-3 h-3 text-white" /> : <Plus className="w-3 h-3 text-gray-500" />}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -324,6 +412,64 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
           </div>
         </div>
       </div>
+
+      {/* Subject Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={resetForm}
+        title={editingSubject ? 'Ders Düzenle' : 'Yeni Ders Ekle'}
+      >
+        <form onSubmit={handleSubmit}>
+          <Input
+            label="Ders Adı"
+            value={formData.name}
+            onChange={(value) => setFormData({ ...formData, name: value })}
+            placeholder="Örn: Matematik"
+            required
+          />
+          
+          <Input
+            label="Branş"
+            value={formData.branch}
+            onChange={(value) => setFormData({ ...formData, branch: value })}
+            placeholder="Örn: Fen Bilimleri"
+            required
+          />
+          
+          <Select
+            label="Eğitim Seviyesi"
+            value={formData.level}
+            onChange={(value) => setFormData({ ...formData, level: value })}
+            options={levelOptions.filter(option => option.value !== '')}
+            required
+          />
+
+          <Input
+            label="Haftalık Ders Saati"
+            type="number"
+            value={formData.weeklyHours}
+            onChange={(value) => setFormData({ ...formData, weeklyHours: value })}
+            placeholder="Örn: 4"
+            required
+          />
+
+          <div className="button-group-mobile mt-6">
+            <Button
+              type="button"
+              onClick={resetForm}
+              variant="secondary"
+            >
+              İptal
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+            >
+              {editingSubject ? 'Güncelle' : 'Kaydet'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

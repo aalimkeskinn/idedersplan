@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { Building, Users, Plus, Minus, AlertTriangle } from 'lucide-react';
-import { Class } from '../../types';
+import { Building, Users, Plus, Minus, AlertTriangle, Edit, Trash2 } from 'lucide-react';
+import { Class, EDUCATION_LEVELS } from '../../types';
+import { useFirestore } from '../../hooks/useFirestore';
 import Button from '../UI/Button';
 import Select from '../UI/Select';
+import Modal from '../UI/Modal';
+import Input from '../UI/Input';
 
 interface WizardStepClassesProps {
   data: {
@@ -21,7 +24,14 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   onUpdate,
   classes
 }) => {
+  const { add: addClass, update: updateClass, remove: removeClass } = useFirestore<Class>('classes');
   const [selectedLevel, setSelectedLevel] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    level: ''
+  });
   
   // Initialize classes data if it doesn't exist
   const classesData = data.classes || {
@@ -129,6 +139,49 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
     });
   };
 
+  // New Class Modal Functions
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      if (editingClass) {
+        await updateClass(editingClass.id, formData);
+      } else {
+        await addClass(formData as Omit<Class, 'id' | 'createdAt'>);
+      }
+      resetForm();
+    } catch (error) {
+      console.error("Error saving class:", error);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({ name: '', level: '' });
+    setEditingClass(null);
+    setIsModalOpen(false);
+  };
+
+  const handleEdit = (classItem: Class) => {
+    setFormData({
+      name: classItem.name,
+      level: classItem.level
+    });
+    setEditingClass(classItem);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await removeClass(id);
+      // If the deleted class was selected, remove it from selection
+      if (classesData.selectedClasses.includes(id)) {
+        handleClassToggle(id);
+      }
+    } catch (error) {
+      console.error("Error deleting class:", error);
+    }
+  };
+
   const levelOptions = [
     { value: '', label: 'Tüm Seviyeler' },
     { value: 'Anaokulu', label: 'Anaokulu' },
@@ -140,7 +193,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
     ? classes.filter(c => c.level === selectedLevel)
     : classes;
 
-  const selectedClasses = classes.filter(c => 
+  const selectedClassItems = classes.filter(c => 
     classesData.selectedClasses.includes(c.id)
   );
 
@@ -162,14 +215,23 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
         </p>
       </div>
 
-      {/* Filter */}
-      <div className="max-w-md mx-auto">
-        <Select
-          label="Seviye Filtresi"
-          value={selectedLevel}
-          onChange={setSelectedLevel}
-          options={levelOptions}
-        />
+      {/* Filter and Add Button */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="md:w-1/2">
+          <Select
+            label="Seviye Filtresi"
+            value={selectedLevel}
+            onChange={setSelectedLevel}
+            options={levelOptions}
+          />
+        </div>
+        <Button
+          onClick={() => setIsModalOpen(true)}
+          icon={Plus}
+          variant="primary"
+        >
+          Yeni Sınıf Ekle
+        </Button>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -244,18 +306,31 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
                         </div>
                       </div>
                       
-                      {isSelected && (
+                      <div className="flex items-center space-x-1">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleClassToggle(classItem.id);
-                          }}
-                          className="text-red-500 hover:text-red-700 p-1"
-                          title="Sınıfı kaldır"
+                          onClick={() => handleEdit(classItem)}
+                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="Sınıfı düzenle"
                         >
-                          <Minus className="w-4 h-4" />
+                          <Edit size={16} />
                         </button>
-                      )}
+                        <button
+                          onClick={() => handleDelete(classItem.id)}
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Sınıfı sil"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                        {isSelected && (
+                          <button
+                            onClick={() => handleClassToggle(classItem.id)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Sınıfı kaldır"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     
                     {isSelected && (
@@ -297,7 +372,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
         ))}
       </div>
 
-      {selectedClasses.length === 0 && (
+      {selectedClassItems.length === 0 && (
         <div className="text-center py-8">
           <Building className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Sınıf Seçin</h3>
@@ -307,7 +382,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
         </div>
       )}
 
-      {selectedClasses.length > 0 && (
+      {selectedClassItems.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-start">
             <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" />
@@ -323,6 +398,47 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
           </div>
         </div>
       )}
+
+      {/* Class Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={resetForm}
+        title={editingClass ? 'Sınıf Düzenle' : 'Yeni Sınıf Ekle'}
+      >
+        <form onSubmit={handleSubmit}>
+          <Input
+            label="Sınıf Adı"
+            value={formData.name}
+            onChange={(value) => setFormData({ ...formData, name: value })}
+            placeholder="Örn: 5A, 7B"
+            required
+          />
+          
+          <Select
+            label="Eğitim Seviyesi"
+            value={formData.level}
+            onChange={(value) => setFormData({ ...formData, level: value })}
+            options={levelOptions.filter(option => option.value !== '')}
+            required
+          />
+
+          <div className="button-group-mobile mt-6">
+            <Button
+              type="button"
+              onClick={resetForm}
+              variant="secondary"
+            >
+              İptal
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+            >
+              {editingClass ? 'Güncelle' : 'Kaydet'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

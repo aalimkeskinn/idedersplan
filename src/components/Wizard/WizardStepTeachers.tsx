@@ -1,8 +1,12 @@
-import React from 'react';
-import { Users, UserCheck, Clock, AlertTriangle } from 'lucide-react';
-import { Teacher } from '../../types';
+import React, { useState } from 'react';
+import { Users, UserCheck, Clock, AlertTriangle, Edit, Trash2, Plus } from 'lucide-react';
+import { Teacher, EDUCATION_LEVELS } from '../../types';
 import { WizardData } from '../../types/wizard';
+import { useFirestore } from '../../hooks/useFirestore';
 import Button from '../UI/Button';
+import Modal from '../UI/Modal';
+import Input from '../UI/Input';
+import Select from '../UI/Select';
 
 interface WizardStepTeachersProps {
   data: WizardData;
@@ -15,6 +19,16 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
   onUpdate,
   teachers
 }) => {
+  const { add: addTeacher, update: updateTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    branch: '',
+    level: ''
+  });
+  const [selectedLevel, setSelectedLevel] = useState('');
+
   const handleTeacherToggle = (teacherId: string) => {
     const currentTeachers = data.selectedTeachers || [];
     const isSelected = currentTeachers.includes(teacherId);
@@ -41,21 +55,81 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
   };
 
   const handleSelectAll = () => {
+    const filteredTeachers = selectedLevel 
+      ? teachers.filter(t => t.level === selectedLevel)
+      : teachers;
+    
     onUpdate({
-      selectedTeachers: teachers.map(t => t.id)
+      selectedTeachers: filteredTeachers.map(t => t.id)
     });
   };
 
   const handleDeselectAll = () => {
+    const filteredTeachers = selectedLevel 
+      ? teachers.filter(t => t.level === selectedLevel)
+      : teachers;
+    
+    const newSelectedTeachers = (data.selectedTeachers || []).filter(
+      id => !filteredTeachers.some(t => t.id === id)
+    );
+    
     onUpdate({
-      selectedTeachers: []
+      selectedTeachers: newSelectedTeachers
     });
+  };
+
+  // New Teacher Modal Functions
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      if (editingTeacher) {
+        await updateTeacher(editingTeacher.id, formData);
+      } else {
+        await addTeacher(formData as Omit<Teacher, 'id' | 'createdAt'>);
+      }
+      resetForm();
+    } catch (error) {
+      console.error("Error saving teacher:", error);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({ name: '', branch: '', level: '' });
+    setEditingTeacher(null);
+    setIsModalOpen(false);
+  };
+
+  const handleEdit = (teacher: Teacher) => {
+    setFormData({
+      name: teacher.name,
+      branch: teacher.branch,
+      level: teacher.level
+    });
+    setEditingTeacher(teacher);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await removeTeacher(id);
+      // If the deleted teacher was selected, remove it from selection
+      if (data.selectedTeachers?.includes(id)) {
+        handleTeacherToggle(id);
+      }
+    } catch (error) {
+      console.error("Error deleting teacher:", error);
+    }
   };
 
   const selectedTeachers = data.selectedTeachers || [];
   const teacherWorkloads = data.teacherWorkloads || {};
   
-  const groupedTeachers = teachers.reduce((acc, teacher) => {
+  const filteredTeachers = selectedLevel 
+    ? teachers.filter(t => t.level === selectedLevel)
+    : teachers;
+  
+  const groupedTeachers = filteredTeachers.reduce((acc, teacher) => {
     if (!acc[teacher.level]) {
       acc[teacher.level] = [];
     }
@@ -75,6 +149,13 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
     return 'text-red-600';
   };
 
+  const levelOptions = [
+    { value: '', label: 'Tüm Seviyeler' },
+    { value: 'Anaokulu', label: 'Anaokulu' },
+    { value: 'İlkokul', label: 'İlkokul' },
+    { value: 'Ortaokul', label: 'Ortaokul' }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -83,6 +164,25 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
         <p className="text-gray-600">
           Programa dahil edilecek öğretmenleri seçin ve ders yüklerini belirleyin
         </p>
+      </div>
+
+      {/* Filter and Add Button */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="md:w-1/2">
+          <Select
+            label="Seviye Filtresi"
+            value={selectedLevel}
+            onChange={setSelectedLevel}
+            options={levelOptions}
+          />
+        </div>
+        <Button
+          onClick={() => setIsModalOpen(true)}
+          icon={Plus}
+          variant="primary"
+        >
+          Yeni Öğretmen Ekle
+        </Button>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -99,14 +199,14 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
               variant="secondary"
               size="sm"
             >
-              Tümünü Seç
+              {selectedLevel ? `${selectedLevel} Tümünü Seç` : 'Tümünü Seç'}
             </Button>
             <Button
               onClick={handleDeselectAll}
               variant="secondary"
               size="sm"
             >
-              Tümünü Kaldır
+              {selectedLevel ? `${selectedLevel} Tümünü Kaldır` : 'Tümünü Kaldır'}
             </Button>
           </div>
         </div>
@@ -174,12 +274,39 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
                         </div>
                       </div>
                       
-                      {isSelected && (
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">Haftalık Ders Yükü:</span>
-                          </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEdit(teacher)}
+                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="Öğretmeni düzenle"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(teacher.id)}
+                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Öğretmeni sil"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                        {isSelected && (
+                          <button
+                            onClick={() => handleTeacherToggle(teacher.id)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Öğretmeni kaldır"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {isSelected && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-medium text-gray-700">
+                            Haftalık Ders Yükü:
+                          </label>
                           <div className="flex items-center space-x-2">
                             <input
                               type="range"
@@ -187,18 +314,18 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
                               max="35"
                               value={workload}
                               onChange={(e) => handleWorkloadChange(teacher.id, parseInt(e.target.value))}
-                              className="w-20"
+                              className="w-24"
                             />
                             <span className={`font-medium ${getWorkloadColor(workload)} min-w-[3rem] text-right`}>
                               {workload} saat
                             </span>
+                            {workload > 30 && (
+                              <AlertTriangle className="w-4 h-4 text-red-500" title="Yüksek ders yükü" />
+                            )}
                           </div>
-                          {workload > 30 && (
-                            <AlertTriangle className="w-4 h-4 text-red-500" title="Yüksek ders yükü" />
-                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -233,6 +360,55 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
           </div>
         </div>
       )}
+
+      {/* Teacher Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={resetForm}
+        title={editingTeacher ? 'Öğretmen Düzenle' : 'Yeni Öğretmen Ekle'}
+      >
+        <form onSubmit={handleSubmit}>
+          <Input
+            label="Ad Soyad"
+            value={formData.name}
+            onChange={(value) => setFormData({ ...formData, name: value })}
+            placeholder="Örn: Ahmet Yılmaz"
+            required
+          />
+          
+          <Input
+            label="Branş"
+            value={formData.branch}
+            onChange={(value) => setFormData({ ...formData, branch: value })}
+            placeholder="Örn: Matematik"
+            required
+          />
+          
+          <Select
+            label="Eğitim Seviyesi"
+            value={formData.level}
+            onChange={(value) => setFormData({ ...formData, level: value })}
+            options={levelOptions.filter(option => option.value !== '')}
+            required
+          />
+
+          <div className="button-group-mobile mt-6">
+            <Button
+              type="button"
+              onClick={resetForm}
+              variant="secondary"
+            >
+              İptal
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+            >
+              {editingTeacher ? 'Güncelle' : 'Kaydet'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

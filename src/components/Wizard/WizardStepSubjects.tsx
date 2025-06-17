@@ -85,11 +85,14 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   };
 
   const handleHoursChange = (subjectId: string, hours: number) => {
+    // Ensure hours is between 1 and 10
+    const validatedHours = Math.max(1, Math.min(10, hours));
+    
     onUpdate({
       ...data,
       subjectHours: {
         ...data.subjectHours,
-        [subjectId]: Math.max(1, Math.min(10, hours))
+        [subjectId]: validatedHours
       }
     });
   };

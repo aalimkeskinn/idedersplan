@@ -8,12 +8,12 @@ import Home from './pages/Home';
 import Teachers from './pages/Teachers';
 import Classes from './pages/Classes';
 import Subjects from './pages/Subjects';
-import Constraints from './pages/Constraints';
 import Schedules from './pages/Schedules';
 import ScheduleWizard from './pages/ScheduleWizard';
 import AllSchedules from './pages/AllSchedules';
 import ClassSchedules from './pages/ClassSchedules';
 import PDFExport from './pages/PDFExport';
+import DataManagement from './pages/DataManagement';
 import ToastContainer from './components/UI/ToastContainer';
 
 function App() {
@@ -59,12 +59,12 @@ function App() {
               <Route path="teachers" element={<Teachers />} />
               <Route path="classes" element={<Classes />} />
               <Route path="subjects" element={<Subjects />} />
-              <Route path="constraints" element={<Constraints />} />
               <Route path="schedules" element={<Schedules />} />
               <Route path="schedule-wizard" element={<ScheduleWizard />} />
               <Route path="class-schedules" element={<ClassSchedules />} />
               <Route path="all-schedules" element={<AllSchedules />} />
               <Route path="pdf" element={<PDFExport />} />
+              <Route path="data-management" element={<DataManagement />} />
             </Route>
           </Routes>
         </Router>

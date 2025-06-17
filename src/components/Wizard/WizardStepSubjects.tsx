@@ -59,6 +59,54 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     { value: 'low', label: 'Düşük Öncelik' }
   ];
 
+  const distributionTypeOptions = [
+    { value: '1', label: '1' },
+    { value: '2', label: '2' },
+    { value: '1+1', label: '1+1' },
+    { value: '3', label: '3' },
+    { value: '1+1+1', label: '1+1+1' },
+    { value: '2+1', label: '2+1' },
+    { value: '4', label: '4' },
+    { value: '1+1+1+1', label: '1+1+1+1' },
+    { value: '2+1+1', label: '2+1+1' },
+    { value: '2+2', label: '2+2' },
+    { value: '5', label: '5' },
+    { value: '1+1+1+1+1', label: '1+1+1+1+1' },
+    { value: '2+1+1+1', label: '2+1+1+1' },
+    { value: '2+2+1', label: '2+2+1' },
+    { value: '3+2', label: '3+2' },
+    { value: '6', label: '6' },
+    { value: '2+2+2', label: '2+2+2' },
+    { value: '1+1+1', label: '1+1+1' },
+    { value: '4+2', label: '4+2' },
+    { value: '7', label: '7' },
+    { value: '2+2+2+1', label: '2+2+2+1' },
+    { value: '4+3', label: '4+3' },
+    { value: '5+2', label: '5+2' },
+    { value: '8', label: '8' },
+    { value: '2+2+2+2', label: '2+2+2+2' },
+    { value: '3+3+2', label: '3+3+2' },
+    { value: '4+2+2', label: '4+2+2' },
+    { value: '5+3', label: '5+3' },
+    { value: '9', label: '9' },
+    { value: '2+2+2+2+1', label: '2+2+2+2+1' },
+    { value: '3+3+3', label: '3+3+3' },
+    { value: '4+3+2', label: '4+3+2' },
+    { value: '5+4', label: '5+4' },
+    { value: '6+3', label: '6+3' },
+    { value: '10', label: '10' },
+    { value: '1+1+1+1+1+1', label: '1+1+1+1+1+1' },
+    { value: '4+4+2', label: '4+4+2' },
+    { value: '5+5', label: '5+5' },
+    { value: '6+4', label: '6+4' },
+    { value: '1*10', label: '1*10' },
+    { value: '12', label: '12' },
+    { value: '3+3+3+2', label: '3+3+3+2' },
+    { value: '6+5', label: '6+5' },
+    { value: '1*11', label: '1*11' },
+    { value: '12', label: '12' }
+  ];
+
   const filteredSubjects = subjects.filter(subject => 
     !selectedLevel || subject.level === selectedLevel
   );
@@ -159,7 +207,9 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
       weeklyHours: 4, // Default weekly hours
       shortName: formData.shortName || generateShortName(formData.name),
       color: formData.color || generateColor(),
-      assignedTeacher: formData.assignedTeacher
+      assignedTeacher: formData.assignedTeacher,
+      distributionType: formData.distributionType,
+      classrooms: formData.classrooms
     };
 
     try {
@@ -194,11 +244,11 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     setFormData({
       name: subject.name,
       shortName: (subject as any).shortName || generateShortName(subject.name),
-      distributionType: '',
+      distributionType: (subject as any).distributionType || '',
       canSplit: false,
       color: (subject as any).color || generateColor(),
       photo: '',
-      classrooms: '',
+      classrooms: (subject as any).classrooms || '',
       phoneNumber: '',
       assignedTeacher: (subject as any).assignedTeacher || ''
     });
@@ -507,11 +557,11 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
           </div>
 
           {/* Optional Fields */}
-          <Input
+          <Select
             label="Dağılım Şekli"
             value={formData.distributionType}
             onChange={(value) => setFormData({ ...formData, distributionType: value })}
-            placeholder="Ders dağılım şekli"
+            options={distributionTypeOptions}
           />
 
           <div className="flex items-center space-x-2 mb-4">

@@ -63,7 +63,7 @@ interface WizardData {
     classCapacities: { [classId: string]: number };
     classPreferences: { [classId: string]: string[] };
   };
-  classrooms: any[]; // Changed from object to array
+  classrooms: any[];
   teachers: {
     selectedTeachers: string[];
     teacherSubjects: { [teacherId: string]: string[] };
@@ -141,7 +141,7 @@ const ScheduleWizard = () => {
       classCapacities: {},
       classPreferences: {}
     },
-    classrooms: [], // Changed from object to empty array
+    classrooms: [],
     teachers: {
       selectedTeachers: [],
       teacherSubjects: {},
@@ -175,7 +175,7 @@ const ScheduleWizard = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // FIXED: Check for templateId in URL parameters to load existing template
+  // CRITICAL: Enhanced template loading with better error handling
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const templateId = urlParams.get('templateId');
@@ -183,10 +183,16 @@ const ScheduleWizard = () => {
     if (templateId && templates.length > 0) {
       const template = templates.find(t => t.id === templateId);
       if (template && template.wizardData) {
-        console.log('📝 Mevcut şablon yükleniyor:', template.name);
+        console.log('📝 ENHANCED Template yükleniyor:', {
+          templateId,
+          templateName: template.name,
+          hasWizardData: !!template.wizardData,
+          wizardDataKeys: Object.keys(template.wizardData || {})
+        });
+        
         setEditingTemplateId(templateId);
         
-        // CRITICAL: Ensure all required fields exist with defaults
+        // CRITICAL: Deep merge with defaults to ensure all fields exist
         const loadedData: WizardData = {
           basicInfo: {
             name: template.wizardData.basicInfo?.name || '',
@@ -240,6 +246,14 @@ const ScheduleWizard = () => {
           }
         };
         
+        console.log('✅ Template verisi yüklendi:', {
+          basicInfoName: loadedData.basicInfo.name,
+          subjectsCount: loadedData.subjects.selectedSubjects.length,
+          classesCount: loadedData.classes.selectedClasses.length,
+          teachersCount: loadedData.teachers.selectedTeachers.length,
+          classroomsCount: loadedData.classrooms.length
+        });
+        
         setWizardData(loadedData);
         
         // Mark completed steps based on loaded data
@@ -249,16 +263,18 @@ const ScheduleWizard = () => {
         if (loadedData.classes?.selectedClasses?.length > 0) completed.add(2);
         if (loadedData.classrooms?.length > 0) completed.add(3);
         if (loadedData.teachers?.selectedTeachers?.length > 0) completed.add(4);
-        // Constraints are optional
-        completed.add(5);
+        completed.add(5); // Constraints are optional
         if (loadedData.generationSettings?.algorithm) completed.add(6);
         
         setCompletedSteps(completed);
         
         success('✅ Şablon Yüklendi', `"${template.name}" şablonu düzenleme için yüklendi`);
+      } else {
+        console.warn('⚠️ Template bulunamadı veya wizardData eksik:', { templateId, template });
+        warning('⚠️ Template Yüklenemedi', 'Şablon verisi bulunamadı veya bozuk');
       }
     }
-  }, [location.search, templates, success]);
+  }, [location.search, templates, success, warning]);
 
   const currentStep = WIZARD_STEPS[currentStepIndex];
 
@@ -276,7 +292,7 @@ const ScheduleWizard = () => {
         return wizardData.classes.selectedClasses.length > 0;
       
       case 'classrooms':
-        return wizardData.classrooms.length > 0; // Updated validation for array
+        return wizardData.classrooms.length > 0;
       
       case 'teachers':
         return wizardData.teachers.selectedTeachers.length > 0;
@@ -310,14 +326,13 @@ const ScheduleWizard = () => {
   };
 
   const handleStepClick = (stepIndex: number) => {
-    // Allow going to previous completed steps or next step if current is valid
     if (stepIndex <= currentStepIndex || 
         (stepIndex === currentStepIndex + 1 && validateCurrentStep())) {
       setCurrentStepIndex(stepIndex);
     }
   };
 
-  // FIXED: Enhanced save template function with better error handling
+  // CRITICAL: Enhanced save template function with better Firebase handling
   const handleSaveTemplate = async () => {
     if (!wizardData.basicInfo.name) {
       warning('⚠️ Program Adı Gerekli', 'Lütfen program adını girin');
@@ -325,45 +340,70 @@ const ScheduleWizard = () => {
     }
 
     setIsSaving(true);
+    
     try {
-      const templateData: Omit<ScheduleTemplate, 'id' | 'createdAt'> = {
+      // CRITICAL: Create a complete template data object
+      const templateData = {
         name: wizardData.basicInfo.name,
         description: wizardData.basicInfo.description || '',
         academicYear: wizardData.basicInfo.academicYear,
         semester: wizardData.basicInfo.semester,
         updatedAt: new Date(),
-        wizardData: { ...wizardData }, // Deep copy to ensure all data is saved
+        wizardData: JSON.parse(JSON.stringify(wizardData)), // Deep clone to avoid reference issues
         generatedSchedules: [],
-        status: 'published'
+        status: 'published' as const
       };
 
-      console.log('💾 Şablon kaydediliyor:', {
+      console.log('💾 ENHANCED Template kayıt işlemi başlatıldı:', {
         isEditing: !!editingTemplateId,
         templateId: editingTemplateId,
         templateName: templateData.name,
-        dataKeys: Object.keys(templateData.wizardData)
+        dataSize: JSON.stringify(templateData).length,
+        wizardDataKeys: Object.keys(templateData.wizardData)
       });
 
+      let result;
+      
       if (editingTemplateId) {
-        // CRITICAL: Update existing template with proper data structure
-        const result = await updateTemplate(editingTemplateId, templateData);
-        console.log('✅ Şablon güncelleme sonucu:', result);
-        success('✅ Şablon Güncellendi', `"${templateData.name}" başarıyla güncellendi`);
+        // CRITICAL: Update existing template
+        console.log('🔄 Mevcut template güncelleniyor:', editingTemplateId);
+        result = await updateTemplate(editingTemplateId, templateData);
+        
+        if (result.success) {
+          console.log('✅ Template güncelleme başarılı');
+          success('✅ Şablon Güncellendi', `"${templateData.name}" başarıyla güncellendi`);
+        } else {
+          throw new Error(result.error || 'Güncelleme başarısız');
+        }
       } else {
         // Create new template
-        const result = await addTemplate(templateData);
-        console.log('✅ Yeni şablon oluşturma sonucu:', result);
-        success('✅ Şablon Kaydedildi', `"${templateData.name}" başarıyla kaydedildi`);
+        console.log('➕ Yeni template oluşturuluyor');
+        result = await addTemplate(templateData);
+        
+        if (result.success) {
+          console.log('✅ Yeni template oluşturma başarılı:', result.id);
+          setEditingTemplateId(result.id || null);
+          success('✅ Şablon Kaydedildi', `"${templateData.name}" başarıyla kaydedildi`);
+        } else {
+          throw new Error(result.error || 'Kayıt başarısız');
+        }
       }
-    } catch (err) {
-      console.error('❌ Şablon kayıt hatası:', err);
-      error('❌ Kayıt Hatası', 'Şablon kaydedilirken bir hata oluştu');
+      
+    } catch (err: any) {
+      console.error('❌ ENHANCED Template kayıt hatası:', {
+        error: err,
+        message: err.message,
+        isEditing: !!editingTemplateId,
+        templateId: editingTemplateId
+      });
+      
+      error('❌ Kayıt Hatası', `Şablon ${editingTemplateId ? 'güncellenirken' : 'kaydedilirken'} bir hata oluştu: ${err.message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ENHANCED: Real schedule generation algorithm with proper teacher-subject matching
+  // Enhanced schedule generation algorithm
   const generateScheduleForTeacher = (
     teacherId: string,
     selectedClasses: Class[],
@@ -394,13 +434,11 @@ const ScheduleWizard = () => {
 
     // Add fixed periods based on teacher level
     DAYS.forEach(day => {
-      // Preparation period (before 1st class)
       schedule[day]['prep'] = {
         classId: 'fixed-period',
         subjectId: 'fixed-prep'
       };
 
-      // Breakfast for middle school (between 1st and 2nd period)
       if (teacher.level === 'Ortaokul') {
         schedule[day]['breakfast'] = {
           classId: 'fixed-period',
@@ -408,21 +446,18 @@ const ScheduleWizard = () => {
         };
       }
 
-      // Lunch period
       const lunchPeriod = (teacher.level === 'İlkokul' || teacher.level === 'Anaokulu') ? '5' : '6';
       schedule[day][lunchPeriod] = {
         classId: 'fixed-period',
         subjectId: 'fixed-lunch'
       };
 
-      // Afternoon breakfast (after 8th period)
       schedule[day]['afternoon-breakfast'] = {
         classId: 'fixed-period',
         subjectId: 'fixed-afternoon-breakfast'
       };
     });
 
-    // CRITICAL: Filter compatible classes and subjects based on teacher's level and branch
     const compatibleClasses = selectedClasses.filter(c => c.level === teacher.level);
     const compatibleSubjects = selectedSubjects.filter(s => 
       s.level === teacher.level && s.branch === teacher.branch
@@ -437,52 +472,34 @@ const ScheduleWizard = () => {
       totalSubjects: compatibleSubjects.length
     });
 
-    if (compatibleClasses.length === 0) {
-      console.warn(`⚠️ ${teacher.name} için uyumlu sınıf bulunamadı (Level: ${teacher.level})`);
+    if (compatibleClasses.length === 0 || compatibleSubjects.length === 0) {
+      console.warn(`⚠️ ${teacher.name} için uyumlu sınıf/ders bulunamadı`);
       return schedule;
     }
 
-    if (compatibleSubjects.length === 0) {
-      console.warn(`⚠️ ${teacher.name} için uyumlu ders bulunamadı (Branch: ${teacher.branch}, Level: ${teacher.level})`);
-      return schedule;
-    }
-
-    // Get available periods (excluding lunch periods)
     const availablePeriods = PERIODS.filter(period => {
-      // Skip lunch periods
       if ((teacher.level === 'İlkokul' || teacher.level === 'Anaokulu') && period === '5') return false;
       if (teacher.level === 'Ortaokul' && period === '6') return false;
       return true;
     });
 
-    console.log('📅 Kullanılabilir ders saatleri:', availablePeriods);
-
-    // ENHANCED: Generate realistic schedule based on subject hours
     let assignedHours = 0;
-    const maxHours = Math.min(25, availablePeriods.length * DAYS.length); // Realistic maximum
-    const targetHours = Math.floor(Math.random() * 11) + 15; // 15-25 hours
+    const targetHours = Math.floor(Math.random() * 11) + 15;
 
-    console.log('🎯 Hedef ders saati:', { targetHours, maxHours });
-
-    // CRITICAL: Assign classes to teacher with proper subject matching
     for (let attempt = 0; attempt < targetHours * 3 && assignedHours < targetHours; attempt++) {
       const randomDay = DAYS[Math.floor(Math.random() * DAYS.length)];
       const randomPeriod = availablePeriods[Math.floor(Math.random() * availablePeriods.length)];
       
-      // Check if slot is empty
       if (!schedule[randomDay][randomPeriod].classId) {
         const randomClass = compatibleClasses[Math.floor(Math.random() * compatibleClasses.length)];
         const randomSubject = compatibleSubjects[Math.floor(Math.random() * compatibleSubjects.length)];
         
-        // CRITICAL: Assign both class and subject
         schedule[randomDay][randomPeriod] = {
           classId: randomClass.id,
           subjectId: randomSubject.id
         };
         
         assignedHours++;
-        
-        console.log(`✅ Ders atandı: ${randomDay} ${randomPeriod}. ders - ${randomClass.name} - ${randomSubject.name}`);
       }
     }
 
@@ -490,7 +507,7 @@ const ScheduleWizard = () => {
     return schedule;
   };
 
-  // ENHANCED: Schedule generation with better error handling and logging
+  // Enhanced schedule generation with better error handling
   const handleGenerateSchedule = async () => {
     if (!validateCurrentStep()) {
       warning('⚠️ Eksik Bilgi', 'Lütfen tüm adımları tamamlayın');
@@ -507,7 +524,6 @@ const ScheduleWizard = () => {
         existingSchedules: existingSchedules.length
       });
 
-      // Get selected data
       const selectedTeachers = teachers.filter(t => 
         wizardData.teachers.selectedTeachers.includes(t.id)
       );
@@ -518,14 +534,7 @@ const ScheduleWizard = () => {
         wizardData.subjects.selectedSubjects.includes(s.id)
       );
 
-      console.log('📊 ENHANCED Seçilen veriler:', {
-        teachers: selectedTeachers.map(t => `${t.name} (${t.branch} - ${t.level})`),
-        classes: selectedClasses.map(c => `${c.name} (${c.level})`),
-        subjects: selectedSubjects.map(s => `${s.name} (${s.branch} - ${s.level})`)
-      });
-
-      // CRITICAL: Clear existing schedules for selected teachers first
-      console.log('🧹 Mevcut programlar temizleniyor...');
+      // Clear existing schedules for selected teachers first
       const existingTeacherSchedules = existingSchedules.filter(schedule => 
         selectedTeachers.some(teacher => teacher.id === schedule.teacherId)
       );
@@ -541,20 +550,17 @@ const ScheduleWizard = () => {
 
       // Generate new schedules for each selected teacher
       let generatedCount = 0;
-      let errorCount = 0;
       
       for (const teacher of selectedTeachers) {
         try {
           console.log(`🎯 ${teacher.name} için program oluşturuluyor...`);
           
-          // ENHANCED: Generate schedule with proper teacher-subject matching
           const teacherSchedule = generateScheduleForTeacher(
             teacher.id,
             selectedClasses,
             selectedSubjects
           );
 
-          // Count actual assigned hours (excluding fixed periods)
           let assignedHours = 0;
           DAYS.forEach(day => {
             PERIODS.forEach(period => {
@@ -570,27 +576,28 @@ const ScheduleWizard = () => {
             continue;
           }
 
-          // Save to Firebase
           const scheduleData: Omit<Schedule, 'id' | 'createdAt'> = {
             teacherId: teacher.id,
             schedule: teacherSchedule,
             updatedAt: new Date()
           };
 
-          await addSchedule(scheduleData);
-          generatedCount++;
-          
-          console.log(`✅ ${teacher.name} programı oluşturuldu ve kaydedildi (${assignedHours} saat)`);
+          const result = await addSchedule(scheduleData);
+          if (result.success) {
+            generatedCount++;
+            console.log(`✅ ${teacher.name} programı oluşturuldu ve kaydedildi (${assignedHours} saat)`);
+          } else {
+            console.error(`❌ ${teacher.name} programı kaydedilemedi:`, result.error);
+          }
         } catch (err) {
           console.error(`❌ ${teacher.name} programı oluşturulamadı:`, err);
-          errorCount++;
         }
       }
 
       if (generatedCount > 0) {
         success('🎯 Program Oluşturuldu!', `${generatedCount} öğretmen için program başarıyla oluşturuldu ve kaydedildi`);
         
-        // CRITICAL: Save template after successful generation
+        // Save template after successful generation
         await handleSaveTemplate();
         
         // Navigate to all schedules page
@@ -613,7 +620,6 @@ const ScheduleWizard = () => {
     console.log('🔄 Wizard data güncelleniyor:', { stepId, stepData });
     
     if (stepId === 'classrooms') {
-      // Handle classrooms as array directly
       setWizardData(prev => ({
         ...prev,
         classrooms: stepData
@@ -688,7 +694,6 @@ const ScheduleWizard = () => {
           <WizardStepClassrooms
             data={wizardData}
             onUpdate={(data) => {
-              // Handle classrooms update directly as array
               if (data.classrooms) {
                 updateWizardData('classrooms', data.classrooms);
               }

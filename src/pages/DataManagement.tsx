@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Database, 
   Users, 
@@ -15,17 +15,26 @@ import {
   Upload,
   MapPin,
   FileSpreadsheet,
-  Check,
-  X
+  CheckCircle,
+  XCircle,
+  Info,
+  ArrowRight,
+  Layers,
+  Shield,
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFirestore } from '../hooks/useFirestore';
 import { useToast } from '../hooks/useToast';
 import { useConfirmation } from '../hooks/useConfirmation';
+import { useErrorModal } from '../hooks/useErrorModal';
 import { Teacher, Class, Subject, Schedule, EDUCATION_LEVELS } from '../types';
 import Button from '../components/UI/Button';
 import ConfirmationModal from '../components/UI/ConfirmationModal';
+import ErrorModal from '../components/UI/ErrorModal';
 import Modal from '../components/UI/Modal';
+import Select from '../components/UI/Select';
+import DOMPurify from 'dompurify';
 
 // Schedule Template interface
 interface ScheduleTemplate {
@@ -54,11 +63,11 @@ interface Classroom {
 }
 
 // Excel import interface
-interface ExcelTeacherRow {
-  ad: string;
-  soyad: string;
-  brans: string;
-  seviye?: string;
+interface ExcelTeacherData {
+  firstName: string;
+  lastName: string;
+  branch: string;
+  level?: string;
 }
 
 const DataManagement = () => {
@@ -76,6 +85,7 @@ const DataManagement = () => {
     hideConfirmation,
     confirmDelete 
   } = useConfirmation();
+  const { errorModal, showError, hideError } = useErrorModal();
 
   const [isDeletingTeachers, setIsDeletingTeachers] = useState(false);
   const [isDeletingClasses, setIsDeletingClasses] = useState(false);
@@ -86,22 +96,25 @@ const DataManagement = () => {
   const [isDeletingAll, setIsDeletingAll] = useState(false);
   
   // Excel import states
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [excelData, setExcelData] = useState<ExcelTeacherRow[]>([]);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importStep, setImportStep] = useState<'upload' | 'preview' | 'mapping' | 'confirm'>('upload');
-  const [selectedLevel, setSelectedLevel] = useState<'Anaokulu' | 'İlkokul' | 'Ortaokul'>('İlkokul');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [excelData, setExcelData] = useState<ExcelTeacherData[]>([]);
+  const [isProcessingExcel, setIsProcessingExcel] = useState(false);
+  const [importLevel, setImportLevel] = useState('İlkokul');
   const [importProgress, setImportProgress] = useState(0);
-  const [importTotal, setImportTotal] = useState(0);
-  const [importSuccess, setImportSuccess] = useState(0);
-  const [importFailed, setImportFailed] = useState(0);
-  const [columnMapping, setColumnMapping] = useState({
-    name: 0, // AD
-    surname: 1, // SOYAD
-    branch: 2, // GÖREV
-    level: -1 // Not mapped by default
+  const [importResults, setImportResults] = useState<{
+    added: number;
+    skipped: number;
+    failed: number;
+    total: number;
+  }>({
+    added: 0,
+    skipped: 0,
+    failed: 0,
+    total: 0
   });
+  const [showImportResults, setShowImportResults] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Delete all teachers
   const handleDeleteAllTeachers = () => {
@@ -344,7 +357,7 @@ const DataManagement = () => {
   };
 
   // Delete all data
-  const handleDeleteAllData = () =>  {
+  const handleDeleteAllData = () => {
     const totalItems = teachers.length + classes.length + subjects.length + schedules.length + templates.length + classrooms.length;
     
     if (totalItems === 0) {
@@ -456,139 +469,167 @@ const DataManagement = () => {
     );
   };
 
-  // Excel Import Functions
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Excel file handling
+  const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Check file type
-    if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      error('❌ Dosya Hatası', 'Lütfen .csv, .xlsx veya .xls formatında bir dosya yükleyin');
-      return;
+    if (file) {
+      setExcelFile(file);
+      parseExcelFile(file);
     }
-
-    // For this example, we'll simulate parsing the file
-    // In a real implementation, you would use a library like xlsx or papaparse
-    simulateExcelParsing(file);
   };
 
-  const simulateExcelParsing = (file: File) => {
-    // This is a simulation of parsing an Excel file
-    // In a real implementation, you would use a library to parse the file
-    
-    // For demonstration, we'll create sample data based on the image
-    const sampleData: ExcelTeacherRow[] = [
-      { ad: 'BİLGE', soyad: 'KÜLEKÇİER', brans: 'ALMANCA ÖĞRETMENİ' },
-      { ad: 'ARZU', soyad: 'ŞAPOĞLU', brans: 'ANAOKULU ÖĞRETMENİ' },
-      { ad: 'NAZAN TAŞKIRAN', soyad: 'TAŞKIRAN', brans: 'ANAOKULU ÖĞRETMENİ' },
-      { ad: 'ELİF', soyad: 'AKILBER', brans: 'ANAOKULU ÖĞRETMENİ' },
-      { ad: 'ELİF', soyad: 'AKARSU', brans: 'BEDEN EĞİTİMİ ÖĞRETMENİ' },
-      { ad: 'MEHMET', soyad: 'UYSAL', brans: 'BEDEN EĞİTİMİ ÖĞRETMENİ' },
-      { ad: 'ALİM', soyad: 'KESKİN', brans: 'BİLGİSAYAR ÖĞRETMENİ' },
-      { ad: 'GİZEM', soyad: 'TÜZÜN', brans: 'BİLGİSAYAR ÖĞRETMENİ' },
-      { ad: 'NURCAN HAŞA', soyad: 'KINIK', brans: 'DANS ÖĞRETMENİ' },
-      { ad: 'HASAN', soyad: 'AVCI', brans: 'DİN KÜLTÜRÜ VE AHLAK BİLGİSİ' },
-      { ad: 'ZEYNEP', soyad: 'TÜRKMEN', brans: 'DÜŞÜNME BECERİLERİ' },
-      { ad: 'DİLEK', soyad: 'YAKAR', brans: 'EĞİTİM DİREKTÖRÜ' },
-      { ad: 'AYÇA', soyad: 'GÖNCELLİ ULCAN', brans: 'FEN BİLGİSİ ÖĞRETMENİ' },
-      { ad: 'GÜLENAY', soyad: 'ÇAKIROĞLU', brans: 'FEN BİLGİSİ ÖĞRETMENİ' },
-      { ad: 'HAVVA EBRU', soyad: 'MERCAN', brans: 'FEN BİLGİSİ ÖĞRETMENİ' },
-      { ad: 'SEDEF', soyad: 'AKSAKAL', brans: 'GÖRSEL SANATLAR' },
-      { ad: 'AYŞE ŞEYDA', soyad: 'SOYDAMAL', brans: 'GÖRSEL SANATLAR' },
-      { ad: 'DİDEM', soyad: 'TOPÇU', brans: 'İNGİLİZCE ÖĞRETMENİ' },
-      { ad: 'CATHERINE ANNE', soyad: 'ÖNCEL', brans: 'İNGİLİZCE ÖĞRETMENİ' },
-      { ad: 'TUĞBA', soyad: 'TEKELİ', brans: 'İNGİLİZCE ÖĞRETMENİ' },
-      // Add more sample data as needed
-    ];
-
-    setExcelData(sampleData);
-    setImportStep('preview');
-    success('✅ Dosya Yüklendi', `${file.name} başarıyla yüklendi`);
-  };
-
-  const handleImportTeachers = async () => {
-    if (excelData.length === 0) {
-      error('❌ Veri Yok', 'İçe aktarılacak veri bulunamadı');
-      return;
-    }
-
-    setIsImporting(true);
-    setImportProgress(0);
-    setImportTotal(excelData.length);
-    setImportSuccess(0);
-    setImportFailed(0);
-
+  const parseExcelFile = async (file: File) => {
     try {
-      // Process each row
-      for (let i = 0; i < excelData.length; i++) {
-        const row = excelData[i];
-        
-        try {
-          // Extract data based on mapping
-          const name = `${row.ad} ${row.soyad}`.trim();
-          const branch = normalizeBranch(row.brans);
-          
-          // Check if teacher already exists
-          const existingTeacher = teachers.find(t => 
-            t.name.toLowerCase() === name.toLowerCase() && 
-            t.branch.toLowerCase() === branch.toLowerCase()
-          );
-          
-          if (existingTeacher) {
-            console.log(`⚠️ Öğretmen zaten mevcut: ${name}`);
-            setImportFailed(prev => prev + 1);
-            continue;
-          }
-          
-          // Add teacher
-          await addTeacher({
-            name,
-            branch,
-            level: selectedLevel
-          } as Omit<Teacher, 'id' | 'createdAt'>);
-          
-          // Create subject if it doesn't exist
-          const existingSubject = subjects.find(s => 
-            s.branch.toLowerCase() === branch.toLowerCase() && 
-            s.level === selectedLevel
-          );
-          
-          if (!existingSubject) {
-            await addSubject({
-              name: branch,
-              branch,
-              level: selectedLevel,
-              weeklyHours: 4 // Default weekly hours
-            } as Omit<Subject, 'id' | 'createdAt'>);
-          }
-          
-          setImportSuccess(prev => prev + 1);
-        } catch (err) {
-          console.error(`❌ Öğretmen eklenemedi: ${row.ad} ${row.soyad}`, err);
-          setImportFailed(prev => prev + 1);
-        }
-        
-        setImportProgress(i + 1);
+      setIsProcessingExcel(true);
+      
+      // Read file as text
+      const text = await file.text();
+      
+      // Parse CSV (assuming tab-separated values from Excel)
+      const rows = text.split('\n');
+      const headers = rows[0].split('\t');
+      
+      // Find column indices
+      const firstNameIndex = headers.findIndex(h => h.trim().toLowerCase() === 'adi');
+      const lastNameIndex = headers.findIndex(h => h.trim().toLowerCase() === 'soyadi');
+      const branchIndex = headers.findIndex(h => h.trim().toLowerCase() === 'görevi');
+      
+      if (firstNameIndex === -1 || lastNameIndex === -1 || branchIndex === -1) {
+        throw new Error('Gerekli sütunlar bulunamadı. Excel dosyasında "ADI", "SOYADI" ve "GÖREVİ" sütunları olmalıdır.');
       }
       
-      success('✅ İçe Aktarma Tamamlandı', `${importSuccess} öğretmen başarıyla eklendi, ${importFailed} başarısız`);
-      resetImport();
-    } catch (err) {
-      error('❌ İçe Aktarma Hatası', 'Veriler içe aktarılırken bir hata oluştu');
+      // Parse data rows
+      const parsedData: ExcelTeacherData[] = [];
+      
+      for (let i = 1; i < rows.length; i++) {
+        const cells = rows[i].split('\t');
+        if (cells.length >= Math.max(firstNameIndex, lastNameIndex, branchIndex) + 1) {
+          const firstName = cells[firstNameIndex]?.trim() || '';
+          const lastName = cells[lastNameIndex]?.trim() || '';
+          const branch = cells[branchIndex]?.trim() || '';
+          
+          if (firstName && lastName && branch) {
+            parsedData.push({
+              firstName,
+              lastName,
+              branch
+            });
+          }
+        }
+      }
+      
+      setExcelData(parsedData);
+      
+      if (parsedData.length === 0) {
+        throw new Error('Geçerli veri bulunamadı. Lütfen dosya formatını kontrol edin.');
+      }
+      
+      info('Excel Dosyası Yüklendi', `${parsedData.length} öğretmen verisi bulundu. İçe aktarmak için seviye seçin ve "İçe Aktar" butonuna tıklayın.`);
+      
+    } catch (err: any) {
+      error('❌ Excel Okuma Hatası', err.message || 'Excel dosyası okunurken bir hata oluştu');
+      setExcelData([]);
+      setExcelFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } finally {
-      setIsImporting(false);
+      setIsProcessingExcel(false);
     }
   };
 
-  const normalizeBranch = (branch: string): string => {
-    // Remove "ÖĞRETMENİ" suffix and trim
-    return branch.replace(/\s*ÖĞRETMENİ\s*$/i, '').trim();
+  const handleImportExcel = async () => {
+    if (!excelFile || excelData.length === 0) {
+      warning('⚠️ Dosya Seçilmedi', 'Lütfen önce bir Excel dosyası seçin');
+      return;
+    }
+    
+    setIsProcessingExcel(true);
+    setImportProgress(0);
+    
+    const results = {
+      added: 0,
+      skipped: 0,
+      failed: 0,
+      total: excelData.length
+    };
+    
+    try {
+      // Process each teacher
+      for (let i = 0; i < excelData.length; i++) {
+        const teacherData = excelData[i];
+        const fullName = `${teacherData.firstName} ${teacherData.lastName}`.trim();
+        const branch = teacherData.branch;
+        
+        // Check if teacher already exists
+        const existingTeacher = teachers.find(t => 
+          t.name.toLowerCase() === fullName.toLowerCase() && 
+          t.branch.toLowerCase() === branch.toLowerCase()
+        );
+        
+        if (existingTeacher) {
+          console.log(`⚠️ Öğretmen zaten mevcut: ${fullName}`);
+          results.skipped++;
+        } else {
+          try {
+            // Add teacher
+            await addTeacher({
+              name: fullName,
+              branch: branch,
+              level: importLevel as 'Anaokulu' | 'İlkokul' | 'Ortaokul'
+            } as Omit<Teacher, 'id' | 'createdAt'>);
+            
+            // Check if subject exists for this branch
+            const existingSubject = subjects.find(s => 
+              s.branch.toLowerCase() === branch.toLowerCase() && 
+              s.level === importLevel
+            );
+            
+            // If subject doesn't exist, create it
+            if (!existingSubject) {
+              await addSubject({
+                name: branch,
+                branch: branch,
+                level: importLevel as 'Anaokulu' | 'İlkokul' | 'Ortaokul',
+                weeklyHours: 4 // Default weekly hours
+              } as Omit<Subject, 'id' | 'createdAt'>);
+            }
+            
+            results.added++;
+          } catch (err) {
+            console.error(`❌ Öğretmen eklenemedi: ${fullName}`, err);
+            results.failed++;
+          }
+        }
+        
+        // Update progress
+        setImportProgress(Math.round(((i + 1) / excelData.length) * 100));
+      }
+      
+      setImportResults(results);
+      setShowImportResults(true);
+      
+      if (results.added > 0) {
+        success('✅ İçe Aktarma Tamamlandı', `${results.added} öğretmen başarıyla eklendi, ${results.skipped} öğretmen atlandı, ${results.failed} öğretmen eklenemedi`);
+      } else if (results.skipped > 0) {
+        warning('⚠️ İçe Aktarma Tamamlandı', `Tüm öğretmenler zaten mevcut. ${results.skipped} öğretmen atlandı`);
+      } else {
+        error('❌ İçe Aktarma Hatası', 'Hiçbir öğretmen eklenemedi');
+      }
+      
+    } catch (err) {
+      console.error('❌ İçe aktarma hatası:', err);
+      error('❌ İçe Aktarma Hatası', 'Veriler içe aktarılırken bir hata oluştu');
+    } finally {
+      setIsProcessingExcel(false);
+    }
   };
 
-  const resetImport = () => {
+  const resetExcelImport = () => {
+    setExcelFile(null);
     setExcelData([]);
-    setImportStep('upload');
-    setIsImportModalOpen(false);
+    setImportProgress(0);
+    setShowImportResults(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -602,20 +643,23 @@ const DataManagement = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-20">
             <div className="flex items-center">
-              <Database className="w-8 h-8 text-purple-600 mr-3" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Veri Yönetimi</h1>
-                <p className="text-sm text-gray-600">Sistem verilerini yönetin ve temizleyin</p>
+              <div className="bg-white p-2 rounded-lg shadow-md">
+                <Database className="w-8 h-8 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <h1 className="text-xl font-bold text-white">Veri Yönetimi</h1>
+                <p className="text-sm text-blue-100">Sistem verilerini yönetin ve temizleyin</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
               <Button
                 onClick={() => navigate('/')}
                 variant="secondary"
+                className="bg-white text-blue-600 hover:bg-blue-50"
               >
                 Ana Sayfaya Dön
               </Button>
@@ -625,24 +669,31 @@ const DataManagement = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Data Statistics */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+        {/* Overview Card */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <BarChart3 className="w-6 h-6 text-purple-600 mr-2" />
-              <h2 className="text-lg font-bold text-gray-900">Veri İstatistikleri</h2>
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <Layers className="w-6 h-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <h2 className="text-xl font-bold text-gray-900">Sistem Genel Bakış</h2>
+                <p className="text-sm text-gray-600">Tüm veri varlıklarınızın durumu</p>
+              </div>
             </div>
-            <div className="text-sm text-gray-600">
-              Toplam {totalDataCount} veri öğesi
+            <div className="text-sm text-gray-600 bg-purple-50 px-4 py-2 rounded-lg">
+              <span className="font-semibold">{totalDataCount}</span> veri öğesi
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-              <div className="flex items-center justify-between mb-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 border border-blue-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
-                  <Users className="w-5 h-5 text-blue-600 mr-2" />
-                  <h3 className="font-medium text-blue-900">Öğretmenler</h3>
+                  <div className="p-2 bg-blue-500 rounded-lg">
+                    <Users className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="ml-3 font-semibold text-blue-800">Öğretmenler</h3>
                 </div>
                 <span className="text-2xl font-bold text-blue-600">{teachers.length}</span>
               </div>
@@ -651,15 +702,17 @@ const DataManagement = () => {
                   onClick={() => navigate('/teachers')}
                   variant="secondary"
                   size="sm"
+                  className="bg-white text-blue-600 border-blue-200 hover:bg-blue-50"
                 >
                   Yönet
                 </Button>
                 <div className="flex space-x-2">
                   <Button
-                    onClick={() => setIsImportModalOpen(true)}
+                    onClick={() => setIsExcelModalOpen(true)}
                     icon={FileSpreadsheet}
                     variant="secondary"
                     size="sm"
+                    className="bg-white text-blue-600 border-blue-200 hover:bg-blue-50"
                   >
                     Excel İçe Aktar
                   </Button>
@@ -678,11 +731,13 @@ const DataManagement = () => {
               </div>
             </div>
             
-            <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-5 border border-emerald-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
-                  <Building className="w-5 h-5 text-emerald-600 mr-2" />
-                  <h3 className="font-medium text-emerald-900">Sınıflar</h3>
+                  <div className="p-2 bg-emerald-500 rounded-lg">
+                    <Building className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="ml-3 font-semibold text-emerald-800">Sınıflar</h3>
                 </div>
                 <span className="text-2xl font-bold text-emerald-600">{classes.length}</span>
               </div>
@@ -691,6 +746,7 @@ const DataManagement = () => {
                   onClick={() => navigate('/classes')}
                   variant="secondary"
                   size="sm"
+                  className="bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                 >
                   Yönet
                 </Button>
@@ -708,11 +764,13 @@ const DataManagement = () => {
               </div>
             </div>
             
-            <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-100">
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-5 border border-indigo-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
-                  <BookOpen className="w-5 h-5 text-indigo-600 mr-2" />
-                  <h3 className="font-medium text-indigo-900">Dersler</h3>
+                  <div className="p-2 bg-indigo-500 rounded-lg">
+                    <BookOpen className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="ml-3 font-semibold text-indigo-800">Dersler</h3>
                 </div>
                 <span className="text-2xl font-bold text-indigo-600">{subjects.length}</span>
               </div>
@@ -721,6 +779,7 @@ const DataManagement = () => {
                   onClick={() => navigate('/subjects')}
                   variant="secondary"
                   size="sm"
+                  className="bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                 >
                   Yönet
                 </Button>
@@ -737,12 +796,16 @@ const DataManagement = () => {
                 )}
               </div>
             </div>
-            
-            <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-              <div className="flex items-center justify-between mb-2">
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 border border-purple-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
-                  <Calendar className="w-5 h-5 text-purple-600 mr-2" />
-                  <h3 className="font-medium text-purple-900">Programlar</h3>
+                  <div className="p-2 bg-purple-500 rounded-lg">
+                    <Calendar className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="ml-3 font-semibold text-purple-800">Programlar</h3>
                 </div>
                 <span className="text-2xl font-bold text-purple-600">{schedules.length}</span>
               </div>
@@ -751,6 +814,7 @@ const DataManagement = () => {
                   onClick={() => navigate('/all-schedules')}
                   variant="secondary"
                   size="sm"
+                  className="bg-white text-purple-600 border-purple-200 hover:bg-purple-50"
                 >
                   Yönet
                 </Button>
@@ -768,11 +832,13 @@ const DataManagement = () => {
               </div>
             </div>
             
-            <div className="bg-orange-50 rounded-lg p-4 border border-orange-100">
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-5 border border-orange-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
-                  <Settings className="w-5 h-5 text-orange-600 mr-2" />
-                  <h3 className="font-medium text-orange-900">Şablonlar</h3>
+                  <div className="p-2 bg-orange-500 rounded-lg">
+                    <Settings className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="ml-3 font-semibold text-orange-800">Şablonlar</h3>
                 </div>
                 <span className="text-2xl font-bold text-orange-600">{templates.length}</span>
               </div>
@@ -781,6 +847,7 @@ const DataManagement = () => {
                   onClick={() => navigate('/schedule-wizard')}
                   variant="secondary"
                   size="sm"
+                  className="bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
                 >
                   Yeni Oluştur
                 </Button>
@@ -798,11 +865,13 @@ const DataManagement = () => {
               </div>
             </div>
 
-            <div className="bg-teal-50 rounded-lg p-4 border border-teal-100">
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl p-5 border border-teal-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
-                  <MapPin className="w-5 h-5 text-teal-600 mr-2" />
-                  <h3 className="font-medium text-teal-900">Derslikler</h3>
+                  <div className="p-2 bg-teal-500 rounded-lg">
+                    <MapPin className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="ml-3 font-semibold text-teal-800">Derslikler</h3>
                 </div>
                 <span className="text-2xl font-bold text-teal-600">{classrooms.length}</span>
               </div>
@@ -811,6 +880,7 @@ const DataManagement = () => {
                   onClick={() => navigate('/classrooms')}
                   variant="secondary"
                   size="sm"
+                  className="bg-white text-teal-600 border-teal-200 hover:bg-teal-50"
                 >
                   Yönet
                 </Button>
@@ -832,17 +902,23 @@ const DataManagement = () => {
 
         {/* Program Templates Section */}
         {templates.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 mb-8">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <Calendar className="w-6 h-6 text-orange-600 mr-2" />
-                <h2 className="text-lg font-bold text-gray-900">Program Şablonları</h2>
+                <div className="p-3 bg-orange-100 rounded-lg">
+                  <Calendar className="w-6 h-6 text-orange-600" />
+                </div>
+                <div className="ml-4">
+                  <h2 className="text-xl font-bold text-gray-900">Program Şablonları</h2>
+                  <p className="text-sm text-gray-600">Oluşturduğunuz program şablonları</p>
+                </div>
               </div>
               <Button
                 onClick={() => navigate('/schedule-wizard')}
                 icon={Plus}
                 variant="primary"
                 size="sm"
+                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
               >
                 Yeni Program
               </Button>
@@ -852,11 +928,11 @@ const DataManagement = () => {
               {sortedTemplates.map((template) => (
                 <div
                   key={template.id}
-                  className="group bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200"
+                  className="group bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 border border-gray-200 hover:border-orange-300 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                      <h3 className="font-semibold text-gray-900 truncate group-hover:text-orange-600 transition-colors">
                         {template.name}
                       </h3>
                       <p className="text-sm text-gray-600 mt-1">
@@ -866,14 +942,14 @@ const DataManagement = () => {
                     <div className="flex items-center space-x-1">
                       <button
                         onClick={() => handleEditTemplate(template.id)}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
                         title="Düzenle"
                       >
                         <Edit size={16} />
                       </button>
                       <button
                         onClick={() => handleDeleteTemplate(template)}
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                        className="p-2 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
                         title="Sil"
                       >
                         <Trash2 size={16} />
@@ -911,6 +987,7 @@ const DataManagement = () => {
                         onClick={() => handleEditTemplate(template.id)}
                         variant="secondary"
                         size="sm"
+                        className="bg-white text-orange-600 border-orange-200 hover:bg-orange-50"
                       >
                         Düzenle
                       </Button>
@@ -924,27 +1001,33 @@ const DataManagement = () => {
 
         {/* Classrooms Section */}
         {classrooms.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 mb-8">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <MapPin className="w-6 h-6 text-teal-600 mr-2" />
-                <h2 className="text-lg font-bold text-gray-900">Derslikler</h2>
+                <div className="p-3 bg-teal-100 rounded-lg">
+                  <MapPin className="w-6 h-6 text-teal-600" />
+                </div>
+                <div className="ml-4">
+                  <h2 className="text-xl font-bold text-gray-900">Derslikler</h2>
+                  <p className="text-sm text-gray-600">Okul derslikleri ve özellikleri</p>
+                </div>
               </div>
               <Button
                 onClick={() => navigate('/classrooms')}
                 icon={Plus}
                 variant="primary"
                 size="sm"
+                className="bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700"
               >
                 Yeni Derslik
               </Button>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {classrooms.map((classroom) => (
+              {classrooms.slice(0, 6).map((classroom) => (
                 <div
                   key={classroom.id}
-                  className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-teal-300 hover:shadow-md transition-all duration-200"
+                  className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5 border border-gray-200 hover:border-teal-300 hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
@@ -969,7 +1052,7 @@ const DataManagement = () => {
                     <div className="flex items-center space-x-1">
                       <button
                         onClick={() => navigate('/classrooms')}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
                         title="Düzenle"
                       >
                         <Edit size={16} />
@@ -986,7 +1069,7 @@ const DataManagement = () => {
                             }
                           }
                         )}
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                        className="p-2 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
                         title="Sil"
                       >
                         <Trash2 size={16} />
@@ -1016,26 +1099,63 @@ const DataManagement = () => {
                       </div>
                     )}
                   </div>
+                  
+                  {/* View All Button */}
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <Button
+                      onClick={() => navigate('/classrooms')}
+                      variant="secondary"
+                      size="sm"
+                      className="w-full bg-white text-teal-600 border-teal-200 hover:bg-teal-50"
+                    >
+                      <div className="flex items-center justify-center">
+                        <span>Tüm Derslikleri Görüntüle</span>
+                        <ArrowRight className="ml-2 w-3 h-3" />
+                      </div>
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
+            
+            {classrooms.length > 6 && (
+              <div className="mt-4 text-center">
+                <Button
+                  onClick={() => navigate('/classrooms')}
+                  variant="secondary"
+                  className="bg-white text-teal-600 border-teal-200 hover:bg-teal-50"
+                >
+                  <div className="flex items-center">
+                    <span>Tüm Derslikleri Görüntüle</span>
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </div>
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Bulk Data Management */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <Database className="w-6 h-6 text-purple-600 mr-2" />
-              <h2 className="text-lg font-bold text-gray-900">Toplu Veri Yönetimi</h2>
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <Database className="w-6 h-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <h2 className="text-xl font-bold text-gray-900">Toplu Veri Yönetimi</h2>
+                <p className="text-sm text-gray-600">Veri yedekleme ve geri yükleme işlemleri</p>
+              </div>
             </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
               <div className="flex items-center mb-4">
-                <Download className="w-5 h-5 text-blue-600 mr-2" />
-                <h3 className="font-medium text-blue-900">Veri Yedekleme</h3>
+                <div className="p-2 bg-blue-500 rounded-lg">
+                  <Download className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="ml-3 font-semibold text-blue-900">Veri Yedekleme</h3>
               </div>
               <p className="text-sm text-blue-700 mb-4">
                 Tüm sistem verilerinizi yedekleyin ve dışa aktarın. Bu işlem tüm öğretmen, sınıf, ders ve program verilerinizi içerir.
@@ -1043,17 +1163,19 @@ const DataManagement = () => {
               <Button
                 variant="primary"
                 icon={Download}
-                className="w-full"
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                 disabled
               >
                 Tüm Verileri Yedekle (Yakında)
               </Button>
             </div>
             
-            <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
               <div className="flex items-center mb-4">
-                <Upload className="w-5 h-5 text-green-600 mr-2" />
-                <h3 className="font-medium text-green-900">Veri Geri Yükleme</h3>
+                <div className="p-2 bg-green-500 rounded-lg">
+                  <Upload className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="ml-3 font-semibold text-green-900">Veri Geri Yükleme</h3>
               </div>
               <p className="text-sm text-green-700 mb-4">
                 Önceden yedeklediğiniz verileri sisteme geri yükleyin. Bu işlem mevcut verilerinizin üzerine yazacaktır.
@@ -1061,7 +1183,7 @@ const DataManagement = () => {
               <Button
                 variant="primary"
                 icon={Upload}
-                className="w-full"
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
                 disabled
               >
                 Verileri Geri Yükle (Yakında)
@@ -1070,18 +1192,105 @@ const DataManagement = () => {
           </div>
         </div>
 
+        {/* System Health */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <Shield className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <h2 className="text-xl font-bold text-gray-900">Sistem Sağlığı</h2>
+                <p className="text-sm text-gray-600">Sistem durumu ve bakım işlemleri</p>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              icon={RefreshCw}
+              className="bg-white text-green-600 border-green-200 hover:bg-green-50"
+              size="sm"
+            >
+              Yenile
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-500 rounded-full">
+                    <CheckCircle className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="ml-2 text-sm font-medium text-gray-700">Veri Bütünlüğü</span>
+                </div>
+                <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                  Sağlıklı
+                </span>
+              </div>
+            </div>
+            
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-500 rounded-full">
+                    <CheckCircle className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="ml-2 text-sm font-medium text-gray-700">Firebase Bağlantısı</span>
+                </div>
+                <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                  Bağlı
+                </span>
+              </div>
+            </div>
+            
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="p-2 bg-green-500 rounded-full">
+                    <CheckCircle className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="ml-2 text-sm font-medium text-gray-700">Sistem Performansı</span>
+                </div>
+                <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                  İyi
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
+            <div className="flex items-start">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Info className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">Sistem Bilgisi</h3>
+                <p className="text-xs text-blue-700 mt-1">
+                  Sistem sağlıklı çalışıyor. Tüm veriler düzenli olarak Firebase'e kaydediliyor ve senkronize ediliyor.
+                  Herhangi bir bakım işlemi gerekmiyor.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Danger Zone */}
-        <div className="bg-red-50 rounded-lg shadow-sm border border-red-200 p-6">
+        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-md border border-red-200 p-6">
           <div className="flex items-center mb-6">
-            <AlertTriangle className="w-6 h-6 text-red-600 mr-2" />
-            <h2 className="text-lg font-bold text-red-900">Tehlikeli Bölge</h2>
+            <div className="p-3 bg-red-100 rounded-lg">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            <div className="ml-4">
+              <h2 className="text-xl font-bold text-red-900">Tehlikeli Bölge</h2>
+              <p className="text-sm text-red-700">Bu bölümdeki işlemler geri alınamaz</p>
+            </div>
           </div>
           
           <div className="space-y-4">
-            <div className="p-4 bg-white rounded-lg border border-red-100">
+            <div className="p-5 bg-white rounded-xl border border-red-200 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-red-900">Tüm Verileri Sil</h3>
+                  <h3 className="font-semibold text-red-900">Tüm Verileri Sil</h3>
                   <p className="text-sm text-red-700 mt-1">
                     Bu işlem tüm öğretmen, sınıf, ders, program ve şablon verilerinizi kalıcı olarak silecektir. Bu işlem geri alınamaz!
                   </p>
@@ -1091,6 +1300,7 @@ const DataManagement = () => {
                   icon={Trash2}
                   variant="danger"
                   disabled={isDeletingAll || totalDataCount === 0}
+                  className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
                 >
                   {isDeletingAll ? 'Siliniyor...' : `Tüm Verileri Sil (${totalDataCount})`}
                 </Button>
@@ -1164,187 +1374,226 @@ const DataManagement = () => {
 
       {/* Excel Import Modal */}
       <Modal
-        isOpen={isImportModalOpen}
-        onClose={resetImport}
-        title="Excel'den Öğretmen İçe Aktar"
+        isOpen={isExcelModalOpen}
+        onClose={() => {
+          setIsExcelModalOpen(false);
+          resetExcelImport();
+        }}
+        title="Excel'den Öğretmen İçe Aktarma"
         size="lg"
       >
         <div className="space-y-6">
-          {importStep === 'upload' && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          {!showImportResults ? (
+            <>
+              {/* File Upload */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Excel Dosyası Seçin
+                </label>
+                <div className="flex items-center justify-center w-full">
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-blue-300 border-dashed rounded-lg cursor-pointer bg-blue-50 hover:bg-blue-100 transition-colors">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <FileSpreadsheet className="w-10 h-10 mb-3 text-blue-500" />
+                      <p className="mb-2 text-sm text-blue-700">
+                        <span className="font-semibold">Dosya seçmek için tıklayın</span> veya sürükleyip bırakın
+                      </p>
+                      <p className="text-xs text-blue-600">
+                        Excel (.xlsx, .xls) veya CSV dosyaları
+                      </p>
+                    </div>
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept=".xlsx,.xls,.csv,.txt"
+                      onChange={handleExcelFileChange}
+                      ref={fileInputRef}
+                      disabled={isProcessingExcel}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Preview and Settings */}
+              {excelData.length > 0 && (
+                <>
+                  <div className="mb-4">
+                    <Select
+                      label="Öğretmen Seviyesi"
+                      value={importLevel}
+                      onChange={setImportLevel}
+                      options={EDUCATION_LEVELS.map(level => ({
+                        value: level,
+                        label: level
+                      }))}
+                      required
+                    />
+                    <p className="text-xs text-gray-600 mt-1">
+                      Tüm öğretmenler için varsayılan seviye. Excel'de seviye bilgisi yoksa bu kullanılacak.
+                    </p>
+                  </div>
+
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-gray-800 mb-2">
+                      Önizleme ({excelData.length} öğretmen)
+                    </h4>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Ad
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Soyad
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Branş
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Seviye
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {excelData.slice(0, 5).map((teacher, index) => (
+                              <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                  {DOMPurify.sanitize(teacher.firstName)}
+                                </td>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                  {DOMPurify.sanitize(teacher.lastName)}
+                                </td>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                  {DOMPurify.sanitize(teacher.branch)}
+                                </td>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                  {importLevel}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {excelData.length > 5 && (
+                        <div className="px-4 py-2 bg-gray-50 text-xs text-gray-500 border-t border-gray-200">
+                          ... ve {excelData.length - 5} öğretmen daha
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-start">
+                      <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-2" />
+                      <div>
+                        <h4 className="text-sm font-medium text-blue-800">İçe Aktarma Bilgisi</h4>
+                        <ul className="mt-1 text-xs text-blue-700 space-y-1">
+                          <li>• Tüm öğretmenler için seviye: <strong>{importLevel}</strong></li>
+                          <li>• Zaten mevcut olan öğretmenler atlanacak</li>
+                          <li>• Her branş için otomatik ders kaydı oluşturulacak</li>
+                          <li>• Toplam {excelData.length} öğretmen içe aktarılacak</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-3">
+                    <Button
+                      onClick={() => {
+                        setIsExcelModalOpen(false);
+                        resetExcelImport();
+                      }}
+                      variant="secondary"
+                    >
+                      İptal
+                    </Button>
+                    <Button
+                      onClick={handleImportExcel}
+                      variant="primary"
+                      disabled={isProcessingExcel || excelData.length === 0}
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                    >
+                      {isProcessingExcel ? 'İçe Aktarılıyor...' : 'İçe Aktar'}
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {/* Processing Indicator */}
+              {isProcessingExcel && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">İşleniyor...</span>
+                    <span className="text-sm text-gray-600">{importProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${importProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Import Results */}
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">İçe Aktarma Tamamlandı</h3>
+                <p className="text-gray-600">
+                  Excel dosyasından öğretmen verileri başarıyla içe aktarıldı
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-green-600 mb-1">{importResults.added}</div>
+                  <div className="text-sm text-green-800">Eklenen</div>
+                </div>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-yellow-600 mb-1">{importResults.skipped}</div>
+                  <div className="text-sm text-yellow-800">Atlanan</div>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-red-600 mb-1">{importResults.failed}</div>
+                  <div className="text-sm text-red-800">Başarısız</div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <div className="flex items-start">
-                  <FileSpreadsheet className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
-                  <div className="text-sm text-blue-700">
-                    <h4 className="font-medium mb-1">Excel Dosyasından Öğretmen İçe Aktarma</h4>
-                    <p>Excel dosyanızda aşağıdaki sütunlar olmalıdır:</p>
-                    <ul className="list-disc list-inside mt-2 space-y-1">
-                      <li>AD - Öğretmenin adı</li>
-                      <li>SOYAD - Öğretmenin soyadı</li>
-                      <li>GÖREV - Öğretmenin branşı/görevi</li>
+                  <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-2" />
+                  <div>
+                    <h4 className="text-sm font-medium text-blue-800">İşlem Özeti</h4>
+                    <ul className="mt-1 text-xs text-blue-700 space-y-1">
+                      <li>• Toplam {importResults.total} öğretmen işlendi</li>
+                      <li>• {importResults.added} yeni öğretmen eklendi</li>
+                      <li>• {importResults.skipped} öğretmen zaten mevcut olduğu için atlandı</li>
+                      <li>• {importResults.failed} öğretmen eklenirken hata oluştu</li>
+                      <li>• Tüm öğretmenler için seviye: <strong>{importLevel}</strong></li>
                     </ul>
                   </div>
                 </div>
               </div>
 
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Excel Dosyası Yükleyin</h3>
-                <p className="text-gray-500 mb-4">
-                  .xlsx, .xls veya .csv formatında bir dosya seçin
-                </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="excel-upload"
-                />
+              <div className="flex justify-end space-x-3">
                 <Button
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    setIsExcelModalOpen(false);
+                    resetExcelImport();
+                  }}
                   variant="primary"
-                  icon={Upload}
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                 >
-                  Dosya Seç
+                  Tamam
                 </Button>
               </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Öğretmen Seviyesi
-                </label>
-                <select
-                  value={selectedLevel}
-                  onChange={(e) => setSelectedLevel(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {EDUCATION_LEVELS.map(level => (
-                    <option key={level} value={level}>{level}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  İçe aktarılan tüm öğretmenler için seviye seçin
-                </p>
-              </div>
-            </div>
+            </>
           )}
-
-          {importStep === 'preview' && (
-            <div className="space-y-4">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-start">
-                  <Check className="w-5 h-5 text-green-600 mt-0.5 mr-3 flex-shrink-0" />
-                  <div className="text-sm text-green-700">
-                    <h4 className="font-medium mb-1">Dosya Başarıyla Yüklendi</h4>
-                    <p>{excelData.length} öğretmen verisi bulundu. Aşağıdaki önizlemeyi kontrol edin ve devam edin.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          #
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Ad
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Soyad
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Branş/Görev
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {excelData.slice(0, 10).map((row, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {index + 1}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {row.ad}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {row.soyad}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {row.brans}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {excelData.length > 10 && (
-                  <div className="px-6 py-3 bg-gray-50 text-center text-sm text-gray-500">
-                    ... ve {excelData.length - 10} öğretmen daha
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-start">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
-                  <div className="text-sm text-yellow-700">
-                    <h4 className="font-medium mb-1">Önemli Bilgi</h4>
-                    <p>Tüm öğretmenler için seviye: <strong>{selectedLevel}</strong></p>
-                    <p className="mt-1">İçe aktarma işlemi aynı zamanda her branş için bir ders kaydı da oluşturacaktır.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isImporting && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">İçe Aktarılıyor...</h3>
-                <p className="text-gray-500">
-                  {importProgress} / {importTotal} öğretmen işleniyor
-                </p>
-              </div>
-              
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div 
-                  className="bg-blue-600 h-2.5 rounded-full" 
-                  style={{ width: `${(importProgress / importTotal) * 100}%` }}
-                ></div>
-              </div>
-              
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Başarılı: {importSuccess}</span>
-                <span>Başarısız: {importFailed}</span>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button
-              type="button"
-              onClick={resetImport}
-              variant="secondary"
-              disabled={isImporting}
-            >
-              İptal
-            </Button>
-            {importStep === 'preview' && (
-              <Button
-                type="button"
-                onClick={handleImportTeachers}
-                variant="primary"
-                disabled={isImporting || excelData.length === 0}
-              >
-                {isImporting ? 'İçe Aktarılıyor...' : `${excelData.length} Öğretmeni İçe Aktar`}
-              </Button>
-            )}
-          </div>
         </div>
       </Modal>
 
@@ -1359,6 +1608,14 @@ const DataManagement = () => {
         confirmText={confirmation.confirmText}
         cancelText={confirmation.cancelText}
         confirmVariant={confirmation.confirmVariant}
+      />
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        onClose={hideError}
+        title={errorModal.title}
+        message={errorModal.message}
       />
     </div>
   );

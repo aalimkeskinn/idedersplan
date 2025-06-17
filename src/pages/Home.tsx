@@ -37,10 +37,10 @@ interface ScheduleTemplate {
 
 const Home = () => {
   const navigate = useNavigate();
-  const { data: teachers, remove: removeTeacher } = useFirestore<Teacher>('teachers');
-  const { data: classes, remove: removeClass } = useFirestore<Class>('classes');
-  const { data: subjects, remove: removeSubject } = useFirestore<Subject>('subjects');
-  const { data: schedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
+  const { data: teachers } = useFirestore<Teacher>('teachers');
+  const { data: classes } = useFirestore<Class>('classes');
+  const { data: subjects } = useFirestore<Subject>('subjects');
+  const { data: schedules } = useFirestore<Schedule>('schedules');
   const { data: templates, remove: removeTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { success, error, warning } = useToast();
   const { 
@@ -49,12 +49,6 @@ const Home = () => {
     hideConfirmation,
     confirmDelete 
   } = useConfirmation();
-
-  const [isDeletingTeachers, setIsDeletingTeachers] = useState(false);
-  const [isDeletingClasses, setIsDeletingClasses] = useState(false);
-  const [isDeletingSubjects, setIsDeletingSubjects] = useState(false);
-  const [isDeletingSchedules, setIsDeletingSchedules] = useState(false);
-  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   const features = [
     {
@@ -80,14 +74,6 @@ const Home = () => {
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-50',
       path: '/classes'
-    },
-    {
-      icon: Clock,
-      title: 'Zaman Kısıtlamaları',
-      description: 'Öğretmen ve sınıf zaman kısıtlamalarını yönetin',
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
-      path: '/constraints'
     },
     {
       icon: Zap,
@@ -120,241 +106,16 @@ const Home = () => {
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
       path: '/pdf'
+    },
+    {
+      icon: Database,
+      title: 'Veri Yönetimi',
+      description: 'Sistem verilerini yönetin ve temizleyin',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      path: '/data-management'
     }
   ];
-
-  // Delete all teachers
-  const handleDeleteAllTeachers = () => {
-    if (teachers.length === 0) {
-      warning('⚠️ Silinecek Öğretmen Yok', 'Sistemde silinecek öğretmen bulunamadı');
-      return;
-    }
-
-    confirmDelete(
-      `${teachers.length} Öğretmen`,
-      async () => {
-        setIsDeletingTeachers(true);
-        
-        try {
-          let deletedCount = 0;
-          
-          for (const teacher of teachers) {
-            try {
-              await removeTeacher(teacher.id);
-              deletedCount++;
-            } catch (err) {
-              console.error(`❌ Öğretmen silinemedi: ${teacher.name}`, err);
-            }
-          }
-
-          if (deletedCount > 0) {
-            success('🗑️ Öğretmenler Silindi', `${deletedCount} öğretmen başarıyla silindi`);
-          } else {
-            error('❌ Silme Hatası', 'Hiçbir öğretmen silinemedi');
-          }
-
-        } catch (err) {
-          console.error('❌ Toplu silme hatası:', err);
-          error('❌ Silme Hatası', 'Öğretmenler silinirken bir hata oluştu');
-        } finally {
-          setIsDeletingTeachers(false);
-        }
-      }
-    );
-  };
-
-  // Delete all classes
-  const handleDeleteAllClasses = () => {
-    if (classes.length === 0) {
-      warning('⚠️ Silinecek Sınıf Yok', 'Sistemde silinecek sınıf bulunamadı');
-      return;
-    }
-
-    confirmDelete(
-      `${classes.length} Sınıf`,
-      async () => {
-        setIsDeletingClasses(true);
-        
-        try {
-          let deletedCount = 0;
-          
-          for (const classItem of classes) {
-            try {
-              await removeClass(classItem.id);
-              deletedCount++;
-            } catch (err) {
-              console.error(`❌ Sınıf silinemedi: ${classItem.name}`, err);
-            }
-          }
-
-          if (deletedCount > 0) {
-            success('🗑️ Sınıflar Silindi', `${deletedCount} sınıf başarıyla silindi`);
-          } else {
-            error('❌ Silme Hatası', 'Hiçbir sınıf silinemedi');
-          }
-
-        } catch (err) {
-          console.error('❌ Toplu silme hatası:', err);
-          error('❌ Silme Hatası', 'Sınıflar silinirken bir hata oluştu');
-        } finally {
-          setIsDeletingClasses(false);
-        }
-      }
-    );
-  };
-
-  // Delete all subjects
-  const handleDeleteAllSubjects = () => {
-    if (subjects.length === 0) {
-      warning('⚠️ Silinecek Ders Yok', 'Sistemde silinecek ders bulunamadı');
-      return;
-    }
-
-    confirmDelete(
-      `${subjects.length} Ders`,
-      async () => {
-        setIsDeletingSubjects(true);
-        
-        try {
-          let deletedCount = 0;
-          
-          for (const subject of subjects) {
-            try {
-              await removeSubject(subject.id);
-              deletedCount++;
-            } catch (err) {
-              console.error(`❌ Ders silinemedi: ${subject.name}`, err);
-            }
-          }
-
-          if (deletedCount > 0) {
-            success('🗑️ Dersler Silindi', `${deletedCount} ders başarıyla silindi`);
-          } else {
-            error('❌ Silme Hatası', 'Hiçbir ders silinemedi');
-          }
-
-        } catch (err) {
-          console.error('❌ Toplu silme hatası:', err);
-          error('❌ Silme Hatası', 'Dersler silinirken bir hata oluştu');
-        } finally {
-          setIsDeletingSubjects(false);
-        }
-      }
-    );
-  };
-
-  // Delete all schedules
-  const handleDeleteAllSchedules = () => {
-    if (schedules.length === 0) {
-      warning('⚠️ Silinecek Program Yok', 'Sistemde silinecek program bulunamadı');
-      return;
-    }
-
-    confirmDelete(
-      `${schedules.length} Program`,
-      async () => {
-        setIsDeletingSchedules(true);
-        
-        try {
-          let deletedCount = 0;
-          
-          for (const schedule of schedules) {
-            try {
-              await removeSchedule(schedule.id);
-              deletedCount++;
-            } catch (err) {
-              console.error(`❌ Program silinemedi: ${schedule.id}`, err);
-            }
-          }
-
-          if (deletedCount > 0) {
-            success('🗑️ Programlar Silindi', `${deletedCount} program başarıyla silindi`);
-          } else {
-            error('❌ Silme Hatası', 'Hiçbir program silinemedi');
-          }
-
-        } catch (err) {
-          console.error('❌ Toplu silme hatası:', err);
-          error('❌ Silme Hatası', 'Programlar silinirken bir hata oluştu');
-        } finally {
-          setIsDeletingSchedules(false);
-        }
-      }
-    );
-  };
-
-  // Delete all data
-  const handleDeleteAllData = () => {
-    const totalItems = teachers.length + classes.length + subjects.length + schedules.length;
-    
-    if (totalItems === 0) {
-      warning('⚠️ Silinecek Veri Yok', 'Sistemde silinecek veri bulunamadı');
-      return;
-    }
-
-    confirmDelete(
-      `Tüm Veriler (${totalItems} öğe)`,
-      async () => {
-        setIsDeletingAll(true);
-        
-        try {
-          let deletedCount = 0;
-          
-          // Delete schedules first
-          for (const schedule of schedules) {
-            try {
-              await removeSchedule(schedule.id);
-              deletedCount++;
-            } catch (err) {
-              console.error(`❌ Program silinemedi: ${schedule.id}`, err);
-            }
-          }
-
-          // Delete teachers
-          for (const teacher of teachers) {
-            try {
-              await removeTeacher(teacher.id);
-              deletedCount++;
-            } catch (err) {
-              console.error(`❌ Öğretmen silinemedi: ${teacher.name}`, err);
-            }
-          }
-
-          // Delete classes
-          for (const classItem of classes) {
-            try {
-              await removeClass(classItem.id);
-              deletedCount++;
-            } catch (err) {
-              console.error(`❌ Sınıf silinemedi: ${classItem.name}`, err);
-            }
-          }
-
-          // Delete subjects
-          for (const subject of subjects) {
-            try {
-              await removeSubject(subject.id);
-              deletedCount++;
-            } catch (err) {
-              console.error(`❌ Ders silinemedi: ${subject.name}`, err);
-            }
-          }
-
-          if (deletedCount > 0) {
-            success('🗑️ Tüm Veriler Silindi', `${deletedCount} öğe başarıyla silindi`);
-          } else {
-            error('❌ Silme Hatası', 'Hiçbir veri silinemedi');
-          }
-
-        } catch (err) {
-          console.error('❌ Toplu silme hatası:', err);
-          error('❌ Silme Hatası', 'Veriler silinirken bir hata oluştu');
-        } finally {
-          setIsDeletingAll(false);
-        }
-      }
-    );
-  };
 
   // Edit template
   const handleEditTemplate = (templateId: string) => {
@@ -368,15 +129,14 @@ const Home = () => {
       async () => {
         try {
           await removeTemplate(template.id);
-          success('🗑️ Şablon Silindi', `${template.name} başarıyla silindi`);
+          success('🗑️ Program Silindi', `${template.name} başarıyla silindi`);
         } catch (err) {
-          error('❌ Silme Hatası', 'Şablon silinirken bir hata oluştu');
+          error('❌ Silme Hatası', 'Program silinirken bir hata oluştu');
         }
       }
     );
   };
 
-  const totalDataCount = teachers.length + classes.length + subjects.length + schedules.length;
   const sortedTemplates = [...templates].sort((a, b) => 
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
@@ -421,10 +181,10 @@ const Home = () => {
               <div>
                 <h2 className="text-lg font-bold text-gray-900 flex items-center">
                   <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-                  Oluşturulan Program Şablonları
+                  Oluşturulan Programlar
                 </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  {templates.length} program şablonu • Düzenlemek için tıklayın
+                  {templates.length} program • Düzenlemek için tıklayın
                 </p>
               </div>
               <Button
@@ -484,14 +244,6 @@ const Home = () => {
                   )}
                   
                   <div className="flex items-center justify-between">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      template.status === 'published' ? 'bg-green-100 text-green-800' :
-                      template.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {template.status === 'published' ? 'Yayınlandı' :
-                       template.status === 'draft' ? 'Taslak' : 'Arşivlendi'}
-                    </span>
                     <span className="text-xs text-gray-400">
                       {new Date(template.updatedAt).toLocaleDateString('tr-TR')}
                     </span>
@@ -506,89 +258,6 @@ const Home = () => {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Data Management Section */}
-      {totalDataCount > 0 && (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h3 className="text-sm font-medium text-red-800 mb-2">Veri Yönetimi</h3>
-                <p className="text-sm text-red-700 mb-4">
-                  Sistemdeki verileri temizlemek için aşağıdaki butonları kullanabilirsiniz. 
-                  Bu işlemler geri alınamaz!
-                </p>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-                  {teachers.length > 0 && (
-                    <Button
-                      onClick={handleDeleteAllTeachers}
-                      icon={Trash2}
-                      variant="danger"
-                      size="sm"
-                      disabled={isDeletingTeachers}
-                      className="w-full"
-                    >
-                      {isDeletingTeachers ? 'Siliniyor...' : `Öğretmenler (${teachers.length})`}
-                    </Button>
-                  )}
-                  
-                  {classes.length > 0 && (
-                    <Button
-                      onClick={handleDeleteAllClasses}
-                      icon={Trash2}
-                      variant="danger"
-                      size="sm"
-                      disabled={isDeletingClasses}
-                      className="w-full"
-                    >
-                      {isDeletingClasses ? 'Siliniyor...' : `Sınıflar (${classes.length})`}
-                    </Button>
-                  )}
-                  
-                  {subjects.length > 0 && (
-                    <Button
-                      onClick={handleDeleteAllSubjects}
-                      icon={Trash2}
-                      variant="danger"
-                      size="sm"
-                      disabled={isDeletingSubjects}
-                      className="w-full"
-                    >
-                      {isDeletingSubjects ? 'Siliniyor...' : `Dersler (${subjects.length})`}
-                    </Button>
-                  )}
-                  
-                  {schedules.length > 0 && (
-                    <Button
-                      onClick={handleDeleteAllSchedules}
-                      icon={Trash2}
-                      variant="danger"
-                      size="sm"
-                      disabled={isDeletingSchedules}
-                      className="w-full"
-                    >
-                      {isDeletingSchedules ? 'Siliniyor...' : `Programlar (${schedules.length})`}
-                    </Button>
-                  )}
-                  
-                  <Button
-                    onClick={handleDeleteAllData}
-                    icon={Trash2}
-                    variant="danger"
-                    size="sm"
-                    disabled={isDeletingAll}
-                    className="w-full font-bold"
-                  >
-                    {isDeletingAll ? 'Siliniyor...' : `Tümünü Sil (${totalDataCount})`}
-                  </Button>
-                </div>
-              </div>
             </div>
           </div>
         </div>

@@ -1,21 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Database, 
-  Upload, 
-  Download, 
-  Trash2, 
   Users, 
   Building, 
   BookOpen, 
-  FileText,
+  Calendar, 
+  Trash2, 
+  Plus, 
+  Edit,
   AlertTriangle,
-  CheckCircle,
-  X,
-  Eye,
-  MapPin,
   BarChart3,
   Settings,
-  RefreshCw
+  Download,
+  Upload,
+  MapPin,
+  FileText,
+  CheckCircle,
+  XCircle,
+  Info
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFirestore } from '../hooks/useFirestore';
@@ -23,49 +25,66 @@ import { useToast } from '../hooks/useToast';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { Teacher, Class, Subject, Schedule, EDUCATION_LEVELS } from '../types';
 import Button from '../components/UI/Button';
-import Select from '../components/UI/Select';
 import ConfirmationModal from '../components/UI/ConfirmationModal';
+import Modal from '../components/UI/Modal';
+import Select from '../components/UI/Select';
 
-// CSV parsing utility
-const parseCSV = (csvText: string): string[][] => {
-  const lines = csvText.split('\n').filter(line => line.trim());
-  return lines.map(line => {
-    const values = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        values.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    
-    values.push(current.trim());
-    return values;
-  });
-};
+// Schedule Template interface
+interface ScheduleTemplate {
+  id: string;
+  name: string;
+  description: string;
+  academicYear: string;
+  semester: string;
+  wizardData: any;
+  createdAt: Date;
+  updatedAt: Date;
+  status: 'draft' | 'published' | 'archived';
+}
 
-interface CSVPreviewData {
-  headers: string[];
-  rows: string[][];
-  validRows: boolean[];
-  existingRows: boolean[];
+// Classroom interface
+interface Classroom {
+  id: string;
+  name: string;
+  type: string;
+  capacity: number;
+  floor: string;
+  building: string;
+  equipment: string[];
+  shortName?: string;
+  color?: string;
+}
+
+// CSV Teacher interface
+interface CSVTeacher {
+  name: string;
+  branch: string;
+  level: string;
+  isValid: boolean;
+  error?: string;
+  exists?: boolean;
+}
+
+// CSV Subject interface
+interface CSVSubject {
+  name: string;
+  branch: string;
+  level: string;
+  weeklyHours: number;
+  isValid: boolean;
+  error?: string;
+  exists?: boolean;
 }
 
 const DataManagement = () => {
   const navigate = useNavigate();
-  const { data: teachers, add: addTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
+  const { data: teachers, remove: removeTeacher, add: addTeacher } = useFirestore<Teacher>('teachers');
   const { data: classes, remove: removeClass } = useFirestore<Class>('classes');
-  const { data: subjects, add: addSubject, remove: removeSubject } = useFirestore<Subject>('subjects');
+  const { data: subjects, remove: removeSubject, add: addSubject } = useFirestore<Subject>('subjects');
   const { data: schedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
-  const { success, error, warning } = useToast();
+  const { data: templates, remove: removeTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
+  const { data: classrooms, remove: removeClassroom } = useFirestore<Classroom>('classrooms');
+  const { success, error, warning, info } = useToast();
   const { 
     confirmation, 
     showConfirmation, 
@@ -73,152 +92,271 @@ const DataManagement = () => {
     confirmDelete 
   } = useConfirmation();
 
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvPreview, setCsvPreview] = useState<CSVPreviewData | null>(null);
-  const [importType, setImportType] = useState<'teachers' | 'subjects'>('teachers');
-  const [defaultLevel, setDefaultLevel] = useState<'Anaokulu' | 'İlkokul' | 'Ortaokul'>('İlkokul');
-  const [defaultWeeklyHours, setDefaultWeeklyHours] = useState(4);
-  const [isImporting, setIsImporting] = useState(false);
+  const [isDeletingTeachers, setIsDeletingTeachers] = useState(false);
+  const [isDeletingClasses, setIsDeletingClasses] = useState(false);
+  const [isDeletingSubjects, setIsDeletingSubjects] = useState(false);
+  const [isDeletingSchedules, setIsDeletingSchedules] = useState(false);
+  const [isDeletingTemplates, setIsDeletingTemplates] = useState(false);
+  const [isDeletingClassrooms, setIsDeletingClassrooms] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  
+  // CSV Import States
+  const [isTeacherCSVModalOpen, setIsTeacherCSVModalOpen] = useState(false);
+  const [isSubjectCSVModalOpen, setIsSubjectCSVModalOpen] = useState(false);
+  const [csvTeachers, setCSVTeachers] = useState<CSVTeacher[]>([]);
+  const [csvSubjects, setCSVSubjects] = useState<CSVSubject[]>([]);
+  const [selectedTeacherLevel, setSelectedTeacherLevel] = useState('İlkokul');
+  const [selectedSubjectLevel, setSelectedSubjectLevel] = useState('İlkokul');
+  const [selectedSubjectHours, setSelectedSubjectHours] = useState('4');
+  const [isImportingTeachers, setIsImportingTeachers] = useState(false);
+  const [isImportingSubjects, setIsImportingSubjects] = useState(false);
+  
+  const teacherFileInputRef = useRef<HTMLInputElement>(null);
+  const subjectFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle CSV file selection
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      error('❌ Geçersiz Dosya', 'Lütfen CSV dosyası seçin');
+  // Delete all teachers
+  const handleDeleteAllTeachers = () => {
+    if (teachers.length === 0) {
+      warning('⚠️ Silinecek Öğretmen Yok', 'Sistemde silinecek öğretmen bulunamadı');
       return;
     }
 
-    setCsvFile(file);
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const csvText = e.target?.result as string;
-      try {
-        const parsedData = parseCSV(csvText);
+    confirmDelete(
+      `${teachers.length} Öğretmen`,
+      async () => {
+        setIsDeletingTeachers(true);
         
-        if (parsedData.length < 2) {
-          error('❌ Geçersiz CSV', 'CSV dosyası en az başlık satırı ve bir veri satırı içermelidir');
-          return;
-        }
-
-        const headers = parsedData[0];
-        const rows = parsedData.slice(1);
-        
-        // Validate and check existing data
-        const validRows: boolean[] = [];
-        const existingRows: boolean[] = [];
-        
-        rows.forEach(row => {
-          if (importType === 'teachers') {
-            const isValid = row[0] && row[0].trim().length > 0; // Name is required
-            const exists = teachers.some(t => t.name.toLowerCase() === row[0]?.toLowerCase());
-            validRows.push(isValid);
-            existingRows.push(exists);
-          } else {
-            const isValid = row[0] && row[0].trim().length > 0; // Subject name is required
-            const weeklyHours = parseInt(row[3]) || defaultWeeklyHours;
-            const isValidHours = weeklyHours >= 1 && weeklyHours <= 30; // FIXED: 1-30 range
-            const exists = subjects.some(s => 
-              s.name.toLowerCase() === row[0]?.toLowerCase() && 
-              s.level === (row[2] || defaultLevel)
-            );
-            validRows.push(isValid && isValidHours);
-            existingRows.push(exists);
+        try {
+          let deletedCount = 0;
+          
+          for (const teacher of teachers) {
+            try {
+              await removeTeacher(teacher.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Öğretmen silinemedi: ${teacher.name}`, err);
+            }
           }
-        });
 
-        setCsvPreview({
-          headers,
-          rows,
-          validRows,
-          existingRows
-        });
-        
-      } catch (err) {
-        error('❌ CSV Okuma Hatası', 'CSV dosyası okunamadı. Dosya formatını kontrol edin.');
+          if (deletedCount > 0) {
+            success('🗑️ Öğretmenler Silindi', `${deletedCount} öğretmen başarıyla silindi`);
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir öğretmen silinemedi');
+          }
+
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Öğretmenler silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingTeachers(false);
+        }
       }
-    };
-    
-    reader.readAsText(file, 'UTF-8');
+    );
   };
 
-  // Import CSV data
-  const handleImportCSV = async () => {
-    if (!csvPreview) return;
+  // Delete all classes
+  const handleDeleteAllClasses = () => {
+    if (classes.length === 0) {
+      warning('⚠️ Silinecek Sınıf Yok', 'Sistemde silinecek sınıf bulunamadı');
+      return;
+    }
 
-    setIsImporting(true);
-    
-    try {
-      let importedCount = 0;
-      let skippedCount = 0;
-
-      for (let i = 0; i < csvPreview.rows.length; i++) {
-        const row = csvPreview.rows[i];
-        const isValid = csvPreview.validRows[i];
-        const exists = csvPreview.existingRows[i];
-
-        if (!isValid || exists) {
-          skippedCount++;
-          continue;
-        }
-
-        if (importType === 'teachers') {
-          const teacherData = {
-            name: row[0]?.trim() || '',
-            branch: row[1]?.trim() || 'Genel',
-            level: (row[2]?.trim() as 'Anaokulu' | 'İlkokul' | 'Ortaokul') || defaultLevel
-          };
-
-          await addTeacher(teacherData as Omit<Teacher, 'id' | 'createdAt'>);
-          importedCount++;
-        } else {
-          const weeklyHours = parseInt(row[3]) || defaultWeeklyHours;
+    confirmDelete(
+      `${classes.length} Sınıf`,
+      async () => {
+        setIsDeletingClasses(true);
+        
+        try {
+          let deletedCount = 0;
           
-          // FIXED: Validate weekly hours range 1-30
-          if (weeklyHours < 1 || weeklyHours > 30) {
-            skippedCount++;
-            continue;
+          for (const classItem of classes) {
+            try {
+              await removeClass(classItem.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Sınıf silinemedi: ${classItem.name}`, err);
+            }
           }
 
-          const subjectData = {
-            name: row[0]?.trim() || '',
-            branch: row[1]?.trim() || row[0]?.trim() || '',
-            level: (row[2]?.trim() as 'Anaokulu' | 'İlkokul' | 'Ortaokul') || defaultLevel,
-            weeklyHours: weeklyHours
-          };
+          if (deletedCount > 0) {
+            success('🗑️ Sınıflar Silindi', `${deletedCount} sınıf başarıyla silindi`);
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir sınıf silinemedi');
+          }
 
-          await addSubject(subjectData as Omit<Subject, 'id' | 'createdAt'>);
-          importedCount++;
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Sınıflar silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingClasses(false);
         }
       }
+    );
+  };
 
-      if (importedCount > 0) {
-        success('✅ İçe Aktarma Tamamlandı', 
-          `${importedCount} ${importType === 'teachers' ? 'öğretmen' : 'ders'} başarıyla eklendi${skippedCount > 0 ? `, ${skippedCount} kayıt atlandı` : ''}`
-        );
-      } else {
-        warning('⚠️ Hiçbir Veri Eklenmedi', 'Tüm veriler zaten mevcut veya geçersiz');
-      }
-
-      // Reset form
-      setCsvFile(null);
-      setCsvPreview(null);
-      const fileInput = document.getElementById('csv-file-input') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
-
-    } catch (err) {
-      error('❌ İçe Aktarma Hatası', 'Veriler içe aktarılırken bir hata oluştu');
-    } finally {
-      setIsImporting(false);
+  // Delete all subjects
+  const handleDeleteAllSubjects = () => {
+    if (subjects.length === 0) {
+      warning('⚠️ Silinecek Ders Yok', 'Sistemde silinecek ders bulunamadı');
+      return;
     }
+
+    confirmDelete(
+      `${subjects.length} Ders`,
+      async () => {
+        setIsDeletingSubjects(true);
+        
+        try {
+          let deletedCount = 0;
+          
+          for (const subject of subjects) {
+            try {
+              await removeSubject(subject.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Ders silinemedi: ${subject.name}`, err);
+            }
+          }
+
+          if (deletedCount > 0) {
+            success('🗑️ Dersler Silindi', `${deletedCount} ders başarıyla silindi`);
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir ders silinemedi');
+          }
+
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Dersler silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingSubjects(false);
+        }
+      }
+    );
+  };
+
+  // Delete all schedules
+  const handleDeleteAllSchedules = () => {
+    if (schedules.length === 0) {
+      warning('⚠️ Silinecek Program Yok', 'Sistemde silinecek program bulunamadı');
+      return;
+    }
+
+    confirmDelete(
+      `${schedules.length} Program`,
+      async () => {
+        setIsDeletingSchedules(true);
+        
+        try {
+          let deletedCount = 0;
+          
+          for (const schedule of schedules) {
+            try {
+              await removeSchedule(schedule.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Program silinemedi: ${schedule.id}`, err);
+            }
+          }
+
+          if (deletedCount > 0) {
+            success('🗑️ Programlar Silindi', `${deletedCount} program başarıyla silindi`);
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir program silinemedi');
+          }
+
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Programlar silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingSchedules(false);
+        }
+      }
+    );
+  };
+
+  // Delete all templates
+  const handleDeleteAllTemplates = () => {
+    if (templates.length === 0) {
+      warning('⚠️ Silinecek Şablon Yok', 'Sistemde silinecek şablon bulunamadı');
+      return;
+    }
+
+    confirmDelete(
+      `${templates.length} Program Şablonu`,
+      async () => {
+        setIsDeletingTemplates(true);
+        
+        try {
+          let deletedCount = 0;
+          
+          for (const template of templates) {
+            try {
+              await removeTemplate(template.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Şablon silinemedi: ${template.name}`, err);
+            }
+          }
+
+          if (deletedCount > 0) {
+            success('🗑️ Şablonlar Silindi', `${deletedCount} şablon başarıyla silindi`);
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir şablon silinemedi');
+          }
+
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Şablonlar silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingTemplates(false);
+        }
+      }
+    );
+  };
+
+  // Delete all classrooms
+  const handleDeleteAllClassrooms = () => {
+    if (classrooms.length === 0) {
+      warning('⚠️ Silinecek Derslik Yok', 'Sistemde silinecek derslik bulunamadı');
+      return;
+    }
+
+    confirmDelete(
+      `${classrooms.length} Derslik`,
+      async () => {
+        setIsDeletingClassrooms(true);
+        
+        try {
+          let deletedCount = 0;
+          
+          for (const classroom of classrooms) {
+            try {
+              await removeClassroom(classroom.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Derslik silinemedi: ${classroom.name}`, err);
+            }
+          }
+
+          if (deletedCount > 0) {
+            success('🗑️ Derslikler Silindi', `${deletedCount} derslik başarıyla silindi`);
+          } else {
+            error('❌ Silme Hatası', 'Hiçbir derslik silinemedi');
+          }
+
+        } catch (err) {
+          console.error('❌ Toplu silme hatası:', err);
+          error('❌ Silme Hatası', 'Derslikler silinirken bir hata oluştu');
+        } finally {
+          setIsDeletingClassrooms(false);
+        }
+      }
+    );
   };
 
   // Delete all data
   const handleDeleteAllData = () => {
-    const totalItems = teachers.length + classes.length + subjects.length + schedules.length;
+    const totalItems = teachers.length + classes.length + subjects.length + schedules.length + templates.length + classrooms.length;
     
     if (totalItems === 0) {
       warning('⚠️ Silinecek Veri Yok', 'Sistemde silinecek veri bulunamadı');
@@ -226,61 +364,81 @@ const DataManagement = () => {
     }
 
     confirmDelete(
-      `Tüm Sistem Verileri (${totalItems} kayıt)`,
+      `Tüm Veriler (${totalItems} öğe)`,
       async () => {
         setIsDeletingAll(true);
         
         try {
           let deletedCount = 0;
           
-          // Delete all schedules first
+          // Delete schedules first
           for (const schedule of schedules) {
             try {
               await removeSchedule(schedule.id);
               deletedCount++;
             } catch (err) {
-              console.error(`Schedule delete error: ${schedule.id}`, err);
+              console.error(`❌ Program silinemedi: ${schedule.id}`, err);
             }
           }
 
-          // Delete all subjects
-          for (const subject of subjects) {
+          // Delete templates
+          for (const template of templates) {
             try {
-              await removeSubject(subject.id);
+              await removeTemplate(template.id);
               deletedCount++;
             } catch (err) {
-              console.error(`Subject delete error: ${subject.id}`, err);
+              console.error(`❌ Şablon silinemedi: ${template.name}`, err);
             }
           }
 
-          // Delete all classes
-          for (const classItem of classes) {
-            try {
-              await removeClass(classItem.id);
-              deletedCount++;
-            } catch (err) {
-              console.error(`Class delete error: ${classItem.id}`, err);
-            }
-          }
-
-          // Delete all teachers
+          // Delete teachers
           for (const teacher of teachers) {
             try {
               await removeTeacher(teacher.id);
               deletedCount++;
             } catch (err) {
-              console.error(`Teacher delete error: ${teacher.id}`, err);
+              console.error(`❌ Öğretmen silinemedi: ${teacher.name}`, err);
+            }
+          }
+
+          // Delete classes
+          for (const classItem of classes) {
+            try {
+              await removeClass(classItem.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Sınıf silinemedi: ${classItem.name}`, err);
+            }
+          }
+
+          // Delete subjects
+          for (const subject of subjects) {
+            try {
+              await removeSubject(subject.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Ders silinemedi: ${subject.name}`, err);
+            }
+          }
+
+          // Delete classrooms
+          for (const classroom of classrooms) {
+            try {
+              await removeClassroom(classroom.id);
+              deletedCount++;
+            } catch (err) {
+              console.error(`❌ Derslik silinemedi: ${classroom.name}`, err);
             }
           }
 
           if (deletedCount > 0) {
-            success('🗑️ Tüm Veriler Silindi', `${deletedCount} kayıt başarıyla silindi`);
+            success('🗑️ Tüm Veriler Silindi', `${deletedCount} öğe başarıyla silindi`);
           } else {
             error('❌ Silme Hatası', 'Hiçbir veri silinemedi');
           }
 
         } catch (err) {
-          console.error('Bulk delete error:', err);
+          console.error('❌ Toplu silme hatası:', err);
           error('❌ Silme Hatası', 'Veriler silinirken bir hata oluştu');
         } finally {
           setIsDeletingAll(false);
@@ -289,442 +447,1121 @@ const DataManagement = () => {
     );
   };
 
-  const levelOptions = EDUCATION_LEVELS.map(level => ({
-    value: level,
-    label: level
-  }));
-
-  const weeklyHoursOptions = Array.from({ length: 30 }, (_, i) => ({
-    value: (i + 1).toString(),
-    label: `${i + 1} saat`
-  }));
-
-  const getRowStatusColor = (index: number) => {
-    if (!csvPreview) return '';
-    
-    const isValid = csvPreview.validRows[index];
-    const exists = csvPreview.existingRows[index];
-    
-    if (!isValid) return 'bg-red-50 border-red-200';
-    if (exists) return 'bg-yellow-50 border-yellow-200';
-    return 'bg-green-50 border-green-200';
+  // Edit template
+  const handleEditTemplate = (templateId: string) => {
+    navigate(`/schedule-wizard?templateId=${templateId}`);
   };
 
-  const getRowStatusIcon = (index: number) => {
-    if (!csvPreview) return null;
-    
-    const isValid = csvPreview.validRows[index];
-    const exists = csvPreview.existingRows[index];
-    
-    if (!isValid) return <X className="w-4 h-4 text-red-600" />;
-    if (exists) return <AlertTriangle className="w-4 h-4 text-yellow-600" />;
-    return <CheckCircle className="w-4 h-4 text-green-600" />;
+  // Delete template
+  const handleDeleteTemplate = (template: ScheduleTemplate) => {
+    confirmDelete(
+      template.name,
+      async () => {
+        try {
+          await removeTemplate(template.id);
+          success('🗑️ Şablon Silindi', `${template.name} başarıyla silindi`);
+        } catch (err) {
+          error('❌ Silme Hatası', 'Şablon silinirken bir hata oluştu');
+        }
+      }
+    );
   };
 
-  const validNewRowsCount = csvPreview ? 
-    csvPreview.validRows.filter((valid, index) => valid && !csvPreview.existingRows[index]).length : 0;
+  // CSV Import Functions
+  const handleTeacherCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) {
+        error('❌ Dosya Hatası', 'Dosya içeriği okunamadı');
+        return;
+      }
+
+      try {
+        // Parse CSV content
+        const lines = content.split('\n').filter(line => line.trim());
+        
+        // Skip header line
+        const dataLines = lines.slice(1);
+        
+        const parsedTeachers: CSVTeacher[] = dataLines.map(line => {
+          // Split by comma or semicolon
+          const columns = line.split(/[,;]/).map(col => col.trim().replace(/^"|"$/g, ''));
+          
+          // Assuming format: "Adı Soyadı", "Branşı", "Eğitim Seviyesi"
+          const name = columns[0] || '';
+          const branch = columns[1] || '';
+          const level = columns[2] || '';
+          
+          // Validate data
+          let isValid = true;
+          let error = '';
+          
+          if (!name) {
+            isValid = false;
+            error = 'Ad Soyad boş olamaz';
+          } else if (!branch) {
+            isValid = false;
+            error = 'Branş boş olamaz';
+          } else if (level && !EDUCATION_LEVELS.includes(level as any)) {
+            isValid = false;
+            error = 'Geçersiz eğitim seviyesi';
+          }
+          
+          // Check if teacher already exists
+          const exists = teachers.some(t => 
+            t.name.toLowerCase() === name.toLowerCase() && 
+            t.branch.toLowerCase() === branch.toLowerCase()
+          );
+          
+          return {
+            name,
+            branch,
+            level: level || selectedTeacherLevel,
+            isValid,
+            error,
+            exists
+          };
+        }).filter(teacher => teacher.name); // Filter out empty rows
+        
+        setCSVTeachers(parsedTeachers);
+        setIsTeacherCSVModalOpen(true);
+        
+        // Reset file input
+        if (teacherFileInputRef.current) {
+          teacherFileInputRef.current.value = '';
+        }
+        
+      } catch (err) {
+        console.error('CSV parsing error:', err);
+        error('❌ CSV Hatası', 'Dosya işlenirken bir hata oluştu');
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+
+  const handleSubjectCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) {
+        error('❌ Dosya Hatası', 'Dosya içeriği okunamadı');
+        return;
+      }
+
+      try {
+        // Parse CSV content
+        const lines = content.split('\n').filter(line => line.trim());
+        
+        // Skip header line
+        const dataLines = lines.slice(1);
+        
+        const parsedSubjects: CSVSubject[] = dataLines.map(line => {
+          // Split by comma or semicolon
+          const columns = line.split(/[,;]/).map(col => col.trim().replace(/^"|"$/g, ''));
+          
+          // Assuming format: "Ders", "Branş", "Eğitim Seviyesi", "Ders Saati"
+          const name = columns[0] || '';
+          const branch = columns[1] || name; // Use name as branch if not provided
+          const level = columns[2] || '';
+          const weeklyHours = parseInt(columns[3] || selectedSubjectHours);
+          
+          // Validate data
+          let isValid = true;
+          let error = '';
+          
+          if (!name) {
+            isValid = false;
+            error = 'Ders adı boş olamaz';
+          } else if (!branch) {
+            isValid = false;
+            error = 'Branş boş olamaz';
+          } else if (level && !EDUCATION_LEVELS.includes(level as any)) {
+            isValid = false;
+            error = 'Geçersiz eğitim seviyesi';
+          } else if (isNaN(weeklyHours) || weeklyHours < 1 || weeklyHours > 12) {
+            isValid = false;
+            error = 'Ders saati 1-12 arasında olmalıdır';
+          }
+          
+          // Check if subject already exists
+          const exists = subjects.some(s => 
+            s.name.toLowerCase() === name.toLowerCase() && 
+            s.level === (level || selectedSubjectLevel)
+          );
+          
+          return {
+            name,
+            branch,
+            level: level || selectedSubjectLevel,
+            weeklyHours: isNaN(weeklyHours) ? parseInt(selectedSubjectHours) : weeklyHours,
+            isValid,
+            error,
+            exists
+          };
+        }).filter(subject => subject.name); // Filter out empty rows
+        
+        setCSVSubjects(parsedSubjects);
+        setIsSubjectCSVModalOpen(true);
+        
+        // Reset file input
+        if (subjectFileInputRef.current) {
+          subjectFileInputRef.current.value = '';
+        }
+        
+      } catch (err) {
+        console.error('CSV parsing error:', err);
+        error('❌ CSV Hatası', 'Dosya işlenirken bir hata oluştu');
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+
+  const handleImportTeachers = async () => {
+    setIsImportingTeachers(true);
+    
+    try {
+      const validTeachers = csvTeachers.filter(t => t.isValid && !t.exists);
+      
+      if (validTeachers.length === 0) {
+        warning('⚠️ İçe Aktarılacak Veri Yok', 'Geçerli ve yeni öğretmen bulunamadı');
+        setIsImportingTeachers(false);
+        return;
+      }
+      
+      let importedCount = 0;
+      
+      for (const teacher of validTeachers) {
+        try {
+          await addTeacher({
+            name: teacher.name,
+            branch: teacher.branch,
+            level: teacher.level as 'Anaokulu' | 'İlkokul' | 'Ortaokul'
+          });
+          importedCount++;
+        } catch (err) {
+          console.error(`❌ Öğretmen eklenemedi: ${teacher.name}`, err);
+        }
+      }
+      
+      if (importedCount > 0) {
+        success('✅ İçe Aktarma Başarılı', `${importedCount} öğretmen başarıyla içe aktarıldı`);
+        setIsTeacherCSVModalOpen(false);
+      } else {
+        error('❌ İçe Aktarma Hatası', 'Hiçbir öğretmen içe aktarılamadı');
+      }
+    } catch (err) {
+      console.error('❌ İçe aktarma hatası:', err);
+      error('❌ İçe Aktarma Hatası', 'Öğretmenler içe aktarılırken bir hata oluştu');
+    } finally {
+      setIsImportingTeachers(false);
+    }
+  };
+
+  const handleImportSubjects = async () => {
+    setIsImportingSubjects(true);
+    
+    try {
+      const validSubjects = csvSubjects.filter(s => s.isValid && !s.exists);
+      
+      if (validSubjects.length === 0) {
+        warning('⚠️ İçe Aktarılacak Veri Yok', 'Geçerli ve yeni ders bulunamadı');
+        setIsImportingSubjects(false);
+        return;
+      }
+      
+      let importedCount = 0;
+      
+      for (const subject of validSubjects) {
+        try {
+          await addSubject({
+            name: subject.name,
+            branch: subject.branch,
+            level: subject.level as 'Anaokulu' | 'İlkokul' | 'Ortaokul',
+            weeklyHours: subject.weeklyHours
+          });
+          importedCount++;
+        } catch (err) {
+          console.error(`❌ Ders eklenemedi: ${subject.name}`, err);
+        }
+      }
+      
+      if (importedCount > 0) {
+        success('✅ İçe Aktarma Başarılı', `${importedCount} ders başarıyla içe aktarıldı`);
+        setIsSubjectCSVModalOpen(false);
+      } else {
+        error('❌ İçe Aktarma Hatası', 'Hiçbir ders içe aktarılamadı');
+      }
+    } catch (err) {
+      console.error('❌ İçe aktarma hatası:', err);
+      error('❌ İçe Aktarma Hatası', 'Dersler içe aktarılırken bir hata oluştu');
+    } finally {
+      setIsImportingSubjects(false);
+    }
+  };
+
+  const totalDataCount = teachers.length + classes.length + subjects.length + schedules.length + templates.length + classrooms.length;
+  const sortedTemplates = [...templates].sort((a, b) => 
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
 
   return (
-    <div className="container-mobile">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="header-mobile">
-        <div className="flex items-center">
-          <Database className="w-8 h-8 text-purple-600 mr-3" />
-          <div>
-            <h1 className="text-responsive-xl font-bold text-gray-900">Veri Yönetimi</h1>
-            <p className="text-responsive-sm text-gray-600">Sistem verilerini yönetin ve CSV dosyalarından toplu veri aktarın</p>
-          </div>
-        </div>
-        <div className="button-group-mobile">
-          <Button
-            onClick={() => navigate('/classrooms')}
-            icon={MapPin}
-            variant="secondary"
-            className="w-full sm:w-auto"
-          >
-            Derslik Yönetimi
-          </Button>
-        </div>
-      </div>
-
-      {/* Data Statistics - Improved Design */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center">
-            <BarChart3 className="w-6 h-6 text-purple-600 mr-3" />
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Veri İstatistikleri</h2>
-              <p className="text-sm text-gray-600 mt-1">Sistemdeki toplam veri miktarları</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button
-              onClick={() => window.location.reload()}
-              icon={RefreshCw}
-              variant="secondary"
-              size="sm"
-            >
-              Yenile
-            </Button>
-            {(teachers.length + classes.length + subjects.length + schedules.length) > 0 && (
-              <Button
-                onClick={handleDeleteAllData}
-                icon={Trash2}
-                variant="danger"
-                disabled={isDeletingAll}
-                size="sm"
-              >
-                {isDeletingAll ? 'Siliniyor...' : 'Tümünü Sil'}
-              </Button>
-            )}
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Teachers Card */}
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-blue-500 rounded-lg">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-blue-700">{teachers.length}</div>
-                <div className="text-sm text-blue-600">Öğretmen</div>
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <Database className="w-8 h-8 text-purple-600 mr-3" />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Veri Yönetimi</h1>
+                <p className="text-sm text-gray-600">Sistem verilerini yönetin ve temizleyin</p>
               </div>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
               <Button
-                onClick={() => navigate('/teachers')}
+                onClick={() => navigate('/')}
                 variant="secondary"
-                size="sm"
-                className="bg-white/80 hover:bg-white text-blue-700 border-blue-200"
               >
-                Yönet
-              </Button>
-              <Button
-                onClick={() => navigate('/teachers')}
-                icon={Eye}
-                variant="secondary"
-                size="sm"
-                className="bg-white/80 hover:bg-white text-blue-700 border-blue-200"
-              >
-                Görüntüle
-              </Button>
-            </div>
-          </div>
-
-          {/* Classes Card */}
-          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 border border-emerald-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-emerald-500 rounded-lg">
-                <Building className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-emerald-700">{classes.length}</div>
-                <div className="text-sm text-emerald-600">Sınıf</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <Button
-                onClick={() => navigate('/classes')}
-                variant="secondary"
-                size="sm"
-                className="bg-white/80 hover:bg-white text-emerald-700 border-emerald-200"
-              >
-                Yönet
-              </Button>
-              <Button
-                onClick={() => navigate('/classes')}
-                icon={Eye}
-                variant="secondary"
-                size="sm"
-                className="bg-white/80 hover:bg-white text-emerald-700 border-emerald-200"
-              >
-                Görüntüle
-              </Button>
-            </div>
-          </div>
-
-          {/* Subjects Card */}
-          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-6 border border-indigo-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-indigo-500 rounded-lg">
-                <BookOpen className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-indigo-700">{subjects.length}</div>
-                <div className="text-sm text-indigo-600">Ders</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <Button
-                onClick={() => navigate('/subjects')}
-                variant="secondary"
-                size="sm"
-                className="bg-white/80 hover:bg-white text-indigo-700 border-indigo-200"
-              >
-                Yönet
-              </Button>
-              <Button
-                onClick={() => navigate('/subjects')}
-                icon={Eye}
-                variant="secondary"
-                size="sm"
-                className="bg-white/80 hover:bg-white text-indigo-700 border-indigo-200"
-              >
-                Görüntüle
-              </Button>
-            </div>
-          </div>
-
-          {/* Schedules Card */}
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-purple-500 rounded-lg">
-                <FileText className="w-6 h-6 text-white" />
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-purple-700">{schedules.length}</div>
-                <div className="text-sm text-purple-600">Program</div>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <Button
-                onClick={() => navigate('/all-schedules')}
-                variant="secondary"
-                size="sm"
-                className="bg-white/80 hover:bg-white text-purple-700 border-purple-200"
-              >
-                Yönet
-              </Button>
-              <Button
-                onClick={() => navigate('/all-schedules')}
-                icon={Eye}
-                variant="secondary"
-                size="sm"
-                className="bg-white/80 hover:bg-white text-purple-700 border-purple-200"
-              >
-                Görüntüle
+                Ana Sayfaya Dön
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* CSV Import Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-        <div className="flex items-center mb-6">
-          <Upload className="w-6 h-6 text-green-600 mr-3" />
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">CSV İçe Aktarma</h2>
-            <p className="text-sm text-gray-600 mt-1">Excel'den CSV formatında toplu veri aktarın</p>
-          </div>
-        </div>
-
-        {/* Import Type Selection */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              İçe Aktarma Türü
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setImportType('teachers')}
-                className={`p-3 rounded-lg border-2 transition-all duration-200 ${
-                  importType === 'teachers'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                }`}
-              >
-                <Users className="w-5 h-5 mx-auto mb-1" />
-                <div className="text-sm font-medium">Öğretmenler</div>
-              </button>
-              <button
-                onClick={() => setImportType('subjects')}
-                className={`p-3 rounded-lg border-2 transition-all duration-200 ${
-                  importType === 'subjects'
-                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                    : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                }`}
-              >
-                <BookOpen className="w-5 h-5 mx-auto mb-1" />
-                <div className="text-sm font-medium">Dersler</div>
-              </button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Data Statistics */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <BarChart3 className="w-6 h-6 text-purple-600 mr-2" />
+              <h2 className="text-lg font-bold text-gray-900">Veri İstatistikleri</h2>
+            </div>
+            <div className="text-sm text-gray-600">
+              Toplam {totalDataCount} veri öğesi
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              CSV Dosyası Seç
-            </label>
-            <input
-              id="csv-file-input"
-              type="file"
-              accept=".csv"
-              onChange={handleFileSelect}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-lg cursor-pointer"
-            />
-          </div>
-        </div>
-
-        {/* Default Values */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <Select
-            label="Varsayılan Eğitim Seviyesi"
-            value={defaultLevel}
-            onChange={(value) => setDefaultLevel(value as 'Anaokulu' | 'İlkokul' | 'Ortaokul')}
-            options={levelOptions}
-          />
           
-          {importType === 'subjects' && (
-            <Select
-              label="Varsayılan Haftalık Ders Saati (1-30)"
-              value={defaultWeeklyHours.toString()}
-              onChange={(value) => setDefaultWeeklyHours(parseInt(value))}
-              options={weeklyHoursOptions}
-            />
-          )}
-        </div>
-
-        {/* CSV Preview */}
-        {csvPreview && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Veri Önizlemesi</h3>
-              <div className="flex items-center space-x-4 text-sm">
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-green-600 mr-1" />
-                  <span className="text-green-700">{validNewRowsCount} yeni kayıt</span>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Users className="w-5 h-5 text-blue-600 mr-2" />
+                    <h3 className="font-medium text-blue-900">Öğretmenler</h3>
+                  </div>
+                  <span className="text-2xl font-bold text-blue-600">{teachers.length}</span>
                 </div>
-                <div className="flex items-center">
-                  <AlertTriangle className="w-4 h-4 text-yellow-600 mr-1" />
-                  <span className="text-yellow-700">{csvPreview.existingRows.filter(Boolean).length} mevcut</span>
-                </div>
-                <div className="flex items-center">
-                  <X className="w-4 h-4 text-red-600 mr-1" />
-                  <span className="text-red-700">{csvPreview.validRows.filter(v => !v).length} geçersiz</span>
-                </div>
+                <p className="text-xs text-blue-700 mb-3">Öğretmen kayıtları</p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <Button
+                  onClick={() => navigate('/teachers')}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Yönet
+                </Button>
+                {teachers.length > 0 && (
+                  <Button
+                    onClick={handleDeleteAllTeachers}
+                    icon={Trash2}
+                    variant="danger"
+                    size="sm"
+                    disabled={isDeletingTeachers}
+                  >
+                    {isDeletingTeachers ? 'Siliniyor...' : 'Tümünü Sil'}
+                  </Button>
+                )}
               </div>
             </div>
             
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto max-h-96">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
-                      {csvPreview.headers.map((header, index) => (
-                        <th key={index} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          {header}
-                        </th>
-                      ))}
-                      {importType === 'subjects' && csvPreview.headers.length < 4 && (
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Haftalık Saat (Varsayılan)
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {csvPreview.rows.map((row, index) => (
-                      <tr key={index} className={`${getRowStatusColor(index)} border-l-4`}>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {getRowStatusIcon(index)}
-                        </td>
-                        {row.map((cell, cellIndex) => (
-                          <td key={cellIndex} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {cell || '-'}
-                          </td>
-                        ))}
-                        {importType === 'subjects' && row.length < 4 && (
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {defaultWeeklyHours} saat
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Building className="w-5 h-5 text-emerald-600 mr-2" />
+                    <h3 className="font-medium text-emerald-900">Sınıflar</h3>
+                  </div>
+                  <span className="text-2xl font-bold text-emerald-600">{classes.length}</span>
+                </div>
+                <p className="text-xs text-emerald-700 mb-3">Sınıf kayıtları</p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <Button
+                  onClick={() => navigate('/classes')}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Yönet
+                </Button>
+                {classes.length > 0 && (
+                  <Button
+                    onClick={handleDeleteAllClasses}
+                    icon={Trash2}
+                    variant="danger"
+                    size="sm"
+                    disabled={isDeletingClasses}
+                  >
+                    {isDeletingClasses ? 'Siliniyor...' : 'Tümünü Sil'}
+                  </Button>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-100 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <BookOpen className="w-5 h-5 text-indigo-600 mr-2" />
+                    <h3 className="font-medium text-indigo-900">Dersler</h3>
+                  </div>
+                  <span className="text-2xl font-bold text-indigo-600">{subjects.length}</span>
+                </div>
+                <p className="text-xs text-indigo-700 mb-3">Ders kayıtları</p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <Button
+                  onClick={() => navigate('/subjects')}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Yönet
+                </Button>
+                {subjects.length > 0 && (
+                  <Button
+                    onClick={handleDeleteAllSubjects}
+                    icon={Trash2}
+                    variant="danger"
+                    size="sm"
+                    disabled={isDeletingSubjects}
+                  >
+                    {isDeletingSubjects ? 'Siliniyor...' : 'Tümünü Sil'}
+                  </Button>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-purple-50 rounded-lg p-4 border border-purple-100 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Calendar className="w-5 h-5 text-purple-600 mr-2" />
+                    <h3 className="font-medium text-purple-900">Programlar</h3>
+                  </div>
+                  <span className="text-2xl font-bold text-purple-600">{schedules.length}</span>
+                </div>
+                <p className="text-xs text-purple-700 mb-3">Program kayıtları</p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <Button
+                  onClick={() => navigate('/all-schedules')}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Yönet
+                </Button>
+                {schedules.length > 0 && (
+                  <Button
+                    onClick={handleDeleteAllSchedules}
+                    icon={Trash2}
+                    variant="danger"
+                    size="sm"
+                    disabled={isDeletingSchedules}
+                  >
+                    {isDeletingSchedules ? 'Siliniyor...' : 'Tümünü Sil'}
+                  </Button>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-orange-50 rounded-lg p-4 border border-orange-100 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <Settings className="w-5 h-5 text-orange-600 mr-2" />
+                    <h3 className="font-medium text-orange-900">Şablonlar</h3>
+                  </div>
+                  <span className="text-2xl font-bold text-orange-600">{templates.length}</span>
+                </div>
+                <p className="text-xs text-orange-700 mb-3">Şablon kayıtları</p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <Button
+                  onClick={() => navigate('/schedule-wizard')}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Yeni Oluştur
+                </Button>
+                {templates.length > 0 && (
+                  <Button
+                    onClick={handleDeleteAllTemplates}
+                    icon={Trash2}
+                    variant="danger"
+                    size="sm"
+                    disabled={isDeletingTemplates}
+                  >
+                    {isDeletingTemplates ? 'Siliniyor...' : 'Tümünü Sil'}
+                  </Button>
+                )}
               </div>
             </div>
 
-            <div className="flex justify-end mt-4">
+            <div className="bg-teal-50 rounded-lg p-4 border border-teal-100 flex flex-col justify-between h-full">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <MapPin className="w-5 h-5 text-teal-600 mr-2" />
+                    <h3 className="font-medium text-teal-900">Derslikler</h3>
+                  </div>
+                  <span className="text-2xl font-bold text-teal-600">{classrooms.length}</span>
+                </div>
+                <p className="text-xs text-teal-700 mb-3">Derslik kayıtları</p>
+              </div>
+              <div className="flex justify-between items-center mt-2">
+                <Button
+                  onClick={() => navigate('/classrooms')}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Yönet
+                </Button>
+                {classrooms.length > 0 && (
+                  <Button
+                    onClick={handleDeleteAllClassrooms}
+                    icon={Trash2}
+                    variant="danger"
+                    size="sm"
+                    disabled={isDeletingClassrooms}
+                  >
+                    {isDeletingClassrooms ? 'Siliniyor...' : 'Tümünü Sil'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CSV Import Section */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <FileText className="w-6 h-6 text-green-600 mr-2" />
+              <h2 className="text-lg font-bold text-gray-900">CSV İçe Aktarma</h2>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-blue-50 rounded-lg p-5 border border-blue-100">
+              <div className="flex items-center mb-4">
+                <Users className="w-5 h-5 text-blue-600 mr-2" />
+                <h3 className="font-medium text-blue-900">Öğretmen CSV İçe Aktarma</h3>
+              </div>
+              <p className="text-sm text-blue-700 mb-4">
+                Excel'den dışa aktardığınız öğretmen verilerini CSV formatında içe aktarın. 
+                Format: "Adı Soyadı", "Branşı", "Eğitim Seviyesi"
+              </p>
+              <div className="flex items-center">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleTeacherCSVUpload}
+                  ref={teacherFileInputRef}
+                  className="hidden"
+                  id="teacher-csv-upload"
+                />
+                <label
+                  htmlFor="teacher-csv-upload"
+                  className="cursor-pointer bg-white hover:bg-blue-50 text-blue-600 font-medium py-2 px-4 border border-blue-300 rounded-lg inline-flex items-center transition-colors"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  CSV Dosyası Seç
+                </label>
+              </div>
+            </div>
+            
+            <div className="bg-indigo-50 rounded-lg p-5 border border-indigo-100">
+              <div className="flex items-center mb-4">
+                <BookOpen className="w-5 h-5 text-indigo-600 mr-2" />
+                <h3 className="font-medium text-indigo-900">Ders CSV İçe Aktarma</h3>
+              </div>
+              <p className="text-sm text-indigo-700 mb-4">
+                Excel'den dışa aktardığınız ders verilerini CSV formatında içe aktarın.
+                Format: "Ders Adı", "Branş", "Eğitim Seviyesi", "Haftalık Saat"
+              </p>
+              <div className="flex items-center">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleSubjectCSVUpload}
+                  ref={subjectFileInputRef}
+                  className="hidden"
+                  id="subject-csv-upload"
+                />
+                <label
+                  htmlFor="subject-csv-upload"
+                  className="cursor-pointer bg-white hover:bg-indigo-50 text-indigo-600 font-medium py-2 px-4 border border-indigo-300 rounded-lg inline-flex items-center transition-colors"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  CSV Dosyası Seç
+                </label>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-start">
+              <Info className="w-5 h-5 text-gray-600 mt-0.5 mr-3 flex-shrink-0" />
+              <div className="text-sm text-gray-700">
+                <h4 className="font-medium mb-2">CSV İçe Aktarma Rehberi</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="font-medium text-gray-900 mb-1">Öğretmen CSV Formatı:</p>
+                    <ul className="list-disc list-inside space-y-1 text-xs">
+                      <li>Sütun başlıkları: <code className="bg-gray-100 px-1 py-0.5 rounded">Adı Soyadı</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">Branşı</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">Eğitim Seviyesi</code></li>
+                      <li>Eğitim seviyesi: Anaokulu, İlkokul, Ortaokul</li>
+                      <li>Excel'den "CSV UTF-8" formatında kaydedin</li>
+                      <li>Türkçe karakter desteği mevcuttur</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900 mb-1">Ders CSV Formatı:</p>
+                    <ul className="list-disc list-inside space-y-1 text-xs">
+                      <li>Sütun başlıkları: <code className="bg-gray-100 px-1 py-0.5 rounded">Ders</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">Branş</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">Eğitim Seviyesi</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">Ders Saati</code></li>
+                      <li>Eğitim seviyesi: Anaokulu, İlkokul, Ortaokul</li>
+                      <li>Ders saati: 1-12 arası sayı</li>
+                      <li>Excel'den "CSV UTF-8" formatında kaydedin</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Program Templates Section */}
+        {templates.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <Calendar className="w-6 h-6 text-orange-600 mr-2" />
+                <h2 className="text-lg font-bold text-gray-900">Program Şablonları</h2>
+              </div>
               <Button
-                onClick={handleImportCSV}
-                icon={Upload}
+                onClick={() => navigate('/schedule-wizard')}
+                icon={Plus}
                 variant="primary"
-                disabled={validNewRowsCount === 0 || isImporting}
+                size="sm"
               >
-                {isImporting ? 'İçe Aktarılıyor...' : `${validNewRowsCount} Kaydı İçe Aktar`}
+                Yeni Program
               </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sortedTemplates.map((template) => (
+                <div
+                  key={template.id}
+                  className="group bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                        {template.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {template.academicYear} {template.semester} Dönemi
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => handleEditTemplate(template.id)}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Düzenle"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTemplate(template)}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                        title="Sil"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {template.description && (
+                    <p className="text-xs text-gray-500 mb-3 line-clamp-2">
+                      {template.description}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                      template.status === 'published' ? 'bg-green-100 text-green-800' :
+                      template.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {template.status === 'published' ? 'Yayınlandı' :
+                       template.status === 'draft' ? 'Taslak' : 'Arşivlendi'}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(template.updatedAt).toLocaleDateString('tr-TR')}
+                    </span>
+                  </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <div className="flex items-center">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        <span>Son güncelleme: {new Date(template.updatedAt).toLocaleDateString('tr-TR')}</span>
+                      </div>
+                      <Button
+                        onClick={() => handleEditTemplate(template.id)}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Düzenle
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
-      </div>
 
-      {/* CSV Import Guide */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <div className="flex items-start">
-          <FileText className="w-6 h-6 text-blue-600 mt-1 mr-3 flex-shrink-0" />
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-blue-900 mb-3">CSV İçe Aktarma Rehberi</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Teachers Guide */}
-              <div className="bg-white rounded-lg p-4 border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-3 flex items-center">
-                  <Users className="w-4 h-4 mr-2" />
-                  Öğretmen Verisi
-                </h4>
-                <div className="space-y-2 text-sm text-blue-700">
-                  <p><strong>Gerekli sütunlar:</strong></p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li><code>Adı Soyadı</code> - Öğretmenin tam adı (zorunlu)</li>
-                    <li><code>Branşı</code> - Öğretmenin branşı (isteğe bağlı)</li>
-                    <li><code>Eğitim Seviyesi</code> - Anaokulu/İlkokul/Ortaokul (isteğe bağlı)</li>
-                  </ul>
-                  <p className="mt-3"><strong>Örnek:</strong></p>
-                  <div className="bg-blue-100 p-2 rounded text-xs font-mono">
-                    Adı Soyadı,Branşı,Eğitim Seviyesi<br/>
-                    Ahmet Yılmaz,Matematik,İlkokul<br/>
-                    Ayşe Demir,Türkçe,Ortaokul
-                  </div>
-                </div>
+        {/* Bulk Data Management */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <Database className="w-6 h-6 text-purple-600 mr-2" />
+              <h2 className="text-lg font-bold text-gray-900">Toplu Veri Yönetimi</h2>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+              <div className="flex items-center mb-4">
+                <Download className="w-5 h-5 text-blue-600 mr-2" />
+                <h3 className="font-medium text-blue-900">Veri Yedekleme</h3>
               </div>
+              <p className="text-sm text-blue-700 mb-4">
+                Tüm sistem verilerinizi yedekleyin ve dışa aktarın. Bu işlem tüm öğretmen, sınıf, ders ve program verilerinizi içerir.
+              </p>
+              <Button
+                variant="primary"
+                icon={Download}
+                className="w-full"
+                disabled
+              >
+                Tüm Verileri Yedekle (Yakında)
+              </Button>
+            </div>
+            
+            <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+              <div className="flex items-center mb-4">
+                <Upload className="w-5 h-5 text-green-600 mr-2" />
+                <h3 className="font-medium text-green-900">Veri Geri Yükleme</h3>
+              </div>
+              <p className="text-sm text-green-700 mb-4">
+                Önceden yedeklediğiniz verileri sisteme geri yükleyin. Bu işlem mevcut verilerinizin üzerine yazacaktır.
+              </p>
+              <Button
+                variant="primary"
+                icon={Upload}
+                className="w-full"
+                disabled
+              >
+                Verileri Geri Yükle (Yakında)
+              </Button>
+            </div>
+          </div>
+        </div>
 
-              {/* Subjects Guide */}
-              <div className="bg-white rounded-lg p-4 border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-3 flex items-center">
-                  <BookOpen className="w-4 h-4 mr-2" />
-                  Ders Verisi
-                </h4>
-                <div className="space-y-2 text-sm text-blue-700">
-                  <p><strong>Gerekli sütunlar:</strong></p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li><code>Ders</code> - Ders adı (zorunlu)</li>
-                    <li><code>Branş</code> - Ders branşı (isteğe bağlı)</li>
-                    <li><code>Eğitim Seviyesi</code> - Anaokulu/İlkokul/Ortaokul (isteğe bağlı)</li>
-                    <li><code>Ders Saati</code> - Haftalık ders saati 1-30 arası (isteğe bağlı)</li>
-                  </ul>
-                  <p className="mt-3"><strong>Örnek:</strong></p>
-                  <div className="bg-blue-100 p-2 rounded text-xs font-mono">
-                    Ders,Branş,Eğitim Seviyesi,Ders Saati<br/>
-                    Matematik,Matematik,İlkokul,5<br/>
-                    Türkçe,Türkçe,Ortaokul,6
-                  </div>
+        {/* Danger Zone */}
+        <div className="bg-red-50 rounded-lg shadow-sm border border-red-200 p-6">
+          <div className="flex items-center mb-6">
+            <AlertTriangle className="w-6 h-6 text-red-600 mr-2" />
+            <h2 className="text-lg font-bold text-red-900">Tehlikeli Bölge</h2>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="p-4 bg-white rounded-lg border border-red-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-red-900">Tüm Verileri Sil</h3>
+                  <p className="text-sm text-red-700 mt-1">
+                    Bu işlem tüm öğretmen, sınıf, ders, program ve şablon verilerinizi kalıcı olarak silecektir. Bu işlem geri alınamaz!
+                  </p>
                 </div>
+                <Button
+                  onClick={handleDeleteAllData}
+                  icon={Trash2}
+                  variant="danger"
+                  disabled={isDeletingAll || totalDataCount === 0}
+                >
+                  {isDeletingAll ? 'Siliniyor...' : `Tüm Verileri Sil (${totalDataCount})`}
+                </Button>
               </div>
             </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+              <Button
+                onClick={handleDeleteAllTeachers}
+                icon={Trash2}
+                variant="danger"
+                disabled={isDeletingTeachers || teachers.length === 0}
+                className="w-full"
+              >
+                {isDeletingTeachers ? 'Siliniyor...' : `Öğretmenler (${teachers.length})`}
+              </Button>
+              
+              <Button
+                onClick={handleDeleteAllClasses}
+                icon={Trash2}
+                variant="danger"
+                disabled={isDeletingClasses || classes.length === 0}
+                className="w-full"
+              >
+                {isDeletingClasses ? 'Siliniyor...' : `Sınıflar (${classes.length})`}
+              </Button>
+              
+              <Button
+                onClick={handleDeleteAllSubjects}
+                icon={Trash2}
+                variant="danger"
+                disabled={isDeletingSubjects || subjects.length === 0}
+                className="w-full"
+              >
+                {isDeletingSubjects ? 'Siliniyor...' : `Dersler (${subjects.length})`}
+              </Button>
+              
+              <Button
+                onClick={handleDeleteAllSchedules}
+                icon={Trash2}
+                variant="danger"
+                disabled={isDeletingSchedules || schedules.length === 0}
+                className="w-full"
+              >
+                {isDeletingSchedules ? 'Siliniyor...' : `Programlar (${schedules.length})`}
+              </Button>
+              
+              <Button
+                onClick={handleDeleteAllTemplates}
+                icon={Trash2}
+                variant="danger"
+                disabled={isDeletingTemplates || templates.length === 0}
+                className="w-full"
+              >
+                {isDeletingTemplates ? 'Siliniyor...' : `Şablonlar (${templates.length})`}
+              </Button>
 
-            <div className="mt-4 p-3 bg-blue-100 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>💡 İpucu:</strong> Excel'den CSV olarak dışa aktarırken "CSV UTF-8" formatını seçin. 
-                Bu, Türkçe karakterlerin doğru görünmesini sağlar.
-              </p>
+              <Button
+                onClick={handleDeleteAllClassrooms}
+                icon={Trash2}
+                variant="danger"
+                disabled={isDeletingClassrooms || classrooms.length === 0}
+                className="w-full"
+              >
+                {isDeletingClassrooms ? 'Siliniyor...' : `Derslikler (${classrooms.length})`}
+              </Button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Teacher CSV Import Modal */}
+      <Modal
+        isOpen={isTeacherCSVModalOpen}
+        onClose={() => setIsTeacherCSVModalOpen(false)}
+        title="Öğretmen CSV İçe Aktarma"
+        size="xl"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-start">
+              <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-blue-800 mb-1">CSV İçe Aktarma Bilgisi</h4>
+                <p className="text-sm text-blue-700">
+                  {csvTeachers.length} öğretmen verisi bulundu. 
+                  {csvTeachers.filter(t => t.isValid && !t.exists).length} yeni öğretmen içe aktarılacak.
+                  {csvTeachers.filter(t => t.exists).length > 0 && ` ${csvTeachers.filter(t => t.exists).length} öğretmen zaten mevcut.`}
+                  {csvTeachers.filter(t => !t.isValid).length > 0 && ` ${csvTeachers.filter(t => !t.isValid).length} geçersiz veri.`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <Select
+              label="Varsayılan Eğitim Seviyesi"
+              value={selectedTeacherLevel}
+              onChange={setSelectedTeacherLevel}
+              options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              CSV dosyasında eğitim seviyesi belirtilmeyen öğretmenler için kullanılacak
+            </p>
+          </div>
+
+          <div className="border rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Durum
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Adı Soyadı
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Branşı
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Eğitim Seviyesi
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Not
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {csvTeachers.map((teacher, index) => (
+                    <tr key={index} className={
+                      teacher.exists ? 'bg-yellow-50' : 
+                      !teacher.isValid ? 'bg-red-50' : 
+                      'hover:bg-gray-50'
+                    }>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {teacher.exists ? (
+                            <div className="text-yellow-500">
+                              <AlertTriangle size={16} />
+                            </div>
+                          ) : teacher.isValid ? (
+                            <div className="text-green-500">
+                              <CheckCircle size={16} />
+                            </div>
+                          ) : (
+                            <div className="text-red-500">
+                              <XCircle size={16} />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{teacher.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">{teacher.branch}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          teacher.level === 'Anaokulu' ? 'bg-green-100 text-green-800' :
+                          teacher.level === 'İlkokul' ? 'bg-blue-100 text-blue-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {teacher.level}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {teacher.exists ? 'Zaten mevcut' : 
+                           !teacher.isValid ? teacher.error : 
+                           'İçe aktarılacak'}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              type="button"
+              onClick={() => setIsTeacherCSVModalOpen(false)}
+              variant="secondary"
+            >
+              İptal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleImportTeachers}
+              variant="primary"
+              disabled={isImportingTeachers || csvTeachers.filter(t => t.isValid && !t.exists).length === 0}
+            >
+              {isImportingTeachers ? 'İçe Aktarılıyor...' : `${csvTeachers.filter(t => t.isValid && !t.exists).length} Öğretmeni İçe Aktar`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Subject CSV Import Modal */}
+      <Modal
+        isOpen={isSubjectCSVModalOpen}
+        onClose={() => setIsSubjectCSVModalOpen(false)}
+        title="Ders CSV İçe Aktarma"
+        size="xl"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+            <div className="flex items-start">
+              <Info className="w-5 h-5 text-indigo-600 mt-0.5 mr-3 flex-shrink-0" />
+              <div>
+                <h4 className="font-medium text-indigo-800 mb-1">CSV İçe Aktarma Bilgisi</h4>
+                <p className="text-sm text-indigo-700">
+                  {csvSubjects.length} ders verisi bulundu. 
+                  {csvSubjects.filter(s => s.isValid && !s.exists).length} yeni ders içe aktarılacak.
+                  {csvSubjects.filter(s => s.exists).length > 0 && ` ${csvSubjects.filter(s => s.exists).length} ders zaten mevcut.`}
+                  {csvSubjects.filter(s => !s.isValid).length > 0 && ` ${csvSubjects.filter(s => !s.isValid).length} geçersiz veri.`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Select
+              label="Varsayılan Eğitim Seviyesi"
+              value={selectedSubjectLevel}
+              onChange={setSelectedSubjectLevel}
+              options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
+              required
+            />
+            
+            <Select
+              label="Varsayılan Haftalık Ders Saati"
+              value={selectedSubjectHours}
+              onChange={setSelectedSubjectHours}
+              options={[
+                { value: '1', label: '1 saat' },
+                { value: '2', label: '2 saat' },
+                { value: '3', label: '3 saat' },
+                { value: '4', label: '4 saat' },
+                { value: '5', label: '5 saat' },
+                { value: '6', label: '6 saat' },
+                { value: '8', label: '8 saat' },
+                { value: '10', label: '10 saat' }
+              ]}
+              required
+            />
+          </div>
+
+          <div className="border rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Durum
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ders Adı
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Branş
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Eğitim Seviyesi
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Haftalık Saat
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Not
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {csvSubjects.map((subject, index) => (
+                    <tr key={index} className={
+                      subject.exists ? 'bg-yellow-50' : 
+                      !subject.isValid ? 'bg-red-50' : 
+                      'hover:bg-gray-50'
+                    }>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {subject.exists ? (
+                            <div className="text-yellow-500">
+                              <AlertTriangle size={16} />
+                            </div>
+                          ) : subject.isValid ? (
+                            <div className="text-green-500">
+                              <CheckCircle size={16} />
+                            </div>
+                          ) : (
+                            <div className="text-red-500">
+                              <XCircle size={16} />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{subject.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">{subject.branch}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          subject.level === 'Anaokulu' ? 'bg-green-100 text-green-800' :
+                          subject.level === 'İlkokul' ? 'bg-blue-100 text-blue-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {subject.level}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{subject.weeklyHours} saat</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {subject.exists ? 'Zaten mevcut' : 
+                           !subject.isValid ? subject.error : 
+                           'İçe aktarılacak'}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              type="button"
+              onClick={() => setIsSubjectCSVModalOpen(false)}
+              variant="secondary"
+            >
+              İptal
+            </Button>
+            <Button
+              type="button"
+              onClick={handleImportSubjects}
+              variant="primary"
+              disabled={isImportingSubjects || csvSubjects.filter(s => s.isValid && !s.exists).length === 0}
+            >
+              {isImportingSubjects ? 'İçe Aktarılıyor...' : `${csvSubjects.filter(s => s.isValid && !s.exists).length} Dersi İçe Aktar`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Confirmation Modal */}
       <ConfirmationModal

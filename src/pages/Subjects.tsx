@@ -107,20 +107,13 @@ const Subjects = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // FIXED: Validate weekly hours range 1-30
-    const weeklyHours = parseInt(formData.weeklyHours);
-    if (weeklyHours < 1 || weeklyHours > 30) {
-      error('❌ Geçersiz Ders Saati', 'Haftalık ders saati 1-30 arasında olmalıdır');
-      return;
-    }
-    
     const subjectData = {
       ...formData,
-      weeklyHours: weeklyHours
+      weeklyHours: parseInt(formData.weeklyHours)
     };
 
     if (editingSubject) {
-      await update(editingSubject.i, subjectData);
+      await update(editingSubject.id, subjectData);
     } else {
       await add(subjectData as Omit<Subject, 'id' | 'createdAt'>);
     }
@@ -133,20 +126,12 @@ const Subjects = () => {
     
     for (const subject of bulkSubjects) {
       if (subject.name && subject.branch && subject.level && subject.weeklyHours) {
-        const weeklyHours = parseInt(subject.weeklyHours);
-        
-        // FIXED: Validate weekly hours range 1-30
-        if (weeklyHours < 1 || weeklyHours > 30) {
-          warning('⚠️ Geçersiz Ders Saati', `"${subject.name}" için haftalık ders saati 1-30 arasında olmalıdır`);
-          continue;
-        }
-        
-        if (EDUCATION_LEVELS.includes(subject.level as any)) {
+        if (EDUCATION_LEVELS.includes(subject.level as any) && !isNaN(parseInt(subject.weeklyHours))) {
           await add({
             name: subject.name,
             branch: subject.branch,
             level: subject.level as Subject['level'],
-            weeklyHours: weeklyHours
+            weeklyHours: parseInt(subject.weeklyHours)
           } as Omit<Subject, 'id' | 'createdAt'>);
         }
       }
@@ -429,7 +414,7 @@ const Subjects = () => {
           />
 
           <Input
-            label="Haftalık Ders Saati (1-30)"
+            label="Haftalık Ders Saati"
             type="number"
             value={formData.weeklyHours}
             onChange={(value) => setFormData({ ...formData, weeklyHours: value })}
@@ -515,7 +500,7 @@ const Subjects = () => {
                     onChange={(e) => updateBulkRow(index, 'weeklyHours', e.target.value)}
                     className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                     min="1"
-                    max="30"
+                    max="10"
                     required
                   />
                   <button

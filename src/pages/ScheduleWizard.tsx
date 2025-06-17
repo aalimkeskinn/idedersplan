@@ -524,19 +524,34 @@ const ScheduleWizard = () => {
         existingSchedules: existingSchedules.length
       });
 
-      const selectedTeachers = teachers.filter(t => 
-        wizardData.teachers.selectedTeachers.includes(t.id)
+      const selectedTeacherIds = wizardData.teachers.selectedTeachers;
+      const selectedTeachers = teachers.filter((t: Teacher) => 
+        selectedTeacherIds.includes(t.id)
       );
-      const selectedClasses = classes.filter(c => 
+      const selectedClasses = classes.filter((c: Class) => 
         wizardData.classes.selectedClasses.includes(c.id)
       );
-      const selectedSubjects = subjects.filter(s => 
+      const selectedSubjects = subjects.filter((s: Subject) => 
         wizardData.subjects.selectedSubjects.includes(s.id)
       );
 
+      // --- YENİ EK: Artık seçili olmayan öğretmenlerin programlarını sil ---
+      const removedTeacherSchedules = existingSchedules.filter((schedule: Schedule) =>
+        !selectedTeacherIds.includes(schedule.teacherId)
+      );
+      for (const removedSchedule of removedTeacherSchedules) {
+        try {
+          await removeSchedule(removedSchedule.id);
+          console.log(`🗑️ Çıkarılan öğretmenin programı silindi: ${removedSchedule.teacherId}`);
+        } catch (err) {
+          console.error(`❌ Çıkarılan öğretmenin programı silinemedi: ${removedSchedule.teacherId}`, err);
+        }
+      }
+      // --- YENİ EK SONU ---
+
       // Clear existing schedules for selected teachers first
-      const existingTeacherSchedules = existingSchedules.filter(schedule => 
-        selectedTeachers.some(teacher => teacher.id === schedule.teacherId)
+      const existingTeacherSchedules = existingSchedules.filter((schedule: Schedule) => 
+        selectedTeachers.some((teacher: Teacher) => teacher.id === schedule.teacherId)
       );
 
       for (const existingSchedule of existingTeacherSchedules) {

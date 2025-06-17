@@ -1,42 +1,60 @@
 export interface WizardData {
   // Step 1: Basic Info
-  programName: string;
-  academicYear: string;
-  semester: 'fall' | 'spring' | 'summer';
-  startDate?: Date;
-  endDate?: Date;
+  basicInfo: {
+    programName: string;
+    academicYear: string;
+    semester: 'fall' | 'spring' | 'summer';
+    startDate?: Date;
+    endDate?: Date;
+  };
   
   // Step 2: Subjects
-  selectedSubjects: string[];
-  subjectHours: { [subjectId: string]: number };
-  subjectPriorities: { [subjectId: string]: 'high' | 'medium' | 'low' };
+  subjects: {
+    selectedSubjects: string[];
+    subjectHours: { [subjectId: string]: number };
+    subjectPriorities: { [subjectId: string]: 'high' | 'medium' | 'low' };
+  };
   
   // Step 3: Classes
-  selectedClasses: string[];
-  classCapacities: { [classId: string]: number };
+  classes: {
+    selectedClasses: string[];
+    classCapacities: { [classId: string]: number };
+  };
   
   // Step 4: Classrooms
-  classrooms: Classroom[];
-  classroomAssignments: { [classId: string]: string[] }; // class -> classroom IDs
+  classrooms: {
+    selectedClassrooms: string[];
+    classroomAssignments: { [classId: string]: string[] }; // class -> classroom IDs
+  };
   
   // Step 5: Teachers
-  selectedTeachers: string[];
-  teacherWorkloads: { [teacherId: string]: number };
-  teacherSubjects: { [teacherId: string]: string[] };
+  teachers: {
+    selectedTeachers: string[];
+    teacherWorkloads: { [teacherId: string]: number };
+    teacherSubjects: { [teacherId: string]: string[] };
+  };
   
   // Step 6: Constraints
   constraints: {
-    global?: GlobalConstraints;
-    teachers?: { [teacherId: string]: TimeConstraint };
-    classes?: { [classId: string]: TimeConstraint };
-    subjects?: { [subjectId: string]: TimeConstraint };
+    timeConstraints: {
+      teachers?: { [teacherId: string]: TimeConstraint };
+      classes?: { [classId: string]: TimeConstraint };
+      subjects?: { [subjectId: string]: TimeConstraint };
+    };
+    globalRules?: GlobalConstraints;
   };
   
   // Step 7: Generation Settings
-  algorithm: 'balanced' | 'compact' | 'distributed';
-  optimizationLevel: 'fast' | 'balanced' | 'thorough';
-  maxGenerationTime: number; // in minutes
-  allowPartialSolution: boolean;
+  generationSettings: {
+    algorithm: 'balanced' | 'compact' | 'distributed';
+    optimizationLevel: 'fast' | 'balanced' | 'thorough';
+    maxGenerationTime: number; // in minutes
+    allowPartialSolution: boolean;
+    prioritizeTeacherPreferences: boolean;
+    prioritizeClassPreferences: boolean;
+    generateMultipleOptions: boolean;
+    allowOverlaps: boolean;
+  };
 }
 
 export interface Classroom {
@@ -120,19 +138,19 @@ export const getStepById = (stepId: WizardStepId) => {
 export const isStepComplete = (stepId: WizardStepId, data: WizardData): boolean => {
   switch (stepId) {
     case 'basic':
-      return !!(data.programName && data.academicYear && data.semester);
+      return !!(data.basicInfo?.programName && data.basicInfo?.academicYear && data.basicInfo?.semester);
     case 'subjects':
-      return !!(data.selectedSubjects && data.selectedSubjects.length > 0);
+      return !!(data.subjects?.selectedSubjects && data.subjects.selectedSubjects.length > 0);
     case 'classes':
-      return !!(data.selectedClasses && data.selectedClasses.length > 0);
+      return !!(data.classes?.selectedClasses && data.classes.selectedClasses.length > 0);
     case 'classrooms':
-      return !!(data.classrooms && data.classrooms.length > 0);
+      return !!(data.classrooms?.selectedClassrooms && data.classrooms.selectedClassrooms.length > 0);
     case 'teachers':
-      return !!(data.selectedTeachers && data.selectedTeachers.length > 0);
+      return !!(data.teachers?.selectedTeachers && data.teachers.selectedTeachers.length > 0);
     case 'constraints':
       return true; // Optional step
     case 'generation':
-      return !!(data.algorithm && data.optimizationLevel);
+      return !!(data.generationSettings?.algorithm && data.generationSettings?.optimizationLevel);
     default:
       return false;
   }
@@ -143,38 +161,38 @@ export const validateStep = (stepId: WizardStepId, data: WizardData): string[] =
   
   switch (stepId) {
     case 'basic':
-      if (!data.programName) errors.push('Program adı gereklidir');
-      if (!data.academicYear) errors.push('Akademik yıl gereklidir');
-      if (!data.semester) errors.push('Dönem seçimi gereklidir');
+      if (!data.basicInfo?.programName) errors.push('Program adı gereklidir');
+      if (!data.basicInfo?.academicYear) errors.push('Akademik yıl gereklidir');
+      if (!data.basicInfo?.semester) errors.push('Dönem seçimi gereklidir');
       break;
       
     case 'subjects':
-      if (!data.selectedSubjects || data.selectedSubjects.length === 0) {
+      if (!data.subjects?.selectedSubjects || data.subjects.selectedSubjects.length === 0) {
         errors.push('En az bir ders seçmelisiniz');
       }
       break;
       
     case 'classes':
-      if (!data.selectedClasses || data.selectedClasses.length === 0) {
+      if (!data.classes?.selectedClasses || data.classes.selectedClasses.length === 0) {
         errors.push('En az bir sınıf seçmelisiniz');
       }
       break;
       
     case 'classrooms':
-      if (!data.classrooms || data.classrooms.length === 0) {
+      if (!data.classrooms?.selectedClassrooms || data.classrooms.selectedClassrooms.length === 0) {
         errors.push('En az bir derslik tanımlamalısınız');
       }
       break;
       
     case 'teachers':
-      if (!data.selectedTeachers || data.selectedTeachers.length === 0) {
+      if (!data.teachers?.selectedTeachers || data.teachers.selectedTeachers.length === 0) {
         errors.push('En az bir öğretmen seçmelisiniz');
       }
       break;
       
     case 'generation':
-      if (!data.algorithm) errors.push('Algoritma seçimi gereklidir');
-      if (!data.optimizationLevel) errors.push('Optimizasyon seviyesi gereklidir');
+      if (!data.generationSettings?.algorithm) errors.push('Algoritma seçimi gereklidir');
+      if (!data.generationSettings?.optimizationLevel) errors.push('Optimizasyon seviyesi gereklidir');
       break;
   }
   

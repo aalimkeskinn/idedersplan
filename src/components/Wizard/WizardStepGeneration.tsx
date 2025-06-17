@@ -68,24 +68,25 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
     const issues = [];
     const warnings = [];
 
-    // Check basic requirements
-    if (wizardData.subjects.selectedSubjects.length === 0) {
+    // Check basic requirements with safe access
+    if (!wizardData.subjects?.selectedSubjects || wizardData.subjects.selectedSubjects.length === 0) {
       issues.push('Hiç ders seçilmemiş');
     }
-    if (wizardData.classes.selectedClasses.length === 0) {
+    if (!wizardData.classes?.selectedClasses || wizardData.classes.selectedClasses.length === 0) {
       issues.push('Hiç sınıf seçilmemiş');
     }
-    if (wizardData.teachers.selectedTeachers.length === 0) {
+    if (!wizardData.teachers?.selectedTeachers || wizardData.teachers.selectedTeachers.length === 0) {
       issues.push('Hiç öğretmen seçilmemiş');
     }
-    if (wizardData.classrooms.selectedClassrooms.length === 0) {
+    if (!wizardData.classrooms?.selectedClassrooms || wizardData.classrooms.selectedClassrooms.length === 0) {
       issues.push('Hiç derslik seçilmemiş');
     }
 
-    // Check ratios
-    const totalHours = Object.values(wizardData.subjects.subjectHours).reduce((sum, hours) => sum + hours, 0);
-    const totalClasses = wizardData.classes.selectedClasses.length;
-    const totalTeachers = wizardData.teachers.selectedTeachers.length;
+    // Check ratios with safe access
+    const totalHours = wizardData.subjects?.subjectHours ? 
+      Object.values(wizardData.subjects.subjectHours).reduce((sum, hours) => sum + hours, 0) : 0;
+    const totalClasses = wizardData.classes?.selectedClasses?.length || 0;
+    const totalTeachers = wizardData.teachers?.selectedTeachers?.length || 0;
 
     if (totalHours > 40) {
       warnings.push('Haftalık toplam ders saati çok yüksek (40+ saat)');
@@ -105,12 +106,13 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
       fast: 2,
       balanced: 4,
       thorough: 8
-    }[data.optimizationLevel];
+    }[data?.optimizationLevel || 'balanced'];
 
-    const complexity = wizardData.subjects.selectedSubjects.length * 
-                     wizardData.classes.selectedClasses.length * 
-                     wizardData.teachers.selectedTeachers.length;
-
+    const subjectCount = wizardData.subjects?.selectedSubjects?.length || 0;
+    const classCount = wizardData.classes?.selectedClasses?.length || 0;
+    const teacherCount = wizardData.teachers?.selectedTeachers?.length || 0;
+    
+    const complexity = subjectCount * classCount * teacherCount;
     const multiplier = complexity > 100 ? 1.5 : complexity > 50 ? 1.2 : 1;
     
     return Math.round(baseTime * multiplier);
@@ -138,19 +140,27 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
         
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div className="text-center p-3 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">{wizardData.subjects.selectedSubjects.length}</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {wizardData.subjects?.selectedSubjects?.length || 0}
+            </div>
             <div className="text-xs text-blue-700">Ders</div>
           </div>
           <div className="text-center p-3 bg-emerald-50 rounded-lg">
-            <div className="text-2xl font-bold text-emerald-600">{wizardData.classes.selectedClasses.length}</div>
+            <div className="text-2xl font-bold text-emerald-600">
+              {wizardData.classes?.selectedClasses?.length || 0}
+            </div>
             <div className="text-xs text-emerald-700">Sınıf</div>
           </div>
           <div className="text-center p-3 bg-indigo-50 rounded-lg">
-            <div className="text-2xl font-bold text-indigo-600">{wizardData.teachers.selectedTeachers.length}</div>
+            <div className="text-2xl font-bold text-indigo-600">
+              {wizardData.teachers?.selectedTeachers?.length || 0}
+            </div>
             <div className="text-xs text-indigo-700">Öğretmen</div>
           </div>
           <div className="text-center p-3 bg-purple-50 rounded-lg">
-            <div className="text-2xl font-bold text-purple-600">{wizardData.classrooms.selectedClassrooms.length}</div>
+            <div className="text-2xl font-bold text-purple-600">
+              {wizardData.classrooms?.selectedClassrooms?.length || 0}
+            </div>
             <div className="text-xs text-purple-700">Derslik</div>
           </div>
         </div>
@@ -219,7 +229,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                     type="radio"
                     name="algorithm"
                     value={option.value}
-                    checked={data.algorithm === option.value}
+                    checked={data?.algorithm === option.value}
                     onChange={(e) => handleChange('algorithm', e.target.value)}
                     className="mt-1"
                   />
@@ -243,7 +253,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                     type="radio"
                     name="optimization"
                     value={option.value}
-                    checked={data.optimizationLevel === option.value}
+                    checked={data?.optimizationLevel === option.value}
                     onChange={(e) => handleChange('optimizationLevel', e.target.value)}
                     className="mt-1"
                   />
@@ -270,7 +280,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={data.prioritizeTeacherPreferences}
+                    checked={data?.prioritizeTeacherPreferences || false}
                     onChange={(e) => handleChange('prioritizeTeacherPreferences', e.target.checked)}
                   />
                   <span className="text-sm">Öğretmen tercihlerini öncelikle</span>
@@ -279,7 +289,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={data.prioritizeClassPreferences}
+                    checked={data?.prioritizeClassPreferences || false}
                     onChange={(e) => handleChange('prioritizeClassPreferences', e.target.checked)}
                   />
                   <span className="text-sm">Sınıf tercihlerini öncelikle</span>
@@ -288,7 +298,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={data.generateMultipleOptions}
+                    checked={data?.generateMultipleOptions || false}
                     onChange={(e) => handleChange('generateMultipleOptions', e.target.checked)}
                   />
                   <span className="text-sm">Birden fazla seçenek oluştur</span>
@@ -297,7 +307,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={data.allowOverlaps}
+                    checked={data?.allowOverlaps || false}
                     onChange={(e) => handleChange('allowOverlaps', e.target.checked)}
                   />
                   <span className="text-sm">Çakışmalara izin ver (acil durumlar için)</span>

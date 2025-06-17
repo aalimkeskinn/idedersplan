@@ -3,10 +3,10 @@ import { BookOpen, Plus, Minus, Star, Clock, Edit, Trash2 } from 'lucide-react';
 import { Subject, EDUCATION_LEVELS, Teacher } from '../../types';
 import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
-import Button from '../components/UI/Button';
-import Select from '../components/UI/Select';
-import Modal from '../components/UI/Modal';
-import Input from '../components/UI/Input';
+import Button from '../UI/Button';
+import Select from '../UI/Select';
+import Modal from '../UI/Modal';
+import Input from '../UI/Input';
 
 interface WizardStepSubjectsProps {
   data: WizardData['subjects'];

@@ -63,12 +63,7 @@ interface WizardData {
     classCapacities: { [classId: string]: number };
     classPreferences: { [classId: string]: string[] };
   };
-  classrooms: {
-    selectedClassrooms: string[];
-    classroomCapacities: { [classroomId: string]: number };
-    classroomTypes: { [classroomId: string]: string };
-    classroomEquipment: { [classroomId: string]: string[] };
-  };
+  classrooms: any[]; // Changed from object to array
   teachers: {
     selectedTeachers: string[];
     teacherSubjects: { [teacherId: string]: string[] };
@@ -139,12 +134,7 @@ const ScheduleWizard = () => {
       classCapacities: {},
       classPreferences: {}
     },
-    classrooms: {
-      selectedClassrooms: [],
-      classroomCapacities: {},
-      classroomTypes: {},
-      classroomEquipment: {}
-    },
+    classrooms: [], // Changed from object to empty array
     teachers: {
       selectedTeachers: [],
       teacherSubjects: {},
@@ -191,7 +181,7 @@ const ScheduleWizard = () => {
         return wizardData.classes.selectedClasses.length > 0;
       
       case 'classrooms':
-        return wizardData.classrooms.selectedClassrooms.length > 0;
+        return wizardData.classrooms.length > 0; // Updated validation for array
       
       case 'teachers':
         return wizardData.teachers.selectedTeachers.length > 0;
@@ -276,13 +266,21 @@ const ScheduleWizard = () => {
   };
 
   const updateWizardData = (stepId: string, stepData: any) => {
-    setWizardData(prev => ({
-      ...prev,
-      [stepId]: {
-        ...prev[stepId as keyof WizardData],
-        ...stepData
-      }
-    }));
+    if (stepId === 'classrooms') {
+      // Handle classrooms as array directly
+      setWizardData(prev => ({
+        ...prev,
+        classrooms: stepData
+      }));
+    } else {
+      setWizardData(prev => ({
+        ...prev,
+        [stepId]: {
+          ...prev[stepId as keyof WizardData],
+          ...stepData
+        }
+      }));
+    }
   };
 
   const getStepIcon = (stepId: string) => {
@@ -334,6 +332,7 @@ const ScheduleWizard = () => {
           <WizardStepClassrooms
             data={wizardData}
             onUpdate={(data) => {
+              // Handle classrooms update directly as array
               if (data.classrooms) {
                 updateWizardData('classrooms', data.classrooms);
               }

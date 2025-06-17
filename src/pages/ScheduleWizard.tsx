@@ -117,7 +117,7 @@ const ScheduleWizard = () => {
   const { success, error, warning, info } = useToast();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [editingTemplateId, setEditingTemplateId] =  useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [wizardData, setWizardData] = useState<WizardData>({
     basicInfo: {
       name: '',
@@ -175,35 +175,90 @@ const ScheduleWizard = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Check for templateId in URL parameters to load existing template
+  // FIXED: Check for templateId in URL parameters to load existing template
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const templateId = urlParams.get('templateId');
     
     if (templateId && templates.length > 0) {
       const template = templates.find(t => t.id === templateId);
-      if (template) {
+      if (template && template.wizardData) {
         console.log('📝 Mevcut şablon yükleniyor:', template.name);
         setEditingTemplateId(templateId);
-        setWizardData(template.wizardData);
+        
+        // CRITICAL: Ensure all required fields exist with defaults
+        const loadedData: WizardData = {
+          basicInfo: {
+            name: template.wizardData.basicInfo?.name || '',
+            academicYear: template.wizardData.basicInfo?.academicYear || '2024/2025',
+            semester: template.wizardData.basicInfo?.semester || '',
+            startDate: template.wizardData.basicInfo?.startDate || '2024-09-01',
+            endDate: template.wizardData.basicInfo?.endDate || '2025-08-31',
+            description: template.wizardData.basicInfo?.description || '',
+            institutionTitle: template.wizardData.basicInfo?.institutionTitle || '',
+            dailyHours: template.wizardData.basicInfo?.dailyHours || 8,
+            weekDays: template.wizardData.basicInfo?.weekDays || 5,
+            weekendClasses: template.wizardData.basicInfo?.weekendClasses || false
+          },
+          subjects: {
+            selectedSubjects: template.wizardData.subjects?.selectedSubjects || [],
+            subjectHours: template.wizardData.subjects?.subjectHours || {},
+            subjectPriorities: template.wizardData.subjects?.subjectPriorities || {}
+          },
+          classes: {
+            selectedClasses: template.wizardData.classes?.selectedClasses || [],
+            classCapacities: template.wizardData.classes?.classCapacities || {},
+            classPreferences: template.wizardData.classes?.classPreferences || {}
+          },
+          classrooms: template.wizardData.classrooms || [],
+          teachers: {
+            selectedTeachers: template.wizardData.teachers?.selectedTeachers || [],
+            teacherSubjects: template.wizardData.teachers?.teacherSubjects || {},
+            teacherMaxHours: template.wizardData.teachers?.teacherMaxHours || {},
+            teacherPreferences: template.wizardData.teachers?.teacherPreferences || {}
+          },
+          constraints: {
+            timeConstraints: template.wizardData.constraints?.timeConstraints || [],
+            globalRules: {
+              maxDailyHoursTeacher: template.wizardData.constraints?.globalRules?.maxDailyHoursTeacher || 8,
+              maxDailyHoursClass: template.wizardData.constraints?.globalRules?.maxDailyHoursClass || 9,
+              maxConsecutiveHours: template.wizardData.constraints?.globalRules?.maxConsecutiveHours || 3,
+              avoidConsecutiveSameSubject: template.wizardData.constraints?.globalRules?.avoidConsecutiveSameSubject ?? true,
+              preferMorningHours: template.wizardData.constraints?.globalRules?.preferMorningHours ?? true,
+              avoidFirstLastPeriod: template.wizardData.constraints?.globalRules?.avoidFirstLastPeriod ?? false,
+              lunchBreakRequired: template.wizardData.constraints?.globalRules?.lunchBreakRequired ?? true,
+              lunchBreakDuration: template.wizardData.constraints?.globalRules?.lunchBreakDuration || 1
+            }
+          },
+          generationSettings: {
+            algorithm: template.wizardData.generationSettings?.algorithm || 'balanced',
+            prioritizeTeacherPreferences: template.wizardData.generationSettings?.prioritizeTeacherPreferences ?? true,
+            prioritizeClassPreferences: template.wizardData.generationSettings?.prioritizeClassPreferences ?? true,
+            allowOverlaps: template.wizardData.generationSettings?.allowOverlaps ?? false,
+            generateMultipleOptions: template.wizardData.generationSettings?.generateMultipleOptions ?? true,
+            optimizationLevel: template.wizardData.generationSettings?.optimizationLevel || 'balanced'
+          }
+        };
+        
+        setWizardData(loadedData);
         
         // Mark completed steps based on loaded data
         const completed = new Set<number>();
-        if (template.wizardData.basicInfo?.name) completed.add(0);
-        if (template.wizardData.subjects?.selectedSubjects?.length > 0) completed.add(1);
-        if (template.wizardData.classes?.selectedClasses?.length > 0) completed.add(2);
-        if (template.wizardData.classrooms?.length > 0) completed.add(3);
-        if (template.wizardData.teachers?.selectedTeachers?.length > 0) completed.add(4);
+        if (loadedData.basicInfo?.name) completed.add(0);
+        if (loadedData.subjects?.selectedSubjects?.length > 0) completed.add(1);
+        if (loadedData.classes?.selectedClasses?.length > 0) completed.add(2);
+        if (loadedData.classrooms?.length > 0) completed.add(3);
+        if (loadedData.teachers?.selectedTeachers?.length > 0) completed.add(4);
         // Constraints are optional
         completed.add(5);
-        if (template.wizardData.generationSettings?.algorithm) completed.add(6);
+        if (loadedData.generationSettings?.algorithm) completed.add(6);
         
         setCompletedSteps(completed);
         
         success('✅ Şablon Yüklendi', `"${template.name}" şablonu düzenleme için yüklendi`);
       }
     }
-  }, [location.search, templates]);
+  }, [location.search, templates, success]);
 
   const currentStep = WIZARD_STEPS[currentStepIndex];
 
@@ -262,7 +317,13 @@ const ScheduleWizard = () => {
     }
   };
 
+  // FIXED: Enhanced save template function with better error handling
   const handleSaveTemplate = async () => {
+    if (!wizardData.basicInfo.name) {
+      warning('⚠️ Program Adı Gerekli', 'Lütfen program adını girin');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const templateData: Omit<ScheduleTemplate, 'id' | 'createdAt'> = {
@@ -271,21 +332,31 @@ const ScheduleWizard = () => {
         academicYear: wizardData.basicInfo.academicYear,
         semester: wizardData.basicInfo.semester,
         updatedAt: new Date(),
-        wizardData,
+        wizardData: { ...wizardData }, // Deep copy to ensure all data is saved
         generatedSchedules: [],
         status: 'published'
       };
 
+      console.log('💾 Şablon kaydediliyor:', {
+        isEditing: !!editingTemplateId,
+        templateId: editingTemplateId,
+        templateName: templateData.name,
+        dataKeys: Object.keys(templateData.wizardData)
+      });
+
       if (editingTemplateId) {
-        // Update existing template
-        await updateTemplate(editingTemplateId, templateData);
-        success('✅ Şablon Güncellendi', 'Program şablonu başarıyla güncellendi');
+        // CRITICAL: Update existing template with proper data structure
+        const result = await updateTemplate(editingTemplateId, templateData);
+        console.log('✅ Şablon güncelleme sonucu:', result);
+        success('✅ Şablon Güncellendi', `"${templateData.name}" başarıyla güncellendi`);
       } else {
         // Create new template
-        await addTemplate(templateData);
-        success('✅ Şablon Kaydedildi', 'Program şablonu başarıyla kaydedildi');
+        const result = await addTemplate(templateData);
+        console.log('✅ Yeni şablon oluşturma sonucu:', result);
+        success('✅ Şablon Kaydedildi', `"${templateData.name}" başarıyla kaydedildi`);
       }
     } catch (err) {
+      console.error('❌ Şablon kayıt hatası:', err);
       error('❌ Kayıt Hatası', 'Şablon kaydedilirken bir hata oluştu');
     } finally {
       setIsSaving(false);
@@ -488,7 +559,7 @@ const ScheduleWizard = () => {
           DAYS.forEach(day => {
             PERIODS.forEach(period => {
               const slot = teacherSchedule[day]?.[period];
-              if (slot?.classId && slot.classId !==  'fixed-period') {
+              if (slot?.classId && slot.classId !== 'fixed-period') {
                 assignedHours++;
               }
             });
@@ -519,7 +590,7 @@ const ScheduleWizard = () => {
       if (generatedCount > 0) {
         success('🎯 Program Oluşturuldu!', `${generatedCount} öğretmen için program başarıyla oluşturuldu ve kaydedildi`);
         
-        // Save template as well
+        // CRITICAL: Save template after successful generation
         await handleSaveTemplate();
         
         // Navigate to all schedules page
@@ -539,6 +610,8 @@ const ScheduleWizard = () => {
   };
 
   const updateWizardData = (stepId: string, stepData: any) => {
+    console.log('🔄 Wizard data güncelleniyor:', { stepId, stepData });
+    
     if (stepId === 'classrooms') {
       // Handle classrooms as array directly
       setWizardData(prev => ({

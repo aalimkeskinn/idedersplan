@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Clock, User, Building, BookOpen, Settings, AlertTriangle } from 'lucide-react';
-import { Teacher, Class, Subject } from '../../types';
-import { WizardData, TimeConstraint } from '../../types/wizard';
+import { Teacher, Class, Subject, DAYS, PERIODS } from '../../types';
+import { WizardData } from '../../types/wizard';
+import { TimeConstraint, CONSTRAINT_TYPES, ConstraintType } from '../../types/constraints';
 import Button from '../UI/Button';
+import Select from '../UI/Select';
+import TimeConstraintGrid from '../Constraints/TimeConstraintGrid';
 
 interface WizardStepConstraintsProps {
   data: WizardData;
@@ -21,59 +24,165 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'global' | 'teachers' | 'classes' | 'subjects'>('global');
   const [selectedEntity, setSelectedEntity] = useState<string>('');
+  const [localConstraints, setLocalConstraints] = useState<TimeConstraint[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const constraints = data.constraints || {};
-  const globalConstraints = constraints.global || {};
+  // Initialize constraints if they don't exist
+  useEffect(() => {
+    if (!data.constraints) {
+      onUpdate({
+        constraints: {
+          timeConstraints: [],
+          globalRules: {
+            maxDailyHoursTeacher: 8,
+            maxDailyHoursClass: 9,
+            maxConsecutiveHours: 3,
+            avoidConsecutiveSameSubject: true,
+            preferMorningHours: true,
+            avoidFirstLastPeriod: false,
+            lunchBreakRequired: true,
+            lunchBreakDuration: 1
+          }
+        }
+      });
+    }
+  }, [data, onUpdate]);
+
+  // Track changes
+  useEffect(() => {
+    setHasUnsavedChanges(false);
+  }, [selectedEntity]);
+
+  const getEntityOptions = () => {
+    switch (activeTab) {
+      case 'teachers':
+        return teachers
+          .filter(t => data.teachers?.selectedTeachers?.includes(t.id))
+          .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+          .map(t => ({
+            value: t.id,
+            label: `${t.name} (${t.branch} - ${t.level})`
+          }));
+      case 'classes':
+        return classes
+          .filter(c => data.classes?.selectedClasses?.includes(c.id))
+          .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+          .map(c => ({
+            value: c.id,
+            label: `${c.name} (${c.level})`
+          }));
+      case 'subjects':
+        return subjects
+          .filter(s => data.subjects?.selectedSubjects?.includes(s.id))
+          .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+          .map(s => ({
+            value: s.id,
+            label: `${s.name} (${s.branch} - ${s.level})`
+          }));
+      default:
+        return [];
+    }
+  };
+
+  const getSelectedEntity = () => {
+    if (!selectedEntity) return null;
+    
+    switch (activeTab) {
+      case 'teachers':
+        return teachers.find(t => t.id === selectedEntity);
+      case 'classes':
+        return classes.find(c => c.id === selectedEntity);
+      case 'subjects':
+        return subjects.find(s => s.id === selectedEntity);
+      default:
+        return null;
+    }
+  };
+
+  const getEntityName = (entity: any) => {
+    if (!entity) return '';
+    return entity.name || '';
+  };
+
+  const getEntityDetails = (entity: any) => {
+    if (!entity) return '';
+    
+    switch (activeTab) {
+      case 'teachers':
+        return `${entity.branch} - ${entity.level}`;
+      case 'classes':
+        return entity.level;
+      case 'subjects':
+        return `${entity.branch} - ${entity.level}`;
+      default:
+        return '';
+    }
+  };
+
+  const getEntityIcon = () => {
+    switch (activeTab) {
+      case 'teachers':
+        return User;
+      case 'classes':
+        return Building;
+      case 'subjects':
+        return BookOpen;
+      default:
+        return Clock;
+    }
+  };
+
+  const getEntityColor = () => {
+    switch (activeTab) {
+      case 'teachers':
+        return 'text-blue-600';
+      case 'classes':
+        return 'text-emerald-600';
+      case 'subjects':
+        return 'text-indigo-600';
+      default:
+        return 'text-purple-600';
+    }
+  };
 
   const handleGlobalConstraintChange = (key: string, value: any) => {
     onUpdate({
       constraints: {
-        ...constraints,
-        global: {
-          ...globalConstraints,
+        ...data.constraints,
+        globalRules: {
+          ...data.constraints?.globalRules,
           [key]: value
         }
       }
     });
   };
 
-  const handleEntityConstraintChange = (entityType: string, entityId: string, day: string, period: string, status: 'available' | 'restricted' | 'unavailable') => {
-    const entityConstraints = constraints[entityType] || {};
-    const currentEntityConstraints = entityConstraints[entityId] || {};
-    const dayConstraints = currentEntityConstraints[day] || {};
+  const handleConstraintsChange = (constraints: TimeConstraint[]) => {
+    setLocalConstraints(constraints);
+    setHasUnsavedChanges(true);
+  };
 
+  const handleSave = () => {
+    if (!selectedEntity) return;
+
+    // Update constraints in wizard data
     onUpdate({
       constraints: {
-        ...constraints,
-        [entityType]: {
-          ...entityConstraints,
-          [entityId]: {
-            ...currentEntityConstraints,
-            [day]: {
-              ...dayConstraints,
-              [period]: status
-            }
-          }
-        }
+        ...data.constraints,
+        timeConstraints: localConstraints
       }
     });
+
+    setHasUnsavedChanges(false);
   };
 
-  const getConstraintStatus = (entityType: string, entityId: string, day: string, period: string): 'available' | 'restricted' | 'unavailable' => {
-    return constraints[entityType]?.[entityId]?.[day]?.[period] || 'available';
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'available': return 'bg-green-100 text-green-800 border-green-300';
-      case 'restricted': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'unavailable': return 'bg-red-100 text-red-800 border-red-300';
-      default: return 'bg-gray-100 text-gray-800 border-gray-300';
-    }
-  };
-
-  const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma'];
-  const periods = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+  const globalConstraints = data.constraints?.globalRules || {};
+  const EntityIcon = getEntityIcon();
+  const entityColor = getEntityColor();
+  const selectedEntity = getSelectedEntity();
+  const entityName = getEntityName(selectedEntity);
+  const entityDetails = getEntityDetails(selectedEntity);
+  const entityLevel = selectedEntity && 'level' in selectedEntity ? selectedEntity.level : undefined;
 
   const tabs = [
     { id: 'global', label: 'Genel Kurallar', icon: Settings },
@@ -181,109 +290,6 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
     </div>
   );
 
-  const renderEntityConstraints = (entityType: string, entities: any[]) => (
-    <div className="space-y-4">
-      <div className="flex items-center space-x-4">
-        <select
-          value={selectedEntity}
-          onChange={(e) => setSelectedEntity(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Seçiniz...</option>
-          {entities.map((entity) => (
-            <option key={entity.id} value={entity.id}>
-              {entity.name} {entity.branch && `(${entity.branch})`}
-            </option>
-          ))}
-        </select>
-        {selectedEntity && (
-          <Button
-            onClick={() => {
-              // Set all periods to available for selected entity
-              days.forEach(day => {
-                periods.forEach(period => {
-                  handleEntityConstraintChange(entityType, selectedEntity, day, period, 'available');
-                });
-              });
-            }}
-            variant="secondary"
-            size="sm"
-          >
-            Tümünü Müsait Yap
-          </Button>
-        )}
-      </div>
-
-      {selectedEntity && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="mb-4">
-            <h4 className="font-medium text-gray-900">
-              {entities.find(e => e.id === selectedEntity)?.name} - Zaman Kısıtlamaları
-            </h4>
-            <p className="text-sm text-gray-600 mt-1">
-              Tıklayarak durumu değiştirin: Müsait → Kısıtlı → Müsait Değil
-            </p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Saat</th>
-                  {days.map(day => (
-                    <th key={day} className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
-                      {day}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {periods.map(period => (
-                  <tr key={period}>
-                    <td className="px-3 py-2 font-medium text-gray-900">{period}. Ders</td>
-                    {days.map(day => {
-                      const status = getConstraintStatus(entityType, selectedEntity, day, period);
-                      return (
-                        <td key={`${day}-${period}`} className="px-1 py-1">
-                          <button
-                            onClick={() => {
-                              const nextStatus = status === 'available' ? 'restricted' : 
-                                               status === 'restricted' ? 'unavailable' : 'available';
-                              handleEntityConstraintChange(entityType, selectedEntity, day, period, nextStatus);
-                            }}
-                            className={`w-full h-8 text-xs font-medium rounded border-2 transition-colors ${getStatusColor(status)}`}
-                            title={`${day} ${period}. ders - ${status === 'available' ? 'Müsait' : status === 'restricted' ? 'Kısıtlı' : 'Müsait Değil'}`}
-                          >
-                            {status === 'available' ? '✓' : status === 'restricted' ? '!' : '✗'}
-                          </button>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-4 flex items-center space-x-6 text-sm">
-            <div className="flex items-center">
-              <div className="w-4 h-4 bg-green-100 border-2 border-green-300 rounded mr-2"></div>
-              <span>Müsait</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-4 h-4 bg-yellow-100 border-2 border-yellow-300 rounded mr-2"></div>
-              <span>Kısıtlı</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-4 h-4 bg-red-100 border-2 border-red-300 rounded mr-2"></div>
-              <span>Müsait Değil</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -299,7 +305,10 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => {
+                setActiveTab(tab.id as any);
+                setSelectedEntity('');
+              }}
               className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
                 activeTab === tab.id
                   ? 'border-purple-500 text-purple-600'
@@ -315,9 +324,65 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
 
       <div className="mt-6">
         {activeTab === 'global' && renderGlobalConstraints()}
-        {activeTab === 'teachers' && renderEntityConstraints('teachers', teachers.filter(t => data.selectedTeachers?.includes(t.id)))}
-        {activeTab === 'classes' && renderEntityConstraints('classes', classes.filter(c => data.selectedClasses?.includes(c.id)))}
-        {activeTab === 'subjects' && renderEntityConstraints('subjects', subjects.filter(s => data.selectedSubjects?.includes(s.id)))}
+        
+        {activeTab !== 'global' && (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-4">
+              <Select
+                label={`${activeTab === 'teachers' ? 'Öğretmen' : activeTab === 'classes' ? 'Sınıf' : 'Ders'} Seçin`}
+                value={selectedEntity}
+                onChange={setSelectedEntity}
+                options={[
+                  { value: '', label: 'Seçiniz...' },
+                  ...getEntityOptions()
+                ]}
+              />
+            </div>
+
+            {selectedEntity && selectedEntity !== '' ? (
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                {/* Entity Info */}
+                <div className="p-4 bg-gray-50 border-b border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`p-2 rounded-lg bg-white shadow-sm`}>
+                        <EntityIcon className={`w-5 h-5 ${entityColor}`} />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-gray-900">{entityName}</h4>
+                        <p className="text-sm text-gray-600">{entityDetails}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time Constraint Grid */}
+                <TimeConstraintGrid
+                  entityType={activeTab === 'teachers' ? 'teacher' : activeTab === 'classes' ? 'class' : 'subject'}
+                  entityId={selectedEntity}
+                  entityName={entityName}
+                  entityLevel={entityLevel}
+                  constraints={data.constraints?.timeConstraints || []}
+                  onConstraintsChange={handleConstraintsChange}
+                  onSave={handleSave}
+                  hasUnsavedChanges={hasUnsavedChanges}
+                />
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <EntityIcon className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {activeTab === 'teachers' ? 'Öğretmen' : activeTab === 'classes' ? 'Sınıf' : 'Ders'} Seçin
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  Zaman kısıtlaması eklemek için yukarıdan bir {activeTab === 'teachers' ? 'öğretmen' : activeTab === 'classes' ? 'sınıf' : 'ders'} seçin
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

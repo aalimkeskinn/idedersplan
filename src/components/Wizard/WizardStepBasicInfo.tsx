@@ -46,6 +46,7 @@ const WizardStepBasicInfo: React.FC<WizardStepBasicInfoProps> = ({ data, onUpdat
   const academicYears = generateAcademicYears();
 
   const semesterOptions = [
+    { value: '', label: 'Seçiniz (İsteğe bağlı)' },
     { value: 'Güz', label: 'Güz Dönemi' },
     { value: 'Bahar', label: 'Bahar Dönemi' },
     { value: 'Yaz', label: 'Yaz Dönemi' }
@@ -116,10 +117,9 @@ const WizardStepBasicInfo: React.FC<WizardStepBasicInfoProps> = ({ data, onUpdat
 
           <Select
             label="Dönem"
-            value={data.semester || 'Güz'}
+            value={data.semester || ''}
             onChange={(value) => handleChange('semester', value)}
             options={semesterOptions}
-            required
           />
         </div>
 
@@ -218,7 +218,7 @@ const WizardStepBasicInfo: React.FC<WizardStepBasicInfoProps> = ({ data, onUpdat
             </h4>
             <div className="text-sm text-gray-700 space-y-1">
               <p><strong>Program:</strong> {data.name}</p>
-              <p><strong>Dönem:</strong> {data.academicYear} {data.semester} Dönemi</p>
+              <p><strong>Dönem:</strong> {data.academicYear} {data.semester ? `${data.semester} Dönemi` : ''}</p>
               <p><strong>Yetkilisi:</strong> {data.institutionTitle || 'Belirtilmemiş'}</p>
               <p><strong>Ders Saati:</strong> Günde {data.dailyHours || 8} saat, Haftada {data.weekDays || 5} gün</p>
               {data.weekendClasses && (

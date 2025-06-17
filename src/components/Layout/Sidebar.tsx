@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Users, Building, BookOpen, Calendar, LogOut, Eye, Menu, X, GraduationCap, Home, ChevronRight, Clock, Zap } from 'lucide-react';
+import { Users, Building, BookOpen, Calendar, LogOut, Eye, Menu, X, GraduationCap, Home, ChevronRight, Zap } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 const Sidebar = () => {
@@ -25,13 +25,6 @@ const Sidebar = () => {
       label: 'Program Sihirbazı', 
       color: 'ide-accent',
       description: 'Otomatik program oluştur'
-    },
-    { 
-      to: '/constraints', 
-      icon: Clock, 
-      label: 'Zaman Kısıtlamaları', 
-      color: 'ide-accent',
-      description: 'Zaman tablosu kısıtlamaları'
     },
     { 
       to: '/schedules', 

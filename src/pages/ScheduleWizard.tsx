@@ -118,7 +118,7 @@ const ScheduleWizard = () => {
     basicInfo: {
       name: '',
       academicYear: '2024/2025',
-      semester: 'Güz',
+      semester: '',
       startDate: '2024-09-01',
       endDate: '2025-08-31',
       description: '',
@@ -204,8 +204,7 @@ const ScheduleWizard = () => {
     switch (currentStep.id) {
       case 'basic-info':
         return !!(wizardData.basicInfo.name && 
-                 wizardData.basicInfo.academicYear && 
-                 wizardData.basicInfo.semester);
+                 wizardData.basicInfo.academicYear);
       
       case 'subjects':
         return wizardData.subjects.selectedSubjects.length > 0;
@@ -266,7 +265,7 @@ const ScheduleWizard = () => {
         updatedAt: new Date(),
         wizardData,
         generatedSchedules: [],
-        status: 'draft'
+        status: 'published'
       };
 
       if (editingTemplateId) {

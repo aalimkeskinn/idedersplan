@@ -319,7 +319,14 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                             >
                               -
                             </button>
-                            <span className="w-8 text-center text-sm font-medium">{hours}</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="10"
+                              value={hours}
+                              onChange={(e) => handleHoursChange(subject.id, parseInt(e.target.value) || 1)}
+                              className="w-12 text-center text-sm font-medium border border-gray-300 rounded py-1"
+                            />
                             <button
                               onClick={() => handleHoursChange(subject.id, hours + 1)}
                               className="w-6 h-6 bg-gray-200 rounded text-xs hover:bg-gray-300"

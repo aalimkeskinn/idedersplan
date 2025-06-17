@@ -20,14 +20,30 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    type: 'normal' as Classroom['type'],
-    capacity: '',
-    floor: '',
-    building: '',
-    equipment: [] as string[]
+    shortName: '',
+    classLevel: '',
+    sharedClassroom: false,
+    needsSpecialEquipment: false,
+    color: '',
+    floors: '',
+    nearbyClassrooms: ''
   });
 
   const classrooms = data.classrooms || [];
+
+  // Auto-generate short name from classroom name
+  const generateShortName = (name: string): string => {
+    if (!name) return '';
+    
+    // Take first 2 characters and make uppercase
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Auto-generate color
+  const generateColor = (): string => {
+    const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4'];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
 
   const classroomTypes = [
     { value: 'normal', label: 'Normal Sınıf' },
@@ -51,11 +67,13 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
     const classroomData: Classroom = {
       id: editingClassroom?.id || Date.now().toString(),
       name: formData.name,
-      type: formData.type,
-      capacity: parseInt(formData.capacity),
-      floor: formData.floor,
-      building: formData.building,
-      equipment: formData.equipment
+      type: 'normal',
+      capacity: 30,
+      floor: '1',
+      building: 'Ana Bina',
+      equipment: [],
+      shortName: formData.shortName || generateShortName(formData.name),
+      color: formData.color || generateColor()
     };
 
     if (editingClassroom) {
@@ -76,11 +94,13 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
   const resetForm = () => {
     setFormData({
       name: '',
-      type: 'normal',
-      capacity: '',
-      floor: '',
-      building: '',
-      equipment: []
+      shortName: '',
+      classLevel: '',
+      sharedClassroom: false,
+      needsSpecialEquipment: false,
+      color: '',
+      floors: '',
+      nearbyClassrooms: ''
     });
     setEditingClassroom(null);
     setIsModalOpen(false);
@@ -89,11 +109,13 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
   const handleEdit = (classroom: Classroom) => {
     setFormData({
       name: classroom.name,
-      type: classroom.type,
-      capacity: classroom.capacity.toString(),
-      floor: classroom.floor,
-      building: classroom.building,
-      equipment: classroom.equipment
+      shortName: (classroom as any).shortName || generateShortName(classroom.name),
+      classLevel: '',
+      sharedClassroom: false,
+      needsSpecialEquipment: false,
+      color: (classroom as any).color || generateColor(),
+      floors: classroom.floor,
+      nearbyClassrooms: ''
     });
     setEditingClassroom(classroom);
     setIsModalOpen(true);
@@ -105,20 +127,25 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
     });
   };
 
-  const handleEquipmentToggle = (equipmentId: string) => {
-    const currentEquipment = formData.equipment;
-    if (currentEquipment.includes(equipmentId)) {
-      setFormData({
-        ...formData,
-        equipment: currentEquipment.filter(e => e !== equipmentId)
-      });
-    } else {
-      setFormData({
-        ...formData,
-        equipment: [...currentEquipment, equipmentId]
-      });
+  // Auto-update short name when name changes
+  React.useEffect(() => {
+    if (formData.name && !editingClassroom) {
+      setFormData(prev => ({
+        ...prev,
+        shortName: generateShortName(prev.name)
+      }));
     }
-  };
+  }, [formData.name, editingClassroom]);
+
+  // Auto-update color when not editing
+  React.useEffect(() => {
+    if (formData.name && !editingClassroom && !formData.color) {
+      setFormData(prev => ({
+        ...prev,
+        color: generateColor()
+      }));
+    }
+  }, [formData.name, editingClassroom]);
 
   const getTypeLabel = (type: string) => {
     return classroomTypes.find(t => t.value === type)?.label || type;
@@ -239,73 +266,87 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
         isOpen={isModalOpen}
         onClose={resetForm}
         title={editingClassroom ? 'Derslik Düzenle' : 'Yeni Derslik Ekle'}
+        size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Derslik Adı"
-            value={formData.name}
-            onChange={(value) => setFormData({ ...formData, name: value })}
-            placeholder="Örn: A101, Fen Lab 1"
-            required
-          />
-
-          <Select
-            label="Derslik Türü"
-            value={formData.type}
-            onChange={(value) => setFormData({ ...formData, type: value as Classroom['type'] })}
-            options={classroomTypes}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-4">
+          {/* Required Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Kapasite"
-              type="number"
-              value={formData.capacity}
-              onChange={(value) => setFormData({ ...formData, capacity: value })}
-              placeholder="30"
+              label="İsim"
+              value={formData.name}
+              onChange={(value) => setFormData({ ...formData, name: value })}
+              placeholder="Örn: A101, Fen Lab 1"
               required
             />
+            
             <Input
-              label="Kat"
-              value={formData.floor}
-              onChange={(value) => setFormData({ ...formData, floor: value })}
-              placeholder="1"
-              required
+              label="Kısaltma"
+              value={formData.shortName}
+              onChange={(value) => setFormData({ ...formData, shortName: value })}
+              placeholder="Otomatik oluşturulur"
+              disabled
             />
           </div>
 
+          {/* Optional Fields */}
           <Input
-            label="Bina"
-            value={formData.building}
-            onChange={(value) => setFormData({ ...formData, building: value })}
-            placeholder="Ana Bina"
-            required
+            label="Sınıfın Dersliği"
+            value={formData.classLevel}
+            onChange={(value) => setFormData({ ...formData, classLevel: value })}
+            placeholder="Hangi sınıfın dersliği"
           />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Ekipmanlar
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {equipmentOptions.map((equipment) => (
-                <div
-                  key={equipment.id}
-                  onClick={() => handleEquipmentToggle(equipment.id)}
-                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-                    formData.equipment.includes(equipment.id)
-                      ? 'border-blue-500 bg-blue-50 text-blue-900'
-                      : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-blue-300'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <equipment.icon size={16} className="mr-2" />
-                    <span className="text-sm font-medium">{equipment.label}</span>
-                  </div>
-                </div>
-              ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="sharedClassroom"
+                checked={formData.sharedClassroom}
+                onChange={(e) => setFormData({ ...formData, sharedClassroom: e.target.checked })}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="sharedClassroom" className="text-sm font-medium text-gray-700">
+                Ortak Derslik
+              </label>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="needsSpecialEquipment"
+                checked={formData.needsSpecialEquipment}
+                onChange={(e) => setFormData({ ...formData, needsSpecialEquipment: e.target.checked })}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="needsSpecialEquipment" className="text-sm font-medium text-gray-700">
+                Nöbet/Gözetim Gereken Alan
+              </label>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Renk"
+              value={formData.color}
+              onChange={(value) => setFormData({ ...formData, color: value })}
+              placeholder="Otomatik atanır"
+              disabled
+            />
+            
+            <Input
+              label="Ziller"
+              value={formData.floors}
+              onChange={(value) => setFormData({ ...formData, floors: value })}
+              placeholder="Kat bilgisi"
+            />
+          </div>
+
+          <Input
+            label="Yakındaki Derslikler"
+            value={formData.nearbyClassrooms}
+            onChange={(value) => setFormData({ ...formData, nearbyClassrooms: value })}
+            placeholder="Komşu derslikler"
+          />
 
           <div className="flex justify-end space-x-3 pt-4">
             <Button
@@ -319,7 +360,7 @@ const WizardStepClassrooms: React.FC<WizardStepClassroomsProps> = ({
               type="submit"
               variant="primary"
             >
-              {editingClassroom ? 'Güncelle' : 'Ekle'}
+              {editingClassroom ? 'Güncelle' : 'Tamamla'}
             </Button>
           </div>
         </form>

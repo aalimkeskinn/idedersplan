@@ -30,6 +30,10 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    shortName: '',
+    classTeacher: '',
+    color: '',
+    mainClassroom: '',
     level: ''
   });
   
@@ -38,6 +42,24 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
     selectedClasses: [],
     classCapacities: {},
     classPreferences: {}
+  };
+
+  // Auto-generate short name from class name
+  const generateShortName = (name: string): string => {
+    if (!name) return '';
+    
+    // Take first 2 characters and make uppercase
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Auto-generate color based on level
+  const generateColor = (level: string): string => {
+    const colors = {
+      'Anaokulu': '#10B981', // Green
+      'İlkokul': '#3B82F6',   // Blue  
+      'Ortaokul': '#8B5CF6'   // Purple
+    };
+    return colors[level as keyof typeof colors] || '#6B7280';
   };
 
   const handleClassToggle = (classId: string) => {
@@ -84,7 +106,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
         ...classesData,
         classCapacities: {
           ...classesData.classCapacities,
-          [classId]: Math.max(1, Math.min(100, capacity))
+          [classId]: Math.max(1, capacity)
         }
       }
     });
@@ -144,10 +166,18 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
     e.preventDefault();
     
     try {
+      const classData = {
+        name: formData.name,
+        level: formData.level,
+        // Store additional metadata in a way that's compatible with existing Class type
+        shortName: formData.shortName || generateShortName(formData.name),
+        color: formData.color || generateColor(formData.level)
+      };
+
       if (editingClass) {
-        await updateClass(editingClass.id, formData);
+        await updateClass(editingClass.id, classData);
       } else {
-        await addClass(formData as Omit<Class, 'id' | 'createdAt'>);
+        await addClass(classData as Omit<Class, 'id' | 'createdAt'>);
       }
       resetForm();
     } catch (error) {
@@ -156,7 +186,14 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   };
 
   const resetForm = () => {
-    setFormData({ name: '', level: '' });
+    setFormData({ 
+      name: '', 
+      shortName: '',
+      classTeacher: '',
+      color: '',
+      mainClassroom: '',
+      level: '' 
+    });
     setEditingClass(null);
     setIsModalOpen(false);
   };
@@ -164,6 +201,10 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   const handleEdit = (classItem: Class) => {
     setFormData({
       name: classItem.name,
+      shortName: (classItem as any).shortName || generateShortName(classItem.name),
+      classTeacher: '',
+      color: (classItem as any).color || generateColor(classItem.level),
+      mainClassroom: '',
       level: classItem.level
     });
     setEditingClass(classItem);
@@ -181,6 +222,26 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
       console.error("Error deleting class:", error);
     }
   };
+
+  // Auto-update short name when name changes
+  React.useEffect(() => {
+    if (formData.name && !editingClass) {
+      setFormData(prev => ({
+        ...prev,
+        shortName: generateShortName(prev.name)
+      }));
+    }
+  }, [formData.name, editingClass]);
+
+  // Auto-update color when level changes
+  React.useEffect(() => {
+    if (formData.level && !editingClass) {
+      setFormData(prev => ({
+        ...prev,
+        color: generateColor(prev.level)
+      }));
+    }
+  }, [formData.level, editingClass]);
 
   const levelOptions = [
     { value: '', label: 'Tüm Seviyeler' },
@@ -356,7 +417,6 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
                               handleCapacityChange(classItem.id, capacity + 1);
                             }}
                             className="w-6 h-6 bg-gray-200 rounded text-xs hover:bg-gray-300"
-                            disabled={capacity >= 100}
                           >
                             +
                           </button>
@@ -404,18 +464,55 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
         isOpen={isModalOpen}
         onClose={resetForm}
         title={editingClass ? 'Sınıf Düzenle' : 'Yeni Sınıf Ekle'}
+        size="lg"
       >
         <form onSubmit={handleSubmit}>
+          {/* Required Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="İsim"
+              value={formData.name}
+              onChange={(value) => setFormData({ ...formData, name: value })}
+              placeholder="Örn: 5A, 7B"
+              required
+            />
+            
+            <Input
+              label="Kısaltma"
+              value={formData.shortName}
+              onChange={(value) => setFormData({ ...formData, shortName: value })}
+              placeholder="Otomatik oluşturulur"
+              disabled
+            />
+          </div>
+
+          {/* Optional Fields */}
           <Input
-            label="Sınıf Adı"
-            value={formData.name}
-            onChange={(value) => setFormData({ ...formData, name: value })}
-            placeholder="Örn: 5A, 7B"
-            required
+            label="Sınıf öğretmeni"
+            value={formData.classTeacher}
+            onChange={(value) => setFormData({ ...formData, classTeacher: value })}
+            placeholder="Öğretmen seçin"
           />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Renk"
+              value={formData.color}
+              onChange={(value) => setFormData({ ...formData, color: value })}
+              placeholder="Otomatik atanır"
+              disabled
+            />
+            
+            <Input
+              label="Ana derslik"
+              value={formData.mainClassroom}
+              onChange={(value) => setFormData({ ...formData, mainClassroom: value })}
+              placeholder="Derslik seçin"
+            />
+          </div>
           
           <Select
-            label="Eğitim Seviyesi"
+            label="Sınıf"
             value={formData.level}
             onChange={(value) => setFormData({ ...formData, level: value })}
             options={levelOptions.filter(option => option.value !== '')}
@@ -434,7 +531,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
               type="submit"
               variant="primary"
             >
-              {editingClass ? 'Güncelle' : 'Kaydet'}
+              {editingClass ? 'Güncelle' : 'Tamamla'}
             </Button>
           </div>
         </form>

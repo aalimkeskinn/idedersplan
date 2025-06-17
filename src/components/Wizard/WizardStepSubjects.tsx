@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, Plus, Minus, Star, Clock, Edit, Trash2 } from 'lucide-react';
-import { Subject, EDUCATION_LEVELS } from '../../types';
+import { Subject, EDUCATION_LEVELS, Teacher } from '../../types';
 import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
 import Button from '../UI/Button';
@@ -15,21 +15,42 @@ interface WizardStepSubjectsProps {
 
 const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate }) => {
   const { data: subjects, add: addSubject, update: updateSubject, remove: removeSubject } = useFirestore<Subject>('subjects');
+  const { data: teachers } = useFirestore<Teacher>('teachers');
+  const { data: classrooms } = useFirestore('classrooms');
   const [selectedLevel, setSelectedLevel] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    branch: '',
-    level: '',
-    weeklyHours: ''
+    shortName: '',
+    distributionType: '',
+    canSplit: false,
+    color: '',
+    photo: '',
+    classrooms: '',
+    phoneNumber: '',
+    assignedTeacher: ''
   });
+
+  // Auto-generate short name from subject name
+  const generateShortName = (name: string): string => {
+    if (!name) return '';
+    
+    // Take first 2 characters and make uppercase
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Auto-generate color
+  const generateColor = (): string => {
+    const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4'];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
 
   const levelOptions = [
     { value: '', label: 'Tüm Seviyeler' },
     { value: 'Anaokulu', label: 'Anaokulu' },
     { value: 'İlkokul', label: 'İlkokul' },
-    { value: 'Ortaokul', label: 'Ortaokul' }
+    { value: 'Ortaokul', label: 'Ortaokul'  }
   ];
 
   const priorityOptions = [
@@ -85,14 +106,12 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   };
 
   const handleHoursChange = (subjectId: string, hours: number) => {
-    // Ensure hours is between 1 and 10
-    const validatedHours = Math.max(1, Math.min(10, hours));
-    
+    // Remove validation to allow any value
     onUpdate({
       ...data,
       subjectHours: {
         ...data.subjectHours,
-        [subjectId]: validatedHours
+        [subjectId]: hours
       }
     });
   };
@@ -108,7 +127,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   };
 
   const getTotalWeeklyHours = () => {
-    return Object.values(data.subjectHours).reduce((total, hours) => total + hours, 0);
+    return Object.values(data.subjectHours).reduce((sum, hours) => sum + hours, 0);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -134,8 +153,13 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     e.preventDefault();
     
     const subjectData = {
-      ...formData,
-      weeklyHours: parseInt(formData.weeklyHours)
+      name: formData.name,
+      branch: formData.name, // Using name as branch for simplicity
+      level: 'İlkokul', // Default level
+      weeklyHours: 4, // Default weekly hours
+      shortName: formData.shortName || generateShortName(formData.name),
+      color: formData.color || generateColor(),
+      assignedTeacher: formData.assignedTeacher
     };
 
     try {
@@ -151,7 +175,17 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   };
 
   const resetForm = () => {
-    setFormData({ name: '', branch: '', level: '', weeklyHours: '' });
+    setFormData({
+      name: '',
+      shortName: '',
+      distributionType: '',
+      canSplit: false,
+      color: '',
+      photo: '',
+      classrooms: '',
+      phoneNumber: '',
+      assignedTeacher: ''
+    });
     setEditingSubject(null);
     setIsModalOpen(false);
   };
@@ -159,9 +193,14 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const handleEdit = (subject: Subject) => {
     setFormData({
       name: subject.name,
-      branch: subject.branch,
-      level: subject.level,
-      weeklyHours: subject.weeklyHours.toString()
+      shortName: (subject as any).shortName || generateShortName(subject.name),
+      distributionType: '',
+      canSplit: false,
+      color: (subject as any).color || generateColor(),
+      photo: '',
+      classrooms: '',
+      phoneNumber: '',
+      assignedTeacher: (subject as any).assignedTeacher || ''
     });
     setEditingSubject(subject);
     setIsModalOpen(true);
@@ -178,6 +217,26 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
       console.error("Error deleting subject:", error);
     }
   };
+
+  // Auto-update short name when name changes
+  React.useEffect(() => {
+    if (formData.name && !editingSubject) {
+      setFormData(prev => ({
+        ...prev,
+        shortName: generateShortName(prev.name)
+      }));
+    }
+  }, [formData.name, editingSubject]);
+
+  // Auto-update color when not editing
+  React.useEffect(() => {
+    if (formData.name && !editingSubject && !formData.color) {
+      setFormData(prev => ({
+        ...prev,
+        color: generateColor()
+      }));
+    }
+  }, [formData.name, editingSubject]);
 
   return (
     <div className="space-y-6">
@@ -318,14 +377,12 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                             <button
                               onClick={() => handleHoursChange(subject.id, hours - 1)}
                               className="w-6 h-6 bg-gray-200 rounded text-xs hover:bg-gray-300"
-                              disabled={hours <= 1}
                             >
                               -
                             </button>
                             <input
                               type="number"
                               min="1"
-                              max="10"
                               value={hours}
                               onChange={(e) => handleHoursChange(subject.id, parseInt(e.target.value) || 1)}
                               className="w-12 text-center text-sm font-medium border border-gray-300 rounded py-1"
@@ -333,7 +390,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                             <button
                               onClick={() => handleHoursChange(subject.id, hours + 1)}
                               className="w-6 h-6 bg-gray-200 rounded text-xs hover:bg-gray-300"
-                              disabled={hours >= 10}
                             >
                               +
                             </button>
@@ -428,39 +484,93 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
         isOpen={isModalOpen}
         onClose={resetForm}
         title={editingSubject ? 'Ders Düzenle' : 'Yeni Ders Ekle'}
+        size="lg"
       >
         <form onSubmit={handleSubmit}>
+          {/* Required Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="İsim"
+              value={formData.name}
+              onChange={(value) => setFormData({ ...formData, name: value })}
+              placeholder="Örn: Matematik"
+              required
+            />
+            
+            <Input
+              label="Kısaltma"
+              value={formData.shortName}
+              onChange={(value) => setFormData({ ...formData, shortName: value })}
+              placeholder="Otomatik oluşturulur"
+              disabled
+            />
+          </div>
+
+          {/* Optional Fields */}
           <Input
-            label="Ders Adı"
-            value={formData.name}
-            onChange={(value) => setFormData({ ...formData, name: value })}
-            placeholder="Örn: Matematik"
-            required
-          />
-          
-          <Input
-            label="Branş"
-            value={formData.branch}
-            onChange={(value) => setFormData({ ...formData, branch: value })}
-            placeholder="Örn: Fen Bilimleri"
-            required
-          />
-          
-          <Select
-            label="Eğitim Seviyesi"
-            value={formData.level}
-            onChange={(value) => setFormData({ ...formData, level: value })}
-            options={levelOptions.filter(option => option.value !== '')}
-            required
+            label="Dağılım Şekli"
+            value={formData.distributionType}
+            onChange={(value) => setFormData({ ...formData, distributionType: value })}
+            placeholder="Ders dağılım şekli"
           />
 
-          <Input
-            label="Haftalık Ders Saati"
-            type="number"
-            value={formData.weeklyHours}
-            onChange={(value) => setFormData({ ...formData, weeklyHours: value })}
-            placeholder="Örn: 4"
-            required
+          <div className="flex items-center space-x-2 mb-4">
+            <input
+              type="checkbox"
+              id="canSplit"
+              checked={formData.canSplit}
+              onChange={(e) => setFormData({ ...formData, canSplit: e.target.checked })}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="canSplit" className="text-sm font-medium text-gray-700">
+              2'lik Kartlar Bölünebilir
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Renk"
+              value={formData.color}
+              onChange={(value) => setFormData({ ...formData, color: value })}
+              placeholder="Otomatik atanır"
+              disabled
+            />
+            
+            <Input
+              label="Fotoğraf"
+              value={formData.photo}
+              onChange={(value) => setFormData({ ...formData, photo: value })}
+              placeholder="Fotoğraf seçin"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Derslikler"
+              value={formData.classrooms}
+              onChange={(value) => setFormData({ ...formData, classrooms: value })}
+              placeholder="Dersin tanımlanmış kartlarına uygula"
+            />
+            
+            <Input
+              label="Numara"
+              value={formData.phoneNumber}
+              onChange={(value) => setFormData({ ...formData, phoneNumber: value })}
+              placeholder="Ders numarası"
+            />
+          </div>
+
+          <Select
+            label="Öğretmen Ata"
+            value={formData.assignedTeacher}
+            onChange={(value) => setFormData({ ...formData, assignedTeacher: value })}
+            options={[
+              { value: '', label: 'Seçiniz...' },
+              ...teachers.map(teacher => ({
+                value: teacher.id,
+                label: teacher.name
+              }))
+            ]}
           />
 
           <div className="button-group-mobile mt-6">
@@ -475,7 +585,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
               type="submit"
               variant="primary"
             >
-              {editingSubject ? 'Güncelle' : 'Kaydet'}
+              {editingSubject ? 'Güncelle' : 'Tamamla'}
             </Button>
           </div>
         </form>

@@ -24,6 +24,14 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    surname: '',
+    shortName: '',
+    rank: '',
+    gender: '',
+    title: '',
+    lastAddition: '',
+    classrooms: '',
+    phoneNumber: '',
     branch: '',
     level: ''
   });
@@ -32,12 +40,21 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
     e.preventDefault();
     
     try {
+      // Combine name and surname for the teacher name
+      const fullName = `${formData.name} ${formData.surname}`.trim();
+      
+      const teacherData = {
+        name: fullName,
+        branch: formData.branch || 'Genel', // Default branch if not provided
+        level: formData.level || 'İlkokul' // Default level if not provided
+      };
+
       if (editingTeacher) {
-        await updateTeacher(editingTeacher.id, formData);
-        success('✅ Güncellendi', `${formData.name} başarıyla güncellendi`);
+        await updateTeacher(editingTeacher.id, teacherData);
+        success('✅ Güncellendi', `${fullName} başarıyla güncellendi`);
       } else {
-        await addTeacher(formData as Omit<Teacher, 'id' | 'createdAt'>);
-        success('✅ Eklendi', `${formData.name} başarıyla eklendi`);
+        await addTeacher(teacherData as Omit<Teacher, 'id' | 'createdAt'>);
+        success('✅ Eklendi', `${fullName} başarıyla eklendi`);
       }
       resetForm();
     } catch (err) {
@@ -46,14 +63,39 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
   };
 
   const resetForm = () => {
-    setFormData({ name: '', branch: '', level: '' });
+    setFormData({
+      name: '',
+      surname: '',
+      shortName: '',
+      rank: '',
+      gender: '',
+      title: '',
+      lastAddition: '',
+      classrooms: '',
+      phoneNumber: '',
+      branch: '',
+      level: ''
+    });
     setEditingTeacher(null);
     setIsModalOpen(false);
   };
 
   const handleEdit = (teacher: Teacher) => {
+    // Split the full name back to name and surname for editing
+    const nameParts = teacher.name.split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    
     setFormData({
-      name: teacher.name,
+      name: firstName,
+      surname: lastName,
+      shortName: '',
+      rank: '',
+      gender: '',
+      title: '',
+      lastAddition: '',
+      classrooms: '',
+      phoneNumber: '',
       branch: teacher.branch,
       level: teacher.level
     });
@@ -97,6 +139,21 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
     value: level,
     label: level
   }));
+
+  const rankOptions = [
+    { value: '', label: 'Seçiniz...' },
+    { value: 'Öğretmen', label: 'Öğretmen' },
+    { value: 'Başöğretmen', label: 'Başöğretmen' },
+    { value: 'Uzman Öğretmen', label: 'Uzman Öğretmen' },
+    { value: 'Müdür Yardımcısı', label: 'Müdür Yardımcısı' },
+    { value: 'Müdür', label: 'Müdür' }
+  ];
+
+  const genderOptions = [
+    { value: '', label: 'Seçiniz...' },
+    { value: 'Erkek', label: 'Erkek' },
+    { value: 'Kadın', label: 'Kadın' }
+  ];
 
   const sortedTeachers = [...teachers].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
@@ -255,31 +312,100 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
         isOpen={isModalOpen}
         onClose={resetForm}
         title={editingTeacher ? 'Öğretmen Düzenle' : 'Yeni Öğretmen Ekle'}
+        size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Required Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="İsim"
+              value={formData.name}
+              onChange={(value) => setFormData({ ...formData, name: value })}
+              placeholder="Örn: Ahmet"
+              required
+            />
+            
+            <Input
+              label="Soy isim"
+              value={formData.surname}
+              onChange={(value) => setFormData({ ...formData, surname: value })}
+              placeholder="Örn: Yılmaz"
+              required
+            />
+          </div>
+
+          {/* Optional Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Kısaltma"
+              value={formData.shortName}
+              onChange={(value) => setFormData({ ...formData, shortName: value })}
+              placeholder="Örn: AY"
+            />
+            
+            <Select
+              label="Rütbe"
+              value={formData.rank}
+              onChange={(value) => setFormData({ ...formData, rank: value })}
+              options={rankOptions}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Cinsiyet"
+              value={formData.gender}
+              onChange={(value) => setFormData({ ...formData, gender: value })}
+              options={genderOptions}
+            />
+            
+            <Input
+              label="Ünvan"
+              value={formData.title}
+              onChange={(value) => setFormData({ ...formData, title: value })}
+              placeholder="Örn: Sınıf Öğretmeni"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="İşim son eki"
+              value={formData.lastAddition}
+              onChange={(value) => setFormData({ ...formData, lastAddition: value })}
+              placeholder=""
+            />
+            
+            <Input
+              label="Derslikler"
+              value={formData.classrooms}
+              onChange={(value) => setFormData({ ...formData, classrooms: value })}
+              placeholder="Örn: A101, B205"
+            />
+          </div>
+
           <Input
-            label="Ad Soyad"
-            value={formData.name}
-            onChange={(value) => setFormData({ ...formData, name: value })}
-            placeholder="Örn: Ahmet Yılmaz"
-            required
+            label="Numara"
+            value={formData.phoneNumber}
+            onChange={(value) => setFormData({ ...formData, phoneNumber: value })}
+            placeholder="Örn: 0555 123 45 67"
           />
-          
-          <Input
-            label="Branş"
-            value={formData.branch}
-            onChange={(value) => setFormData({ ...formData, branch: value })}
-            placeholder="Örn: Matematik"
-            required
-          />
-          
-          <Select
-            label="Eğitim Seviyesi"
-            value={formData.level}
-            onChange={(value) => setFormData({ ...formData, level: value })}
-            options={levelOptions}
-            required
-          />
+
+          {/* Branch and Level for system compatibility */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Branş"
+              value={formData.branch}
+              onChange={(value) => setFormData({ ...formData, branch: value })}
+              placeholder="Örn: Matematik, Türkçe"
+            />
+            
+            <Select
+              label="Eğitim Seviyesi"
+              value={formData.level}
+              onChange={(value) => setFormData({ ...formData, level: value })}
+              options={levelOptions}
+            />
+          </div>
 
           <div className="flex justify-end space-x-3 pt-4">
             <Button
@@ -293,7 +419,7 @@ const WizardStepTeachers: React.FC<WizardStepTeachersProps> = ({
               type="submit"
               variant="primary"
             >
-              {editingTeacher ? 'Güncelle' : 'Ekle'}
+              {editingTeacher ? 'Güncelle' : 'Tamamla'}
             </Button>
           </div>
         </form>

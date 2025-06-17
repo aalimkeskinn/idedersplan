@@ -60,13 +60,6 @@ const Sidebar = () => {
       label: 'Veri Yönetimi', 
       color: 'ide-primary',
       description: 'Sistem verilerini yönet'
-    },
-    { 
-      to: '/classrooms', 
-      icon: MapPin, 
-      label: 'Derslik Yönetimi', 
-      color: 'ide-secondary',
-      description: 'Derslikleri yönet'
     }
   ];
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Save, RotateCcw, Users, Building, ArrowLeftRight, Clock, AlertTriangle } from 'lucide-react';
+import { Calendar, Save, RotateCcw, Users, Building, ArrowLeftRight, Clock, AlertTriangle, Info } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Teacher, Class, Subject, Schedule, DAYS, PERIODS, getTimeForPeriod, formatTimeRange } from '../types';
 import { TimeConstraint } from '../types/constraints';
@@ -8,7 +8,7 @@ import { useToast } from '../hooks/useToast';
 import { useErrorModal } from '../hooks/useErrorModal';
 import { useConfirmation } from '../hooks/useConfirmation';
 import { validateSchedule, checkSlotConflict } from '../utils/validation';
-import { validateScheduleWithConstraints, checkConstraintViolations } from '../utils/scheduleValidation';
+import { validateScheduleWithConstraints, checkConstraintViolations, getConstraintWarnings, isOptimalTimeSlot } from '../utils/scheduleValidation';
 import Button from '../components/UI/Button';
 import Select from '../components/UI/Select';
 import ScheduleSlotModal from '../components/UI/ScheduleSlotModal';
@@ -421,6 +421,20 @@ const Schedules = () => {
         showError('⚠️ Zaman Kısıtlaması İhlali!', violationMessage);
         return;
       }
+
+      // Check for warnings (non-blocking)
+      const constraintWarnings = getConstraintWarnings(
+        'teacher',
+        day,
+        period,
+        selectedTeacherId,
+        classId,
+        constraints
+      );
+
+      if (constraintWarnings.length > 0 && showConstraintWarnings) {
+        warning('⚠️ Kısıtlama Uyarısı', constraintWarnings.join('\n'));
+      }
       
       // Set the slot
       setCurrentSchedule(prev => ({
@@ -498,6 +512,31 @@ const Schedules = () => {
         const violationMessage = allViolations.join('\n');
         showError('⚠️ Zaman Kısıtlaması İhlali!', violationMessage);
         return;
+      }
+
+      // Check for warnings (non-blocking)
+      const teacherWarnings = getConstraintWarnings(
+        'teacher',
+        day,
+        period,
+        teacherId,
+        selectedClassId,
+        constraints
+      );
+
+      const classWarnings = getConstraintWarnings(
+        'class',
+        day,
+        period,
+        teacherId,
+        selectedClassId,
+        constraints
+      );
+
+      const allWarnings = [...teacherWarnings, ...classWarnings];
+
+      if (allWarnings.length > 0 && showConstraintWarnings) {
+        warning('⚠️ Kısıtlama Uyarısı', allWarnings.join('\n'));
       }
       
       // Set the slot
@@ -764,12 +803,14 @@ const Schedules = () => {
     }
   };
 
-  // Check if slot has constraint violations
+  // ENHANCED: Check if slot has constraint violations or warnings
   const getSlotConstraintStatus = (day: string, period: string) => {
     const slot = currentSchedule[day]?.[period];
     if (!slot || slot.classId === 'fixed-period') return null;
 
     let violations: string[] = [];
+    let warnings: string[] = [];
+    let optimalInfo = null;
 
     if (mode === 'teacher' && selectedTeacherId && slot.classId) {
       violations = checkConstraintViolations(
@@ -780,6 +821,24 @@ const Schedules = () => {
         slot.classId,
         constraints
       );
+
+      warnings = getConstraintWarnings(
+        'teacher',
+        day,
+        period,
+        selectedTeacherId,
+        slot.classId,
+        constraints
+      );
+
+      optimalInfo = isOptimalTimeSlot(
+        'teacher',
+        selectedTeacherId,
+        day,
+        period,
+        constraints
+      );
+
     } else if (mode === 'class' && selectedClassId && slot.teacherId) {
       const teacherViolations = checkConstraintViolations(
         'teacher',
@@ -798,9 +857,50 @@ const Schedules = () => {
         constraints
       );
       violations = [...teacherViolations, ...classViolations];
+
+      const teacherWarnings = getConstraintWarnings(
+        'teacher',
+        day,
+        period,
+        slot.teacherId,
+        selectedClassId,
+        constraints
+      );
+      const classWarnings = getConstraintWarnings(
+        'class',
+        day,
+        period,
+        slot.teacherId,
+        selectedClassId,
+        constraints
+      );
+      warnings = [...teacherWarnings, ...classWarnings];
+
+      // Check optimal status for both teacher and class
+      const teacherOptimal = isOptimalTimeSlot(
+        'teacher',
+        slot.teacherId,
+        day,
+        period,
+        constraints
+      );
+      const classOptimal = isOptimalTimeSlot(
+        'class',
+        selectedClassId,
+        day,
+        period,
+        constraints
+      );
+
+      // Use the less optimal status
+      optimalInfo = !teacherOptimal.isOptimal ? teacherOptimal : classOptimal;
     }
 
-    return violations.length > 0 ? violations : null;
+    return {
+      violations: violations.length > 0 ? violations : null,
+      warnings: warnings.length > 0 ? warnings : null,
+      optimal: optimalInfo
+    };
   };
 
   // Zaman bilgisini al
@@ -905,7 +1005,7 @@ const Schedules = () => {
                   <Clock className="w-3 h-3 mr-1" />
                   {(selectedTeacher || selectedClass)?.level === 'Ortaokul' ? 'Ortaokul Saatleri' : 'Genel Saatler'}
                 </div>
-                <div className="text-xs text-green-600 mt-1">🔒 Yemek • 🥐 Kahvaltı</div>
+                <div className="text-xs text-green-600 mt-1">🔒 Yemek • 🥐 Kahvaltı • ✅ Tercih edilen (varsayılan)</div>
               </div>
             )}
           </div>
@@ -958,7 +1058,7 @@ const Schedules = () => {
                     • {(selectedTeacher || selectedClass)?.level === 'Ortaokul' ? 'Ortaokul zaman dilimi' : 'Genel zaman dilimi'}
                   </span>
                   <span className="ml-2 text-green-600">
-                    • 🔒 Yemek • 🥐 Kahvaltı
+                    • 🔒 Yemek • 🥐 Kahvaltı • ✅ Tercih edilen (varsayılan)
                   </span>
                 </p>
               </div>
@@ -1062,7 +1162,28 @@ const Schedules = () => {
                         {DAYS.map(day => {
                           const slotDisplay = getSlotDisplay(day, period);
                           const isFixed = isFixedPeriod(day, period);
-                          const constraintViolations = getSlotConstraintStatus(day, period);
+                          const constraintStatus = getSlotConstraintStatus(day, period);
+                          
+                          // Determine slot styling based on constraints
+                          let slotStyling = '';
+                          let slotIcon = null;
+                          let slotTitle = '';
+
+                          if (constraintStatus?.violations) {
+                            slotStyling = 'ring-2 ring-red-400';
+                            slotIcon = <AlertTriangle className="w-4 h-4 text-red-500" />;
+                            slotTitle = `Kısıtlama İhlali: ${constraintStatus.violations.join(', ')}`;
+                          } else if (constraintStatus?.warnings) {
+                            slotStyling = 'ring-1 ring-yellow-400';
+                            slotIcon = <Info className="w-4 h-4 text-yellow-500" />;
+                            slotTitle = `Uyarı: ${constraintStatus.warnings.join(', ')}`;
+                          } else if (constraintStatus?.optimal && !constraintStatus.optimal.isOptimal) {
+                            if (constraintStatus.optimal.constraintType === 'restricted') {
+                              slotStyling = 'ring-1 ring-yellow-300';
+                              slotIcon = <Info className="w-3 h-3 text-yellow-500" />;
+                              slotTitle = constraintStatus.optimal.reason;
+                            }
+                          }
                           
                           return (
                             <td key={`${day}-${period}`} className="px-2 py-2">
@@ -1073,14 +1194,14 @@ const Schedules = () => {
                                   isFixed
                                     ? `${slotDisplay?.color || 'bg-green-100 border-green-300'} cursor-not-allowed`
                                     : slotDisplay 
-                                    ? `${slotDisplay.color} hover:opacity-80 ${constraintViolations ? 'ring-2 ring-red-400' : ''}` 
+                                    ? `${slotDisplay.color} hover:opacity-80 ${slotStyling}` 
                                     : 'border-gray-300 bg-gray-50 border-dashed hover:border-purple-400 hover:bg-purple-50'
                                 }`}
-                                title={constraintViolations ? `Kısıtlama İhlali: ${constraintViolations.join(', ')}` : undefined}
+                                title={slotTitle || (slotDisplay ? undefined : (mode === 'teacher' ? 'Sınıf Ekle' : 'Öğretmen Ekle'))}
                               >
-                                {constraintViolations && (
+                                {(constraintStatus?.violations || constraintStatus?.warnings || (constraintStatus?.optimal && !constraintStatus.optimal.isOptimal)) && (
                                   <div className="absolute top-1 right-1">
-                                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                                    {slotIcon}
                                   </div>
                                 )}
                                 {slotDisplay ? (
@@ -1206,6 +1327,14 @@ const Schedules = () => {
               <p>• <strong>Kahvaltı:</strong> İlkokul/Anaokul 08:30-08:50, Ortaokul 09:15-09:35</p>
               <p>• <strong>Yemek:</strong> İlkokul 5. ders (11:50-12:25), Ortaokul 6. ders (12:30-13:05)</p>
               <p>• <strong>İkindi Kahvaltısı:</strong> 8. ders sonrası (14:35-14:45)</p>
+            </div>
+          </div>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-md mx-auto mt-4">
+            <h4 className="text-sm font-medium text-green-800 mb-2">✅ Zaman Kısıtlamaları:</h4>
+            <div className="text-xs text-green-700 space-y-1">
+              <p>• <strong>Varsayılan:</strong> Tüm zaman dilimleri "Tercih Edilen" olarak başlar</p>
+              <p>• <strong>Kısıtlama Yönetimi:</strong> "Zaman Kısıtlamaları" sayfasından özelleştirin</p>
+              <p>• <strong>Otomatik Kontrol:</strong> Program oluştururken kısıtlamalar kontrol edilir</p>
             </div>
           </div>
           <div className="flex items-center justify-center space-x-2 text-sm text-gray-400 mt-4">

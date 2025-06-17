@@ -78,11 +78,33 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
   };
 
   const handleSlotClick = (day: string, period: string) => {
+    console.log('🔄 Slot tıklandı:', {
+      day,
+      period,
+      selectedConstraintType,
+      entityId,
+      entityName
+    });
+
     const existingConstraint = getConstraintForSlot(day, period);
     
     if (existingConstraint) {
-      if (existingConstraint.constraintType === 'preferred') {
-        // Change from preferred to selected type (unavailable or restricted)
+      if (existingConstraint.constraintType === selectedConstraintType) {
+        // Same type clicked - change back to preferred
+        const updatedConstraints = constraints.map(c => 
+          (c.entityId === entityId && c.day === day && c.period === period)
+            ? {
+                ...c,
+                constraintType: 'preferred' as ConstraintType,
+                reason: `Tercih edilen - ${entityName}`,
+                updatedAt: new Date()
+              }
+            : c
+        );
+        onConstraintsChange(updatedConstraints);
+        console.log('✅ Kısıtlama "tercih edilen"e değiştirildi');
+      } else {
+        // Different type - change to selected type
         const updatedConstraints = constraints.map(c => 
           (c.entityId === entityId && c.day === day && c.period === period)
             ? {
@@ -94,22 +116,13 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
             : c
         );
         onConstraintsChange(updatedConstraints);
-      } else {
-        // Change back to preferred (default state)
-        const updatedConstraints = constraints.map(c => 
-          (c.entityId === entityId && c.day === day && c.period === period)
-            ? {
-                ...c,
-                constraintType: 'preferred',
-                reason: `Tercih edilen - ${entityName}`,
-                updatedAt: new Date()
-              }
-            : c
-        );
-        onConstraintsChange(updatedConstraints);
+        console.log('✅ Kısıtlama değiştirildi:', {
+          from: existingConstraint.constraintType,
+          to: selectedConstraintType
+        });
       }
     } else {
-      // This shouldn't happen with default constraints, but handle it anyway
+      // No constraint exists - create new one
       const newConstraint: TimeConstraint = {
         id: `${entityId}-${day}-${period}-${Date.now()}`,
         entityType,
@@ -123,10 +136,13 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
       };
       
       onConstraintsChange([...constraints, newConstraint]);
+      console.log('✅ Yeni kısıtlama oluşturuldu:', newConstraint);
     }
   };
 
   const resetToPreferred = () => {
+    console.log('🔄 Tüm kısıtlamalar "tercih edilen"e sıfırlanıyor');
+    
     const updatedConstraints = constraints.map(c => 
       c.entityId === entityId
         ? {
@@ -138,6 +154,7 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
         : c
     );
     onConstraintsChange(updatedConstraints);
+    console.log('✅ Tüm kısıtlamalar sıfırlandı');
   };
 
   const getTimeInfo = (period: string) => {
@@ -229,12 +246,15 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
             </div>
           </div>
 
-          {/* Constraint Type Selector */}
+          {/* FIXED: Constraint Type Selector */}
           <div className="lg:col-span-1">
             <h4 className="text-sm font-medium text-gray-700 mb-3">Değiştirmek İçin Seçin</h4>
             <div className="space-y-2">
               <button
-                onClick={() => setSelectedConstraintType('unavailable')}
+                onClick={() => {
+                  console.log('🔄 Kısıtlama türü değiştirildi: unavailable');
+                  setSelectedConstraintType('unavailable');
+                }}
                 className={`w-full p-3 rounded-lg border-2 transition-all duration-200 text-left ${
                   selectedConstraintType === 'unavailable'
                     ? 'bg-red-100 border-red-300 text-red-800 ring-2 ring-red-500 ring-opacity-50'
@@ -251,7 +271,10 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
               </button>
               
               <button
-                onClick={() => setSelectedConstraintType('restricted')}
+                onClick={() => {
+                  console.log('🔄 Kısıtlama türü değiştirildi: restricted');
+                  setSelectedConstraintType('restricted');
+                }}
                 className={`w-full p-3 rounded-lg border-2 transition-all duration-200 text-left ${
                   selectedConstraintType === 'restricted'
                     ? 'bg-yellow-100 border-yellow-300 text-yellow-800 ring-2 ring-yellow-500 ring-opacity-50'
@@ -263,6 +286,26 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
                   <div>
                     <div className="font-medium">Kısıtlı</div>
                     <div className="text-xs opacity-75">Uyarı verir ama engel olmaz</div>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  console.log('🔄 Kısıtlama türü değiştirildi: preferred');
+                  setSelectedConstraintType('preferred');
+                }}
+                className={`w-full p-3 rounded-lg border-2 transition-all duration-200 text-left ${
+                  selectedConstraintType === 'preferred'
+                    ? 'bg-green-100 border-green-300 text-green-800 ring-2 ring-green-500 ring-opacity-50'
+                    : 'bg-white border-gray-200 hover:border-green-300 hover:bg-green-50'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5" />
+                  <div>
+                    <div className="font-medium">Tercih Edilen</div>
+                    <div className="text-xs opacity-75">Normal program oluşturma</div>
                   </div>
                 </div>
               </button>
@@ -278,8 +321,23 @@ const TimeConstraintGrid: React.FC<TimeConstraintGridProps> = ({
                 <div className="text-xs text-blue-700 space-y-1">
                   <p><strong>1.</strong> Yukarıdan kısıtlama türü seçin</p>
                   <p><strong>2.</strong> Zaman tablosunda istediğiniz saate tıklayın</p>
-                  <p><strong>3.</strong> Kısıtlı saate tekrar tıklayarak "tercih edilen"e dönebilirsiniz</p>
+                  <p><strong>3.</strong> Aynı türe tekrar tıklayarak "tercih edilen"e dönebilirsiniz</p>
                   <p><strong>4.</strong> Değişiklikleri kaydetmeyi unutmayın!</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ADDED: Current Selection Info */}
+            <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <span className="text-lg">{CONSTRAINT_TYPES[selectedConstraintType].icon}</span>
+                <div>
+                  <div className="font-medium text-purple-800 text-sm">
+                    Seçili: {CONSTRAINT_TYPES[selectedConstraintType].label}
+                  </div>
+                  <div className="text-xs text-purple-600">
+                    {CONSTRAINT_TYPES[selectedConstraintType].description}
+                  </div>
                 </div>
               </div>
             </div>

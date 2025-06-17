@@ -109,11 +109,11 @@ const ScheduleWizard = () => {
   const { data: classes } = useFirestore<Class>('classes');
   const { data: subjects } = useFirestore<Subject>('subjects');
   const { add: addTemplate, update: updateTemplate, data: templates } = useFirestore<ScheduleTemplate>('schedule-templates');
-  const { add: addSchedule } = useFirestore<Schedule>('schedules');
-  const { success, error, warning } = useToast();
+  const { add: addSchedule, data: existingSchedules } = useFirestore<Schedule>('schedules');
+  const { success, error, warning, info } = useToast();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] =  useState<string | null>(null);
   const [wizardData, setWizardData] = useState<WizardData>({
     basicInfo: {
       name: '',
@@ -290,6 +290,16 @@ const ScheduleWizard = () => {
     selectedClasses: Class[],
     selectedSubjects: Subject[]
   ): Schedule['schedule'] => {
+    // Check if teacher already has a schedule
+    const existingTeacherSchedule = existingSchedules.find(s => s.teacherId === teacherId);
+    
+    // If teacher already has a schedule, return it to preserve existing data
+    if (existingTeacherSchedule) {
+      console.log(`⚠️ ${teacherId} için mevcut program bulundu, korunuyor`);
+      return existingTeacherSchedule.schedule;
+    }
+    
+    // Otherwise, generate a new schedule
     const schedule: Schedule['schedule'] = {};
     
     // Initialize empty schedule
@@ -390,7 +400,8 @@ const ScheduleWizard = () => {
       console.log('🎯 Program oluşturma başlatıldı:', {
         selectedTeachers: wizardData.teachers.selectedTeachers.length,
         selectedClasses: wizardData.classes.selectedClasses.length,
-        selectedSubjects: wizardData.subjects.selectedSubjects.length
+        selectedSubjects: wizardData.subjects.selectedSubjects.length,
+        existingSchedules: existingSchedules.length
       });
 
       // Get selected data
@@ -412,34 +423,62 @@ const ScheduleWizard = () => {
 
       // Generate schedules for each selected teacher
       let generatedCount = 0;
+      let preservedCount = 0;
       
       for (const teacher of selectedTeachers) {
         try {
-          const teacherSchedule = generateScheduleForTeacher(
-            teacher.id,
-            selectedClasses,
-            selectedSubjects
-          );
-
-          // Save to Firebase
-          const scheduleData: Omit<Schedule, 'id' | 'createdAt'> = {
-            teacherId: teacher.id,
-            schedule: teacherSchedule,
-            updatedAt: new Date()
-          };
-
-          await addSchedule(scheduleData);
-          generatedCount++;
+          // Check if teacher already has a schedule
+          const existingSchedule = existingSchedules.find(s => s.teacherId === teacher.id);
           
-          console.log(`✅ ${teacher.name} programı Firebase'e kaydedildi`);
-          
+          if (existingSchedule) {
+            // Preserve existing schedule - just update the timestamp
+            await updateTeacherSchedule(existingSchedule);
+            preservedCount++;
+            console.log(`✅ ${teacher.name} mevcut programı korundu`);
+          } else {
+            // Generate new schedule
+            const teacherSchedule = generateScheduleForTeacher(
+              teacher.id,
+              selectedClasses,
+              selectedSubjects
+            );
+
+            // Save to Firebase
+            const scheduleData: Omit<Schedule, 'id' | 'createdAt'> = {
+              teacherId: teacher.id,
+              schedule: teacherSchedule,
+              updatedAt: new Date()
+            };
+
+            await addSchedule(scheduleData);
+            generatedCount++;
+            
+            console.log(`✅ ${teacher.name} programı Firebase'e kaydedildi`);
+          }
         } catch (err) {
           console.error(`❌ ${teacher.name} programı kaydedilemedi:`, err);
         }
       }
 
-      if (generatedCount > 0) {
-        success('🎯 Program Oluşturuldu!', `${generatedCount} öğretmen için program başarıyla oluşturuldu ve Firebase'e kaydedildi`);
+      // Update existing teacher schedule
+      async function updateTeacherSchedule(schedule: Schedule) {
+        // Just update the timestamp to mark it as updated
+        await updateTeacher(schedule.teacherId, {
+          updatedAt: new Date()
+        });
+      }
+
+      if (generatedCount > 0 || preservedCount > 0) {
+        let message = '';
+        if (generatedCount > 0 && preservedCount > 0) {
+          message = `${generatedCount} öğretmen için yeni program oluşturuldu ve ${preservedCount} öğretmenin mevcut programı korundu`;
+        } else if (generatedCount > 0) {
+          message = `${generatedCount} öğretmen için program başarıyla oluşturuldu ve Firebase'e kaydedildi`;
+        } else {
+          message = `${preservedCount} öğretmenin mevcut programı korundu`;
+        }
+        
+        success('🎯 Program Oluşturuldu!', message);
         
         // Save template as well
         await handleSaveTemplate();

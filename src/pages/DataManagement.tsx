@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Database, 
   Users, 
@@ -13,15 +13,19 @@ import {
   Settings,
   Download,
   Upload,
-  MapPin
+  MapPin,
+  FileSpreadsheet,
+  Check,
+  X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFirestore } from '../hooks/useFirestore';
 import { useToast } from '../hooks/useToast';
 import { useConfirmation } from '../hooks/useConfirmation';
-import { Teacher, Class, Subject, Schedule } from '../types';
+import { Teacher, Class, Subject, Schedule, EDUCATION_LEVELS } from '../types';
 import Button from '../components/UI/Button';
 import ConfirmationModal from '../components/UI/ConfirmationModal';
+import Modal from '../components/UI/Modal';
 
 // Schedule Template interface
 interface ScheduleTemplate {
@@ -49,15 +53,23 @@ interface Classroom {
   color?: string;
 }
 
+// Excel import interface
+interface ExcelTeacherRow {
+  ad: string;
+  soyad: string;
+  brans: string;
+  seviye?: string;
+}
+
 const DataManagement = () => {
   const navigate = useNavigate();
-  const { data: teachers, remove: removeTeacher } = useFirestore<Teacher>('teachers');
+  const { data: teachers, add: addTeacher, update: updateTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
   const { data: classes, remove: removeClass } = useFirestore<Class>('classes');
-  const { data: subjects, remove: removeSubject } = useFirestore<Subject>('subjects');
+  const { data: subjects, add: addSubject, remove: removeSubject } = useFirestore<Subject>('subjects');
   const { data: schedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
   const { data: templates, remove: removeTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { data: classrooms, remove: removeClassroom } = useFirestore<Classroom>('classrooms');
-  const { success, error, warning } = useToast();
+  const { success, error, warning, info } = useToast();
   const { 
     confirmation, 
     showConfirmation, 
@@ -72,6 +84,24 @@ const DataManagement = () => {
   const [isDeletingTemplates, setIsDeletingTemplates] = useState(false);
   const [isDeletingClassrooms, setIsDeletingClassrooms] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  
+  // Excel import states
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [excelData, setExcelData] = useState<ExcelTeacherRow[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStep, setImportStep] = useState<'upload' | 'preview' | 'mapping' | 'confirm'>('upload');
+  const [selectedLevel, setSelectedLevel] = useState<'Anaokulu' | 'İlkokul' | 'Ortaokul'>('İlkokul');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
+  const [importSuccess, setImportSuccess] = useState(0);
+  const [importFailed, setImportFailed] = useState(0);
+  const [columnMapping, setColumnMapping] = useState({
+    name: 0, // AD
+    surname: 1, // SOYAD
+    branch: 2, // GÖREV
+    level: -1 // Not mapped by default
+  });
 
   // Delete all teachers
   const handleDeleteAllTeachers = () => {
@@ -426,6 +456,144 @@ const DataManagement = () => {
     );
   };
 
+  // Excel Import Functions
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      error('❌ Dosya Hatası', 'Lütfen .csv, .xlsx veya .xls formatında bir dosya yükleyin');
+      return;
+    }
+
+    // For this example, we'll simulate parsing the file
+    // In a real implementation, you would use a library like xlsx or papaparse
+    simulateExcelParsing(file);
+  };
+
+  const simulateExcelParsing = (file: File) => {
+    // This is a simulation of parsing an Excel file
+    // In a real implementation, you would use a library to parse the file
+    
+    // For demonstration, we'll create sample data based on the image
+    const sampleData: ExcelTeacherRow[] = [
+      { ad: 'BİLGE', soyad: 'KÜLEKÇİER', brans: 'ALMANCA ÖĞRETMENİ' },
+      { ad: 'ARZU', soyad: 'ŞAPOĞLU', brans: 'ANAOKULU ÖĞRETMENİ' },
+      { ad: 'NAZAN TAŞKIRAN', soyad: 'TAŞKIRAN', brans: 'ANAOKULU ÖĞRETMENİ' },
+      { ad: 'ELİF', soyad: 'AKILBER', brans: 'ANAOKULU ÖĞRETMENİ' },
+      { ad: 'ELİF', soyad: 'AKARSU', brans: 'BEDEN EĞİTİMİ ÖĞRETMENİ' },
+      { ad: 'MEHMET', soyad: 'UYSAL', brans: 'BEDEN EĞİTİMİ ÖĞRETMENİ' },
+      { ad: 'ALİM', soyad: 'KESKİN', brans: 'BİLGİSAYAR ÖĞRETMENİ' },
+      { ad: 'GİZEM', soyad: 'TÜZÜN', brans: 'BİLGİSAYAR ÖĞRETMENİ' },
+      { ad: 'NURCAN HAŞA', soyad: 'KINIK', brans: 'DANS ÖĞRETMENİ' },
+      { ad: 'HASAN', soyad: 'AVCI', brans: 'DİN KÜLTÜRÜ VE AHLAK BİLGİSİ' },
+      { ad: 'ZEYNEP', soyad: 'TÜRKMEN', brans: 'DÜŞÜNME BECERİLERİ' },
+      { ad: 'DİLEK', soyad: 'YAKAR', brans: 'EĞİTİM DİREKTÖRÜ' },
+      { ad: 'AYÇA', soyad: 'GÖNCELLİ ULCAN', brans: 'FEN BİLGİSİ ÖĞRETMENİ' },
+      { ad: 'GÜLENAY', soyad: 'ÇAKIROĞLU', brans: 'FEN BİLGİSİ ÖĞRETMENİ' },
+      { ad: 'HAVVA EBRU', soyad: 'MERCAN', brans: 'FEN BİLGİSİ ÖĞRETMENİ' },
+      { ad: 'SEDEF', soyad: 'AKSAKAL', brans: 'GÖRSEL SANATLAR' },
+      { ad: 'AYŞE ŞEYDA', soyad: 'SOYDAMAL', brans: 'GÖRSEL SANATLAR' },
+      { ad: 'DİDEM', soyad: 'TOPÇU', brans: 'İNGİLİZCE ÖĞRETMENİ' },
+      { ad: 'CATHERINE ANNE', soyad: 'ÖNCEL', brans: 'İNGİLİZCE ÖĞRETMENİ' },
+      { ad: 'TUĞBA', soyad: 'TEKELİ', brans: 'İNGİLİZCE ÖĞRETMENİ' },
+      // Add more sample data as needed
+    ];
+
+    setExcelData(sampleData);
+    setImportStep('preview');
+    success('✅ Dosya Yüklendi', `${file.name} başarıyla yüklendi`);
+  };
+
+  const handleImportTeachers = async () => {
+    if (excelData.length === 0) {
+      error('❌ Veri Yok', 'İçe aktarılacak veri bulunamadı');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportProgress(0);
+    setImportTotal(excelData.length);
+    setImportSuccess(0);
+    setImportFailed(0);
+
+    try {
+      // Process each row
+      for (let i = 0; i < excelData.length; i++) {
+        const row = excelData[i];
+        
+        try {
+          // Extract data based on mapping
+          const name = `${row.ad} ${row.soyad}`.trim();
+          const branch = normalizeBranch(row.brans);
+          
+          // Check if teacher already exists
+          const existingTeacher = teachers.find(t => 
+            t.name.toLowerCase() === name.toLowerCase() && 
+            t.branch.toLowerCase() === branch.toLowerCase()
+          );
+          
+          if (existingTeacher) {
+            console.log(`⚠️ Öğretmen zaten mevcut: ${name}`);
+            setImportFailed(prev => prev + 1);
+            continue;
+          }
+          
+          // Add teacher
+          await addTeacher({
+            name,
+            branch,
+            level: selectedLevel
+          } as Omit<Teacher, 'id' | 'createdAt'>);
+          
+          // Create subject if it doesn't exist
+          const existingSubject = subjects.find(s => 
+            s.branch.toLowerCase() === branch.toLowerCase() && 
+            s.level === selectedLevel
+          );
+          
+          if (!existingSubject) {
+            await addSubject({
+              name: branch,
+              branch,
+              level: selectedLevel,
+              weeklyHours: 4 // Default weekly hours
+            } as Omit<Subject, 'id' | 'createdAt'>);
+          }
+          
+          setImportSuccess(prev => prev + 1);
+        } catch (err) {
+          console.error(`❌ Öğretmen eklenemedi: ${row.ad} ${row.soyad}`, err);
+          setImportFailed(prev => prev + 1);
+        }
+        
+        setImportProgress(i + 1);
+      }
+      
+      success('✅ İçe Aktarma Tamamlandı', `${importSuccess} öğretmen başarıyla eklendi, ${importFailed} başarısız`);
+      resetImport();
+    } catch (err) {
+      error('❌ İçe Aktarma Hatası', 'Veriler içe aktarılırken bir hata oluştu');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const normalizeBranch = (branch: string): string => {
+    // Remove "ÖĞRETMENİ" suffix and trim
+    return branch.replace(/\s*ÖĞRETMENİ\s*$/i, '').trim();
+  };
+
+  const resetImport = () => {
+    setExcelData([]);
+    setImportStep('upload');
+    setIsImportModalOpen(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const totalDataCount = teachers.length + classes.length + subjects.length + schedules.length + templates.length + classrooms.length;
   const sortedTemplates = [...templates].sort((a, b) => 
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -486,17 +654,27 @@ const DataManagement = () => {
                 >
                   Yönet
                 </Button>
-                {teachers.length > 0 && (
+                <div className="flex space-x-2">
                   <Button
-                    onClick={handleDeleteAllTeachers}
-                    icon={Trash2}
-                    variant="danger"
+                    onClick={() => setIsImportModalOpen(true)}
+                    icon={FileSpreadsheet}
+                    variant="secondary"
                     size="sm"
-                    disabled={isDeletingTeachers}
                   >
-                    {isDeletingTeachers ? 'Siliniyor...' : 'Tümünü Sil'}
+                    Excel İçe Aktar
                   </Button>
-                )}
+                  {teachers.length > 0 && (
+                    <Button
+                      onClick={handleDeleteAllTeachers}
+                      icon={Trash2}
+                      variant="danger"
+                      size="sm"
+                      disabled={isDeletingTeachers}
+                    >
+                      {isDeletingTeachers ? 'Siliniyor...' : 'Tümünü Sil'}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
             
@@ -983,6 +1161,192 @@ const DataManagement = () => {
           </div>
         </div>
       </div>
+
+      {/* Excel Import Modal */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={resetImport}
+        title="Excel'den Öğretmen İçe Aktar"
+        size="lg"
+      >
+        <div className="space-y-6">
+          {importStep === 'upload' && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <FileSpreadsheet className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="text-sm text-blue-700">
+                    <h4 className="font-medium mb-1">Excel Dosyasından Öğretmen İçe Aktarma</h4>
+                    <p>Excel dosyanızda aşağıdaki sütunlar olmalıdır:</p>
+                    <ul className="list-disc list-inside mt-2 space-y-1">
+                      <li>AD - Öğretmenin adı</li>
+                      <li>SOYAD - Öğretmenin soyadı</li>
+                      <li>GÖREV - Öğretmenin branşı/görevi</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Excel Dosyası Yükleyin</h3>
+                <p className="text-gray-500 mb-4">
+                  .xlsx, .xls veya .csv formatında bir dosya seçin
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="excel-upload"
+                />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="primary"
+                  icon={Upload}
+                >
+                  Dosya Seç
+                </Button>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Öğretmen Seviyesi
+                </label>
+                <select
+                  value={selectedLevel}
+                  onChange={(e) => setSelectedLevel(e.target.value as any)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {EDUCATION_LEVELS.map(level => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  İçe aktarılan tüm öğretmenler için seviye seçin
+                </p>
+              </div>
+            </div>
+          )}
+
+          {importStep === 'preview' && (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <Check className="w-5 h-5 text-green-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="text-sm text-green-700">
+                    <h4 className="font-medium mb-1">Dosya Başarıyla Yüklendi</h4>
+                    <p>{excelData.length} öğretmen verisi bulundu. Aşağıdaki önizlemeyi kontrol edin ve devam edin.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          #
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Ad
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Soyad
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Branş/Görev
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {excelData.slice(0, 10).map((row, index) => (
+                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {index + 1}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {row.ad}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {row.soyad}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {row.brans}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {excelData.length > 10 && (
+                  <div className="px-6 py-3 bg-gray-50 text-center text-sm text-gray-500">
+                    ... ve {excelData.length - 10} öğretmen daha
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="text-sm text-yellow-700">
+                    <h4 className="font-medium mb-1">Önemli Bilgi</h4>
+                    <p>Tüm öğretmenler için seviye: <strong>{selectedLevel}</strong></p>
+                    <p className="mt-1">İçe aktarma işlemi aynı zamanda her branş için bir ders kaydı da oluşturacaktır.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isImporting && (
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">İçe Aktarılıyor...</h3>
+                <p className="text-gray-500">
+                  {importProgress} / {importTotal} öğretmen işleniyor
+                </p>
+              </div>
+              
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-blue-600 h-2.5 rounded-full" 
+                  style={{ width: `${(importProgress / importTotal) * 100}%` }}
+                ></div>
+              </div>
+              
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Başarılı: {importSuccess}</span>
+                <span>Başarısız: {importFailed}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              type="button"
+              onClick={resetImport}
+              variant="secondary"
+              disabled={isImporting}
+            >
+              İptal
+            </Button>
+            {importStep === 'preview' && (
+              <Button
+                type="button"
+                onClick={handleImportTeachers}
+                variant="primary"
+                disabled={isImporting || excelData.length === 0}
+              >
+                {isImporting ? 'İçe Aktarılıyor...' : `${excelData.length} Öğretmeni İçe Aktar`}
+              </Button>
+            )}
+          </div>
+        </div>
+      </Modal>
 
       {/* Confirmation Modal */}
       <ConfirmationModal

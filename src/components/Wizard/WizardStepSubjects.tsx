@@ -22,7 +22,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    branch: '',
     shortName: '',
     distributionType: '',
     canSplit: false,
@@ -30,10 +29,8 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     photo: '',
     classrooms: '',
     phoneNumber: '',
-    assignedTeacher: [] as string[]
+    assignedTeacher: ''
   });
-
-  const teacherList: Teacher[] = teachers as Teacher[];
 
   // Auto-generate short name from subject name
   const generateShortName = (name: string): string => {
@@ -205,9 +202,9 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     
     const subjectData = {
       name: formData.name,
-      branch: formData.branch || formData.name,
-      level: 'İlkokul' as 'Anaokulu' | 'İlkokul' | 'Ortaokul',
-      weeklyHours: 4,
+      branch: formData.name, // Using name as branch for simplicity
+      level: 'İlkokul', // Default level
+      weeklyHours: 4, // Default weekly hours
       shortName: formData.shortName || generateShortName(formData.name),
       color: formData.color || generateColor(),
       assignedTeacher: formData.assignedTeacher,
@@ -230,7 +227,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const resetForm = () => {
     setFormData({
       name: '',
-      branch: '',
       shortName: '',
       distributionType: '',
       canSplit: false,
@@ -238,7 +234,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
       photo: '',
       classrooms: '',
       phoneNumber: '',
-      assignedTeacher: []
+      assignedTeacher: ''
     });
     setEditingSubject(null);
     setIsModalOpen(false);
@@ -247,7 +243,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   const handleEdit = (subject: Subject) => {
     setFormData({
       name: subject.name,
-      branch: (subject as any).branch || subject.name,
       shortName: (subject as any).shortName || generateShortName(subject.name),
       distributionType: (subject as any).distributionType || '',
       canSplit: false,
@@ -255,7 +250,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
       photo: '',
       classrooms: (subject as any).classrooms || '',
       phoneNumber: '',
-      assignedTeacher: Array.isArray((subject as any).assignedTeacher) ? (subject as any).assignedTeacher : ((subject as any).assignedTeacher ? [(subject as any).assignedTeacher] : [])
+      assignedTeacher: (subject as any).assignedTeacher || ''
     });
     setEditingSubject(subject);
     setIsModalOpen(true);
@@ -292,24 +287,6 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
       }));
     }
   }, [formData.name, editingSubject]);
-
-  // Modal açıldığında branşa uygun öğretmenleri otomatik seçili yap
-  React.useEffect(() => {
-    if (isModalOpen && formData.branch) {
-      const branchedTeachers = teacherList
-        .filter((teacher: Teacher) =>
-          typeof teacher.name === 'string' &&
-          typeof teacher.branch === 'string' &&
-          teacher.branch === formData.branch
-        )
-        .map((teacher: Teacher) => teacher.id);
-      setFormData(prev => ({
-        ...prev,
-        assignedTeacher: branchedTeachers
-      }));
-    }
-    // eslint-disable-next-line
-  }, [isModalOpen, formData.branch]);
 
   return (
     <div className="space-y-6">
@@ -639,41 +616,18 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
             />
           </div>
 
-          {/* Öğretmen Ata - Checkbox Listesi */}
-          <div className="mb-4">
-            <label className="block text-sm font-semibold text-ide-gray-800 mb-2">Öğretmen Ata</label>
-            <div className="grid grid-cols-1 gap-2">
-              {teacherList
-                .filter((teacher: Teacher) =>
-                  typeof teacher.name === 'string' &&
-                  typeof teacher.branch === 'string' &&
-                  teacher.branch === formData.branch
-                )
-                .map((teacher: Teacher) => (
-                  <label key={teacher.id} className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.assignedTeacher.includes(teacher.id)}
-                      onChange={e => {
-                        if (e.target.checked) {
-                          setFormData({
-                            ...formData,
-                            assignedTeacher: [...formData.assignedTeacher, teacher.id]
-                          });
-                        } else {
-                          setFormData({
-                            ...formData,
-                            assignedTeacher: formData.assignedTeacher.filter(id => id !== teacher.id)
-                          });
-                        }
-                      }}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-800">{teacher.name}</span>
-                  </label>
-                ))}
-            </div>
-          </div>
+          <Select
+            label="Öğretmen Ata"
+            value={formData.assignedTeacher}
+            onChange={(value) => setFormData({ ...formData, assignedTeacher: value })}
+            options={[
+              { value: '', label: 'Seçiniz...' },
+              ...teachers.map(teacher => ({
+                value: teacher.id,
+                label: teacher.name
+              }))
+            ]}
+          />
 
           <div className="button-group-mobile mt-6">
             <Button

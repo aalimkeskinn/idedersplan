@@ -586,9 +586,9 @@ const DataManagement = () => {
           } else if (level && !EDUCATION_LEVELS.includes(level as any)) {
             isValid = false;
             error = 'Geçersiz eğitim seviyesi';
-          } else if (isNaN(weeklyHours) || weeklyHours < 1 || weeklyHours > 12) {
+          } else if (isNaN(weeklyHours) || weeklyHours < 1 || weeklyHours > 30) {
             isValid = false;
-            error = 'Ders saati 1-12 arasında olmalıdır';
+            error = 'Ders saati 1-30 arasında olmalıdır';
           }
           
           // Check if subject already exists
@@ -751,23 +751,21 @@ const DataManagement = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <Users className="w-5 h-5 text-blue-600 mr-2" />
-                    <h3 className="font-medium text-blue-900">Öğretmenler</h3>
-                  </div>
-                  <span className="text-2xl font-bold text-blue-600">{teachers.length}</span>
-                </div>
-                <p className="text-xs text-blue-700 mb-3">Öğretmen kayıtları</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            {/* Öğretmenler */}
+            <div className="bg-blue-50 rounded-xl p-6 border border-blue-100 flex flex-col items-center justify-between min-h-[200px] shadow-sm">
+              <div className="flex flex-col items-center mb-4">
+                <Users className="w-8 h-8 text-blue-600 mb-2" />
+                <h3 className="text-base font-semibold text-blue-900 mb-1">Öğretmenler</h3>
+                <span className="text-3xl font-extrabold text-blue-700 mb-1">{teachers.length}</span>
+                <p className="text-xs text-blue-700">Öğretmen kayıtları</p>
               </div>
-              <div className="flex justify-between items-center mt-2">
+              <div className="flex flex-col w-full gap-2 mt-auto">
                 <Button
                   onClick={() => navigate('/teachers')}
                   variant="secondary"
-                  size="sm"
+                  size="md"
+                  className="w-full"
                 >
                   Yönet
                 </Button>
@@ -776,31 +774,29 @@ const DataManagement = () => {
                     onClick={handleDeleteAllTeachers}
                     icon={Trash2}
                     variant="danger"
-                    size="sm"
+                    size="md"
                     disabled={isDeletingTeachers}
+                    className="w-full"
                   >
                     {isDeletingTeachers ? 'Siliniyor...' : 'Tümünü Sil'}
                   </Button>
                 )}
               </div>
             </div>
-            
-            <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <Building className="w-5 h-5 text-emerald-600 mr-2" />
-                    <h3 className="font-medium text-emerald-900">Sınıflar</h3>
-                  </div>
-                  <span className="text-2xl font-bold text-emerald-600">{classes.length}</span>
-                </div>
-                <p className="text-xs text-emerald-700 mb-3">Sınıf kayıtları</p>
+            {/* Sınıflar */}
+            <div className="bg-emerald-50 rounded-xl p-6 border border-emerald-100 flex flex-col items-center justify-between min-h-[200px] shadow-sm">
+              <div className="flex flex-col items-center mb-4">
+                <Building className="w-8 h-8 text-emerald-600 mb-2" />
+                <h3 className="text-base font-semibold text-emerald-900 mb-1">Sınıflar</h3>
+                <span className="text-3xl font-extrabold text-emerald-700 mb-1">{classes.length}</span>
+                <p className="text-xs text-emerald-700">Sınıf kayıtları</p>
               </div>
-              <div className="flex justify-between items-center mt-2">
+              <div className="flex flex-col w-full gap-2 mt-auto">
                 <Button
                   onClick={() => navigate('/classes')}
                   variant="secondary"
-                  size="sm"
+                  size="md"
+                  className="w-full"
                 >
                   Yönet
                 </Button>
@@ -809,31 +805,29 @@ const DataManagement = () => {
                     onClick={handleDeleteAllClasses}
                     icon={Trash2}
                     variant="danger"
-                    size="sm"
+                    size="md"
                     disabled={isDeletingClasses}
+                    className="w-full"
                   >
                     {isDeletingClasses ? 'Siliniyor...' : 'Tümünü Sil'}
                   </Button>
                 )}
               </div>
             </div>
-            
-            <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-100 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <BookOpen className="w-5 h-5 text-indigo-600 mr-2" />
-                    <h3 className="font-medium text-indigo-900">Dersler</h3>
-                  </div>
-                  <span className="text-2xl font-bold text-indigo-600">{subjects.length}</span>
-                </div>
-                <p className="text-xs text-indigo-700 mb-3">Ders kayıtları</p>
+            {/* Dersler */}
+            <div className="bg-indigo-50 rounded-xl p-6 border border-indigo-100 flex flex-col items-center justify-between min-h-[200px] shadow-sm">
+              <div className="flex flex-col items-center mb-4">
+                <BookOpen className="w-8 h-8 text-indigo-600 mb-2" />
+                <h3 className="text-base font-semibold text-indigo-900 mb-1">Dersler</h3>
+                <span className="text-3xl font-extrabold text-indigo-700 mb-1">{subjects.length}</span>
+                <p className="text-xs text-indigo-700">Ders kayıtları</p>
               </div>
-              <div className="flex justify-between items-center mt-2">
+              <div className="flex flex-col w-full gap-2 mt-auto">
                 <Button
                   onClick={() => navigate('/subjects')}
                   variant="secondary"
-                  size="sm"
+                  size="md"
+                  className="w-full"
                 >
                   Yönet
                 </Button>
@@ -842,97 +836,29 @@ const DataManagement = () => {
                     onClick={handleDeleteAllSubjects}
                     icon={Trash2}
                     variant="danger"
-                    size="sm"
+                    size="md"
                     disabled={isDeletingSubjects}
+                    className="w-full"
                   >
                     {isDeletingSubjects ? 'Siliniyor...' : 'Tümünü Sil'}
                   </Button>
                 )}
               </div>
             </div>
-            
-            <div className="bg-purple-50 rounded-lg p-4 border border-purple-100 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <Calendar className="w-5 h-5 text-purple-600 mr-2" />
-                    <h3 className="font-medium text-purple-900">Programlar</h3>
-                  </div>
-                  <span className="text-2xl font-bold text-purple-600">{schedules.length}</span>
-                </div>
-                <p className="text-xs text-purple-700 mb-3">Program kayıtları</p>
+            {/* Derslikler */}
+            <div className="bg-teal-50 rounded-xl p-6 border border-teal-100 flex flex-col items-center justify-between min-h-[200px] shadow-sm">
+              <div className="flex flex-col items-center mb-4">
+                <MapPin className="w-8 h-8 text-teal-600 mb-2" />
+                <h3 className="text-base font-semibold text-teal-900 mb-1">Derslikler</h3>
+                <span className="text-3xl font-extrabold text-teal-700 mb-1">{classrooms.length}</span>
+                <p className="text-xs text-teal-700">Derslik kayıtları</p>
               </div>
-              <div className="flex justify-between items-center mt-2">
-                <Button
-                  onClick={() => navigate('/all-schedules')}
-                  variant="secondary"
-                  size="sm"
-                >
-                  Yönet
-                </Button>
-                {schedules.length > 0 && (
-                  <Button
-                    onClick={handleDeleteAllSchedules}
-                    icon={Trash2}
-                    variant="danger"
-                    size="sm"
-                    disabled={isDeletingSchedules}
-                  >
-                    {isDeletingSchedules ? 'Siliniyor...' : 'Tümünü Sil'}
-                  </Button>
-                )}
-              </div>
-            </div>
-            
-            <div className="bg-orange-50 rounded-lg p-4 border border-orange-100 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <Settings className="w-5 h-5 text-orange-600 mr-2" />
-                    <h3 className="font-medium text-orange-900">Şablonlar</h3>
-                  </div>
-                  <span className="text-2xl font-bold text-orange-600">{templates.length}</span>
-                </div>
-                <p className="text-xs text-orange-700 mb-3">Şablon kayıtları</p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
-                <Button
-                  onClick={() => navigate('/schedule-wizard')}
-                  variant="secondary"
-                  size="sm"
-                >
-                  Yeni Oluştur
-                </Button>
-                {templates.length > 0 && (
-                  <Button
-                    onClick={handleDeleteAllTemplates}
-                    icon={Trash2}
-                    variant="danger"
-                    size="sm"
-                    disabled={isDeletingTemplates}
-                  >
-                    {isDeletingTemplates ? 'Siliniyor...' : 'Tümünü Sil'}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-teal-50 rounded-lg p-4 border border-teal-100 flex flex-col justify-between h-full">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <MapPin className="w-5 h-5 text-teal-600 mr-2" />
-                    <h3 className="font-medium text-teal-900">Derslikler</h3>
-                  </div>
-                  <span className="text-2xl font-bold text-teal-600">{classrooms.length}</span>
-                </div>
-                <p className="text-xs text-teal-700 mb-3">Derslik kayıtları</p>
-              </div>
-              <div className="flex justify-between items-center mt-2">
+              <div className="flex flex-col w-full gap-3 mt-auto pt-2">
                 <Button
                   onClick={() => navigate('/classrooms')}
                   variant="secondary"
-                  size="sm"
+                  size="md"
+                  className="w-full"
                 >
                   Yönet
                 </Button>
@@ -941,10 +867,42 @@ const DataManagement = () => {
                     onClick={handleDeleteAllClassrooms}
                     icon={Trash2}
                     variant="danger"
-                    size="sm"
+                    size="md"
                     disabled={isDeletingClassrooms}
+                    className="w-full"
                   >
                     {isDeletingClassrooms ? 'Siliniyor...' : 'Tümünü Sil'}
+                  </Button>
+                )}
+              </div>
+            </div>
+            {/* Programlar */}
+            <div className="bg-purple-50 rounded-xl p-6 border border-purple-100 flex flex-col items-center justify-between min-h-[200px] shadow-sm">
+              <div className="flex flex-col items-center mb-4">
+                <Calendar className="w-8 h-8 text-purple-600 mb-2" />
+                <h3 className="text-base font-semibold text-purple-900 mb-1">Programlar</h3>
+                <span className="text-3xl font-extrabold text-purple-700 mb-1">{schedules.length}</span>
+                <p className="text-xs text-purple-700">Program kayıtları</p>
+              </div>
+              <div className="flex flex-col w-full gap-2 mt-auto">
+                <Button
+                  onClick={() => navigate('/all-schedules')}
+                  variant="secondary"
+                  size="md"
+                  className="w-full"
+                >
+                  Yönet
+                </Button>
+                {schedules.length > 0 && (
+                  <Button
+                    onClick={handleDeleteAllSchedules}
+                    icon={Trash2}
+                    variant="danger"
+                    size="md"
+                    disabled={isDeletingSchedules}
+                    className="w-full"
+                  >
+                    {isDeletingSchedules ? 'Siliniyor...' : 'Tümünü Sil'}
                   </Button>
                 )}
               </div>
@@ -1039,7 +997,7 @@ const DataManagement = () => {
                     <ul className="list-disc list-inside space-y-1 text-xs">
                       <li>Sütun başlıkları: <code className="bg-gray-100 px-1 py-0.5 rounded">Ders</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">Branş</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">Eğitim Seviyesi</code>, <code className="bg-gray-100 px-1 py-0.5 rounded">Ders Saati</code></li>
                       <li>Eğitim seviyesi: Anaokulu, İlkokul, Ortaokul</li>
-                      <li>Ders saati: 1-12 arası sayı</li>
+                      <li>Ders saati: 1-30 arası sayı</li>
                       <li>Excel'den "CSV UTF-8" formatında kaydedin</li>
                     </ul>
                   </div>
@@ -1048,98 +1006,6 @@ const DataManagement = () => {
             </div>
           </div>
         </div>
-
-        {/* Program Templates Section */}
-        {templates.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center">
-                <Calendar className="w-6 h-6 text-orange-600 mr-2" />
-                <h2 className="text-lg font-bold text-gray-900">Program Şablonları</h2>
-              </div>
-              <Button
-                onClick={() => navigate('/schedule-wizard')}
-                icon={Plus}
-                variant="primary"
-                size="sm"
-              >
-                Yeni Program
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortedTemplates.map((template) => (
-                <div
-                  key={template.id}
-                  className="group bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-                        {template.name}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {template.academicYear} {template.semester} Dönemi
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <button
-                        onClick={() => handleEditTemplate(template.id)}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                        title="Düzenle"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTemplate(template)}
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Sil"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {template.description && (
-                    <p className="text-xs text-gray-500 mb-3 line-clamp-2">
-                      {template.description}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center justify-between">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      template.status === 'published' ? 'bg-green-100 text-green-800' :
-                      template.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {template.status === 'published' ? 'Yayınlandı' :
-                       template.status === 'draft' ? 'Taslak' : 'Arşivlendi'}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {new Date(template.updatedAt).toLocaleDateString('tr-TR')}
-                    </span>
-                  </div>
-                  
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <div className="flex items-center">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        <span>Son güncelleme: {new Date(template.updatedAt).toLocaleDateString('tr-TR')}</span>
-                      </div>
-                      <Button
-                        onClick={() => handleEditTemplate(template.id)}
-                        variant="secondary"
-                        size="sm"
-                      >
-                        Düzenle
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Bulk Data Management */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
@@ -1256,26 +1122,6 @@ const DataManagement = () => {
               >
                 {isDeletingSchedules ? 'Siliniyor...' : `Programlar (${schedules.length})`}
               </Button>
-              
-              <Button
-                onClick={handleDeleteAllTemplates}
-                icon={Trash2}
-                variant="danger"
-                disabled={isDeletingTemplates || templates.length === 0}
-                className="w-full"
-              >
-                {isDeletingTemplates ? 'Siliniyor...' : `Şablonlar (${templates.length})`}
-              </Button>
-
-              <Button
-                onClick={handleDeleteAllClassrooms}
-                icon={Trash2}
-                variant="danger"
-                disabled={isDeletingClassrooms || classrooms.length === 0}
-                className="w-full"
-              >
-                {isDeletingClassrooms ? 'Siliniyor...' : `Derslikler (${classrooms.length})`}
-              </Button>
             </div>
           </div>
         </div>
@@ -1302,19 +1148,6 @@ const DataManagement = () => {
                 </p>
               </div>
             </div>
-          </div>
-
-          <div className="mb-4">
-            <Select
-              label="Varsayılan Eğitim Seviyesi"
-              value={selectedTeacherLevel}
-              onChange={setSelectedTeacherLevel}
-              options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              CSV dosyasında eğitim seviyesi belirtilmeyen öğretmenler için kullanılacak
-            </p>
           </div>
 
           <div className="border rounded-lg overflow-hidden">
@@ -1433,33 +1266,6 @@ const DataManagement = () => {
                 </p>
               </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <Select
-              label="Varsayılan Eğitim Seviyesi"
-              value={selectedSubjectLevel}
-              onChange={setSelectedSubjectLevel}
-              options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
-              required
-            />
-            
-            <Select
-              label="Varsayılan Haftalık Ders Saati"
-              value={selectedSubjectHours}
-              onChange={setSelectedSubjectHours}
-              options={[
-                { value: '1', label: '1 saat' },
-                { value: '2', label: '2 saat' },
-                { value: '3', label: '3 saat' },
-                { value: '4', label: '4 saat' },
-                { value: '5', label: '5 saat' },
-                { value: '6', label: '6 saat' },
-                { value: '8', label: '8 saat' },
-                { value: '10', label: '10 saat' }
-              ]}
-              required
-            />
           </div>
 
           <div className="border rounded-lg overflow-hidden">

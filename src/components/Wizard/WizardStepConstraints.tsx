@@ -48,10 +48,21 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
     }
   }, [data, onUpdate]);
 
-  // Track changes
+  // CRITICAL: Initialize local constraints from wizard data
   useEffect(() => {
+    const wizardConstraints = data.constraints?.timeConstraints || [];
+    console.log('🔄 Wizard constraints yükleniyor:', wizardConstraints);
+    setLocalConstraints([...wizardConstraints]);
     setHasUnsavedChanges(false);
-  }, [selectedEntity]);
+  }, [data.constraints?.timeConstraints, selectedEntity]);
+
+  // CRITICAL: Track changes in local constraints
+  useEffect(() => {
+    const wizardConstraints = data.constraints?.timeConstraints || [];
+    const hasChanges = JSON.stringify(localConstraints) !== JSON.stringify(wizardConstraints);
+    setHasUnsavedChanges(hasChanges);
+    console.log('📊 Constraint değişiklik durumu:', { hasChanges, localCount: localConstraints.length, wizardCount: wizardConstraints.length });
+  }, [localConstraints, data.constraints?.timeConstraints]);
 
   const getEntityOptions = () => {
     switch (activeTab) {
@@ -146,6 +157,7 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
   };
 
   const handleGlobalConstraintChange = (key: string, value: any) => {
+    console.log('🔄 Global constraint değişikliği:', { key, value });
     onUpdate({
       constraints: {
         ...data.constraints,
@@ -157,15 +169,31 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
     });
   };
 
+  // CRITICAL: Handle constraints change from TimeConstraintGrid
   const handleConstraintsChange = (constraints: TimeConstraint[]) => {
+    console.log('🔄 Constraints değiştirildi:', {
+      newCount: constraints.length,
+      selectedEntity,
+      entityType: activeTab
+    });
     setLocalConstraints(constraints);
     setHasUnsavedChanges(true);
   };
 
+  // CRITICAL: Save constraints to wizard data
   const handleSave = () => {
-    if (!selectedEntity) return;
+    if (!selectedEntity) {
+      console.warn('⚠️ Seçili entity yok, kaydetme iptal edildi');
+      return;
+    }
 
-    // Update constraints in wizard data
+    console.log('💾 Constraints kaydediliyor:', {
+      entityId: selectedEntity,
+      entityType: activeTab,
+      constraintsCount: localConstraints.length
+    });
+
+    // Update wizard data with new constraints
     onUpdate({
       constraints: {
         ...data.constraints,
@@ -174,6 +202,7 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
     });
 
     setHasUnsavedChanges(false);
+    console.log('✅ Constraints başarıyla kaydedildi');
   };
 
   const globalConstraints = data.constraints?.globalRules || {};
@@ -306,8 +335,10 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
             <button
               key={tab.id}
               onClick={() => {
+                console.log('🔄 Tab değiştirildi:', tab.id);
                 setActiveTab(tab.id as any);
                 setSelectedEntity('');
+                setHasUnsavedChanges(false);
               }}
               className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
                 activeTab === tab.id
@@ -331,7 +362,11 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
               <Select
                 label={`${activeTab === 'teachers' ? 'Öğretmen' : activeTab === 'classes' ? 'Sınıf' : 'Ders'} Seçin`}
                 value={selectedEntity}
-                onChange={setSelectedEntity}
+                onChange={(value) => {
+                  console.log('🔄 Entity seçildi:', { activeTab, entityId: value });
+                  setSelectedEntity(value);
+                  setHasUnsavedChanges(false);
+                }}
                 options={[
                   { value: '', label: 'Seçiniz...' },
                   ...getEntityOptions()
@@ -353,16 +388,21 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
                         <p className="text-sm text-gray-600">{entityDetails}</p>
                       </div>
                     </div>
+                    {hasUnsavedChanges && (
+                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                        Kaydedilmemiş değişiklikler
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Time Constraint Grid */}
+                {/* CRITICAL: Time Constraint Grid with proper props */}
                 <TimeConstraintGrid
                   entityType={activeTab === 'teachers' ? 'teacher' : activeTab === 'classes' ? 'class' : 'subject'}
                   entityId={selectedEntity}
                   entityName={entityName}
                   entityLevel={entityLevel}
-                  constraints={data.constraints?.timeConstraints || []}
+                  constraints={localConstraints}
                   onConstraintsChange={handleConstraintsChange}
                   onSave={handleSave}
                   hasUnsavedChanges={hasUnsavedChanges}
@@ -391,7 +431,7 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
           <div>
             <h4 className="font-medium text-blue-800">Kısıtlama Önerileri</h4>
             <ul className="text-sm text-blue-700 mt-2 space-y-1">
-              <li>• <strong>Müsait:</strong> Bu saatte ders atanabilir (varsayılan)</li>
+              <li>• <strong>Tercih Edilen:</strong> Bu saatte ders atanabilir (varsayılan)</li>
               <li>• <strong>Kısıtlı:</strong> Mümkünse bu saatte ders atanmasın, gerekirse atanabilir</li>
               <li>• <strong>Müsait Değil:</strong> Bu saatte kesinlikle ders atanmasın</li>
               <li>• Öğretmenlerin özel durumları (toplantı, nöbet vb.) için kısıtlama ekleyin</li>

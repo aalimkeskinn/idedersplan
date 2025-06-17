@@ -16,7 +16,6 @@ import {
   Zap
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { WizardData, ScheduleTemplate, WizardStepId, WIZARD_STEPS } from '../types/wizard';
 import { useFirestore } from '../hooks/useFirestore';
 import { useToast } from '../hooks/useToast';
 import Button from '../components/UI/Button';
@@ -27,10 +26,93 @@ import WizardStepClassrooms from '../components/Wizard/WizardStepClassrooms';
 import WizardStepTeachers from '../components/Wizard/WizardStepTeachers';
 import WizardStepConstraints from '../components/Wizard/WizardStepConstraints';
 import WizardStepGeneration from '../components/Wizard/WizardStepGeneration';
+import { Teacher, Class, Subject } from '../types';
+
+// Define wizard steps
+const WIZARD_STEPS = [
+  { id: 'basic-info', title: 'Temel Bilgiler', description: 'Program adı ve dönem bilgileri', icon: '📝' },
+  { id: 'subjects', title: 'Dersler', description: 'Ders seçimi ve haftalık saatler', icon: '📚' },
+  { id: 'classes', title: 'Sınıflar', description: 'Sınıf seçimi ve kapasiteler', icon: '🏫' },
+  { id: 'classrooms', title: 'Derslikler', description: 'Derslik yönetimi ve atamalar', icon: '🚪' },
+  { id: 'teachers', title: 'Öğretmenler', description: 'Öğretmen seçimi ve ders yükleri', icon: '👨‍🏫' },
+  { id: 'constraints', title: 'Kısıtlamalar', description: 'Zaman kısıtlamaları ve kurallar', icon: '⏰' },
+  { id: 'generation', title: 'Program Oluştur', description: 'Otomatik program oluşturma', icon: '⚡' }
+];
+
+// Define wizard data structure
+interface WizardData {
+  basicInfo: {
+    name: string;
+    academicYear: string;
+    semester: string;
+    startDate: string;
+    endDate: string;
+    description: string;
+    institutionTitle: string;
+    dailyHours: number;
+    weekDays: number;
+    weekendClasses: boolean;
+  };
+  subjects: {
+    selectedSubjects: string[];
+    subjectHours: { [subjectId: string]: number };
+    subjectPriorities: { [subjectId: string]: 'high' | 'medium' | 'low' };
+  };
+  classes: {
+    selectedClasses: string[];
+    classCapacities: { [classId: string]: number };
+    classPreferences: { [classId: string]: string[] };
+  };
+  classrooms: {
+    selectedClassrooms: string[];
+    classroomCapacities: { [classroomId: string]: number };
+    classroomTypes: { [classroomId: string]: string };
+    classroomEquipment: { [classroomId: string]: string[] };
+  };
+  teachers: {
+    selectedTeachers: string[];
+    teacherSubjects: { [teacherId: string]: string[] };
+    teacherMaxHours: { [teacherId: string]: number };
+    teacherPreferences: { [teacherId: string]: string[] };
+  };
+  constraints: {
+    timeConstraints: any[];
+    globalRules: {
+      maxDailyHours: number;
+      maxConsecutiveHours: number;
+      lunchBreakRequired: boolean;
+      weekendScheduling: boolean;
+    };
+  };
+  generationSettings: {
+    algorithm: 'balanced' | 'compact' | 'distributed';
+    prioritizeTeacherPreferences: boolean;
+    prioritizeClassPreferences: boolean;
+    allowOverlaps: boolean;
+    generateMultipleOptions: boolean;
+    optimizationLevel: 'fast' | 'balanced' | 'thorough';
+  };
+}
+
+// Define schedule template interface
+interface ScheduleTemplate {
+  id: string;
+  name: string;
+  description: string;
+  academicYear: string;
+  semester: string;
+  updatedAt: Date;
+  wizardData: WizardData;
+  generatedSchedules: any[];
+  status: 'draft' | 'published' | 'archived';
+}
 
 const ScheduleWizard = () => {
   const navigate = useNavigate();
-  const { add: addTemplate, update: updateTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
+  const { data: teachers } = useFirestore<Teacher>('teachers');
+  const { data: classes } = useFirestore<Class>('classes');
+  const { data: subjects } = useFirestore<Subject>('subjects');
+  const { add: addTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { success, error, warning } = useToast();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -39,9 +121,13 @@ const ScheduleWizard = () => {
       name: '',
       academicYear: '2024/2025',
       semester: 'Güz',
-      startDate: '',
-      endDate: '',
-      description: ''
+      startDate: '2024-09-01',
+      endDate: '2025-08-31',
+      description: '',
+      institutionTitle: '',
+      dailyHours: 8,
+      weekDays: 5,
+      weekendClasses: false
     },
     subjects: {
       selectedSubjects: [],
@@ -189,10 +275,13 @@ const ScheduleWizard = () => {
     }
   };
 
-  const updateWizardData = (stepData: Partial<WizardData>) => {
+  const updateWizardData = (stepId: string, stepData: any) => {
     setWizardData(prev => ({
       ...prev,
-      ...stepData
+      [stepId]: {
+        ...prev[stepId as keyof WizardData],
+        ...stepData
+      }
     }));
   };
 
@@ -209,25 +298,13 @@ const ScheduleWizard = () => {
     }
   };
 
-  const getStepColor = (stepIndex: number) => {
-    if (completedSteps.has(stepIndex)) {
-      return 'bg-green-500 text-white border-green-500';
-    } else if (stepIndex === currentStepIndex) {
-      return 'bg-blue-500 text-white border-blue-500';
-    } else if (stepIndex < currentStepIndex) {
-      return 'bg-gray-300 text-gray-600 border-gray-300';
-    } else {
-      return 'bg-white text-gray-400 border-gray-300';
-    }
-  };
-
   const renderStepContent = () => {
     switch (currentStep.id) {
       case 'basic-info':
         return (
           <WizardStepBasicInfo
             data={wizardData.basicInfo}
-            onUpdate={(data) => updateWizardData({ basicInfo: data })}
+            onUpdate={(data) => updateWizardData('basicInfo', data)}
           />
         );
       
@@ -235,42 +312,44 @@ const ScheduleWizard = () => {
         return (
           <WizardStepSubjects
             data={wizardData.subjects}
-            onUpdate={(data) => updateWizardData({ subjects: data })}
+            onUpdate={(data) => updateWizardData('subjects', data)}
           />
         );
       
       case 'classes':
         return (
           <WizardStepClasses
-            data={wizardData.classes}
-            onUpdate={(data) => updateWizardData({ classes: data })}
+            data={wizardData}
+            onUpdate={(data) => updateWizardData('classes', data.classes)}
+            classes={classes}
           />
         );
       
       case 'classrooms':
         return (
           <WizardStepClassrooms
-            data={wizardData.classrooms}
-            onUpdate={(data) => updateWizardData({ classrooms: data })}
+            data={wizardData}
+            onUpdate={(data) => updateWizardData('classrooms', data.classrooms)}
           />
         );
       
       case 'teachers':
         return (
           <WizardStepTeachers
-            data={wizardData.teachers}
-            subjects={wizardData.subjects}
-            onUpdate={(data) => updateWizardData({ teachers: data })}
+            data={wizardData}
+            onUpdate={(data) => updateWizardData('teachers', data.teachers)}
+            teachers={teachers}
           />
         );
       
       case 'constraints':
         return (
           <WizardStepConstraints
-            data={wizardData.constraints}
-            teachers={wizardData.teachers}
-            classes={wizardData.classes}
-            onUpdate={(data) => updateWizardData({ constraints: data })}
+            data={wizardData}
+            onUpdate={(data) => updateWizardData('constraints', data.constraints)}
+            teachers={teachers}
+            classes={classes}
+            subjects={subjects}
           />
         );
       
@@ -279,7 +358,7 @@ const ScheduleWizard = () => {
           <WizardStepGeneration
             data={wizardData.generationSettings}
             wizardData={wizardData}
-            onUpdate={(data) => updateWizardData({ generationSettings: data })}
+            onUpdate={(data) => updateWizardData('generationSettings', data)}
             onGenerate={handleGenerateSchedule}
             isGenerating={isGenerating}
           />

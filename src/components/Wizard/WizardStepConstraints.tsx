@@ -179,10 +179,10 @@ const WizardStepConstraints: React.FC<WizardStepConstraintsProps> = ({
   const globalConstraints = data.constraints?.globalRules || {};
   const EntityIcon = getEntityIcon();
   const entityColor = getEntityColor();
-  const selectedEntity = getSelectedEntity();
-  const entityName = getEntityName(selectedEntity);
-  const entityDetails = getEntityDetails(selectedEntity);
-  const entityLevel = selectedEntity && 'level' in selectedEntity ? selectedEntity.level : undefined;
+  const currentSelectedEntityObject = getSelectedEntity();
+  const entityName = getEntityName(currentSelectedEntityObject);
+  const entityDetails = getEntityDetails(currentSelectedEntityObject);
+  const entityLevel = currentSelectedEntityObject && 'level' in currentSelectedEntityObject ? currentSelectedEntityObject.level : undefined;
 
   const tabs = [
     { id: 'global', label: 'Genel Kurallar', icon: Settings },

@@ -58,10 +58,11 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
   ];
 
   const handleChange = (field: keyof WizardData['generationSettings'], value: any) => {
-    onUpdate({
+    const updatedData = {
       ...data,
       [field]: value
-    });
+    };
+    onUpdate(updatedData);
   };
 
   const getValidationSummary = () => {
@@ -116,6 +117,35 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
     const multiplier = complexity > 100 ? 1.5 : complexity > 50 ? 1.2 : 1;
     
     return Math.round(baseTime * multiplier);
+  };
+
+  // CRITICAL: Initialize default values if not set
+  const currentData = {
+    algorithm: 'balanced',
+    optimizationLevel: 'balanced',
+    prioritizeTeacherPreferences: true,
+    prioritizeClassPreferences: true,
+    generateMultipleOptions: false,
+    allowOverlaps: false,
+    ...data
+  };
+
+  const handleGenerateClick = () => {
+    console.log('🚀 Program oluştur butonu tıklandı');
+    console.log('📊 Wizard verisi:', {
+      subjects: wizardData.subjects?.selectedSubjects?.length || 0,
+      classes: wizardData.classes?.selectedClasses?.length || 0,
+      teachers: wizardData.teachers?.selectedTeachers?.length || 0,
+      classrooms: wizardData.classrooms?.length || 0,
+      canGenerate,
+      issues
+    });
+    
+    if (canGenerate && onGenerate) {
+      onGenerate();
+    } else {
+      console.warn('⚠️ Program oluşturulamıyor:', issues);
+    }
   };
 
   return (
@@ -229,7 +259,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                     type="radio"
                     name="algorithm"
                     value={option.value}
-                    checked={data?.algorithm === option.value}
+                    checked={currentData.algorithm === option.value}
                     onChange={(e) => handleChange('algorithm', e.target.value)}
                     className="mt-1"
                   />
@@ -253,7 +283,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                     type="radio"
                     name="optimization"
                     value={option.value}
-                    checked={data?.optimizationLevel === option.value}
+                    checked={currentData.optimizationLevel === option.value}
                     onChange={(e) => handleChange('optimizationLevel', e.target.value)}
                     className="mt-1"
                   />
@@ -280,7 +310,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={data?.prioritizeTeacherPreferences || false}
+                    checked={currentData.prioritizeTeacherPreferences || false}
                     onChange={(e) => handleChange('prioritizeTeacherPreferences', e.target.checked)}
                   />
                   <span className="text-sm">Öğretmen tercihlerini öncelikle</span>
@@ -289,7 +319,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={data?.prioritizeClassPreferences || false}
+                    checked={currentData.prioritizeClassPreferences || false}
                     onChange={(e) => handleChange('prioritizeClassPreferences', e.target.checked)}
                   />
                   <span className="text-sm">Sınıf tercihlerini öncelikle</span>
@@ -298,7 +328,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={data?.generateMultipleOptions || false}
+                    checked={currentData.generateMultipleOptions || false}
                     onChange={(e) => handleChange('generateMultipleOptions', e.target.checked)}
                   />
                   <span className="text-sm">Birden fazla seçenek oluştur</span>
@@ -307,7 +337,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                 <label className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    checked={data?.allowOverlaps || false}
+                    checked={currentData.allowOverlaps || false}
                     onChange={(e) => handleChange('allowOverlaps', e.target.checked)}
                   />
                   <span className="text-sm">Çakışmalara izin ver (acil durumlar için)</span>
@@ -341,11 +371,11 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
             </div>
           ) : (
             <Button
-              onClick={onGenerate}
+              onClick={handleGenerateClick}
               icon={Play}
               variant="primary"
               size="lg"
-              disabled={!canGenerate}
+              disabled={!canGenerate || isGenerating}
               className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
             >
               🎯 Program Oluşturmayı Başlat

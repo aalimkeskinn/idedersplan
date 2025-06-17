@@ -27,6 +27,7 @@ import WizardStepTeachers from '../components/Wizard/WizardStepTeachers';
 import WizardStepConstraints from '../components/Wizard/WizardStepConstraints';
 import WizardStepGeneration from '../components/Wizard/WizardStepGeneration';
 import { Teacher, Class, Subject, Schedule, DAYS, PERIODS } from '../types';
+import { TimeConstraint } from '../types/constraints';
 
 // Define wizard steps
 const WIZARD_STEPS = [
@@ -71,7 +72,7 @@ interface WizardData {
     teacherPreferences: { [teacherId: string]: string[] };
   };
   constraints: {
-    timeConstraints: any[];
+    timeConstraints: TimeConstraint[];
     globalRules: {
       maxDailyHoursTeacher: number;
       maxDailyHoursClass: number;
@@ -114,6 +115,7 @@ const ScheduleWizard = () => {
   const { data: subjects } = useFirestore<Subject>('subjects');
   const { add: addTemplate, update: updateTemplate, data: templates } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { add: addSchedule, data: existingSchedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
+  const { data: constraints } = useFirestore<TimeConstraint>('constraints');
   const { success, error, warning, info } = useToast();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -276,6 +278,20 @@ const ScheduleWizard = () => {
     }
   }, [location.search, templates, success, warning]);
 
+  // Sync constraints from Firebase to wizard data
+  useEffect(() => {
+    if (constraints.length > 0) {
+      console.log('🔄 Kısıtlamalar Firebase\'den yükleniyor:', constraints.length);
+      setWizardData(prev => ({
+        ...prev,
+        constraints: {
+          ...prev.constraints,
+          timeConstraints: constraints
+        }
+      }));
+    }
+  }, [constraints]);
+
   const currentStep = WIZARD_STEPS[currentStepIndex];
 
   // Validate current step
@@ -403,7 +419,21 @@ const ScheduleWizard = () => {
     }
   };
 
-  // Enhanced schedule generation algorithm
+  // CRITICAL: Check if a time slot is unavailable based on constraints
+  const isSlotUnavailable = (teacherId: string, day: string, period: string): boolean => {
+    // Find teacher constraints for this slot
+    const teacherConstraint = wizardData.constraints.timeConstraints.find(c => 
+      c.entityType === 'teacher' && 
+      c.entityId === teacherId && 
+      c.day === day && 
+      c.period === period && 
+      c.constraintType === 'unavailable'
+    );
+    
+    return !!teacherConstraint;
+  };
+
+  // Enhanced schedule generation algorithm with constraint checking
   const generateScheduleForTeacher = (
     teacherId: string,
     selectedClasses: Class[],
@@ -486,21 +516,60 @@ const ScheduleWizard = () => {
     let assignedHours = 0;
     const targetHours = Math.floor(Math.random() * 11) + 15;
 
-    for (let attempt = 0; attempt < targetHours * 3 && assignedHours < targetHours; attempt++) {
+    // CRITICAL: Track which slots have been tried to avoid infinite loops
+    const triedSlots = new Set<string>();
+    
+    // Maximum attempts to avoid infinite loops
+    const maxAttempts = targetHours * 5;
+    let attempts = 0;
+
+    while (assignedHours < targetHours && attempts < maxAttempts) {
+      attempts++;
+      
       const randomDay = DAYS[Math.floor(Math.random() * DAYS.length)];
       const randomPeriod = availablePeriods[Math.floor(Math.random() * availablePeriods.length)];
       
-      if (!schedule[randomDay][randomPeriod].classId) {
+      const slotKey = `${randomDay}-${randomPeriod}`;
+      
+      // Skip if we've already tried this slot
+      if (triedSlots.has(slotKey)) {
+        continue;
+      }
+      
+      triedSlots.add(slotKey);
+      
+      // CRITICAL: Check if slot is empty AND not unavailable due to constraints
+      if (!schedule[randomDay][randomPeriod].classId && !isSlotUnavailable(teacherId, randomDay, randomPeriod)) {
         const randomClass = compatibleClasses[Math.floor(Math.random() * compatibleClasses.length)];
         const randomSubject = compatibleSubjects[Math.floor(Math.random() * compatibleSubjects.length)];
         
-        schedule[randomDay][randomPeriod] = {
-          classId: randomClass.id,
-          subjectId: randomSubject.id
-        };
+        // Check if class has any unavailable constraints for this slot
+        const classConstraint = wizardData.constraints.timeConstraints.find(c => 
+          c.entityType === 'class' && 
+          c.entityId === randomClass.id && 
+          c.day === randomDay && 
+          c.period === randomPeriod && 
+          c.constraintType === 'unavailable'
+        );
         
-        assignedHours++;
+        if (!classConstraint) {
+          schedule[randomDay][randomPeriod] = {
+            classId: randomClass.id,
+            subjectId: randomSubject.id
+          };
+          
+          assignedHours++;
+          console.log(`✅ Ders atandı: ${randomDay} ${randomPeriod}. ders - ${randomClass.name} - ${randomSubject.name}`);
+        } else {
+          console.log(`⚠️ Sınıf kısıtlaması nedeniyle atama yapılamadı: ${randomDay} ${randomPeriod}. ders - ${randomClass.name}`);
+        }
+      } else if (isSlotUnavailable(teacherId, randomDay, randomPeriod)) {
+        console.log(`⚠️ Öğretmen kısıtlaması nedeniyle atama yapılamadı: ${randomDay} ${randomPeriod}. ders - ${teacher.name}`);
       }
+    }
+
+    if (attempts >= maxAttempts && assignedHours < targetHours) {
+      console.warn(`⚠️ ${teacher.name} için maksimum deneme sayısına ulaşıldı. Hedef: ${targetHours}, Atanan: ${assignedHours}`);
     }
 
     console.log(`🎯 ${teacher.name} için ${assignedHours} saatlik program oluşturuldu`);
@@ -521,7 +590,8 @@ const ScheduleWizard = () => {
         selectedTeachers: wizardData.teachers.selectedTeachers.length,
         selectedClasses: wizardData.classes.selectedClasses.length,
         selectedSubjects: wizardData.subjects.selectedSubjects.length,
-        existingSchedules: existingSchedules.length
+        existingSchedules: existingSchedules.length,
+        constraints: wizardData.constraints.timeConstraints.length
       });
 
       const selectedTeacherIds = wizardData.teachers.selectedTeachers;

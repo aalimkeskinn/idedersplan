@@ -104,7 +104,7 @@ interface ScheduleTemplate {
 
 const ScheduleWizard = () => {
   const navigate = useNavigate();
-  const { data: teachers } = useFirestore<Teacher>('teachers');
+  const { data: teachers, add: addTeacher, update: updateTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
   const { data: classes } = useFirestore<Class>('classes');
   const { data: subjects } = useFirestore<Subject>('subjects');
   const { add: addTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
@@ -283,6 +283,21 @@ const ScheduleWizard = () => {
     }
   };
 
+  const handleTeachersChange = (updatedTeachers: Teacher[]) => {
+    // This function would typically update the teachers in Firestore
+    // For now, we'll just handle it locally since the component manages its own teacher list
+  };
+
+  const handleSelectedTeachersChange = (selectedTeacherIds: string[]) => {
+    setWizardData(prev => ({
+      ...prev,
+      teachers: {
+        ...prev.teachers,
+        selectedTeachers: selectedTeacherIds
+      }
+    }));
+  };
+
   const getStepIcon = (stepId: string) => {
     switch (stepId) {
       case 'basic-info': return Calendar;
@@ -343,13 +358,10 @@ const ScheduleWizard = () => {
       case 'teachers':
         return (
           <WizardStepTeachers
-            data={wizardData}
-            onUpdate={(data) => {
-              if (data.teachers) {
-                updateWizardData('teachers', data.teachers);
-              }
-            }}
-            teachers={teachers}
+            teachers={teachers || []}
+            onTeachersChange={handleTeachersChange}
+            selectedTeachers={wizardData.teachers.selectedTeachers}
+            onSelectedTeachersChange={handleSelectedTeachersChange}
           />
         );
       

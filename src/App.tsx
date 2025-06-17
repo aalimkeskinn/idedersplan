@@ -10,6 +10,7 @@ import Classes from './pages/Classes';
 import Subjects from './pages/Subjects';
 import Constraints from './pages/Constraints';
 import Schedules from './pages/Schedules';
+import ScheduleWizard from './pages/ScheduleWizard';
 import AllSchedules from './pages/AllSchedules';
 import ClassSchedules from './pages/ClassSchedules';
 import PDFExport from './pages/PDFExport';
@@ -60,6 +61,7 @@ function App() {
               <Route path="subjects" element={<Subjects />} />
               <Route path="constraints" element={<Constraints />} />
               <Route path="schedules" element={<Schedules />} />
+              <Route path="schedule-wizard" element={<ScheduleWizard />} />
               <Route path="class-schedules" element={<ClassSchedules />} />
               <Route path="all-schedules" element={<AllSchedules />} />
               <Route path="pdf" element={<PDFExport />} />

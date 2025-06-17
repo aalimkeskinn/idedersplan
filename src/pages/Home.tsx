@@ -6,7 +6,9 @@ import {
   Calendar, 
   FileText, 
   Eye,
-  ArrowRight
+  ArrowRight,
+  Clock,
+  Zap
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -39,9 +41,25 @@ const Home = () => {
       path: '/classes'
     },
     {
+      icon: Clock,
+      title: 'Zaman Kısıtlamaları',
+      description: 'Öğretmen ve sınıf zaman kısıtlamalarını yönetin',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      path: '/constraints'
+    },
+    {
+      icon: Zap,
+      title: 'Program Sihirbazı',
+      description: 'Adım adım otomatik program oluşturun',
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-50',
+      path: '/schedule-wizard'
+    },
+    {
       icon: Calendar,
-      title: 'Program Oluştur',
-      description: 'Öğretmen veya sınıf bazlı ders programları oluşturun',
+      title: 'Manuel Program',
+      description: 'Öğretmen veya sınıf bazlı manuel program oluşturun',
       color: 'text-purple-600',
       bgColor: 'bg-purple-50',
       path: '/schedules'
@@ -90,15 +108,15 @@ const Home = () => {
             İDE Okulları Ders Programı Sistemi
           </h1>
           <p className="text-sm md:text-base text-gray-600 mb-4 max-w-2xl mx-auto">
-            Okul ders programlarını kolayca oluşturun, yönetin ve PDF olarak indirin. 
-            Çakışma kontrolü, otomatik saatler ve profesyonel çıktılar.
+            Sihirbaz ile otomatik program oluşturun veya manuel olarak düzenleyin. 
+            Çakışma kontrolü, zaman kısıtlamaları ve profesyonel PDF çıktıları.
           </p>
         </div>
       </div>
 
       {/* Minimal Features Grid */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {features.map((feature, index) => (
             <div
               key={index}
@@ -127,20 +145,20 @@ const Home = () => {
         <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
             <div>
+              <div className="text-lg font-bold text-gray-900">Sihirbaz Sistemi</div>
+              <div className="text-xs text-gray-600">Adım adım otomatik oluşturma</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-gray-900">Zaman Kısıtlamaları</div>
+              <div className="text-xs text-gray-600">Esnek kısıtlama yönetimi</div>
+            </div>
+            <div>
               <div className="text-lg font-bold text-gray-900">Çakışma Kontrolü</div>
               <div className="text-xs text-gray-600">Otomatik çakışma tespiti</div>
             </div>
             <div>
               <div className="text-lg font-bold text-gray-900">PDF Çıktı</div>
               <div className="text-xs text-gray-600">Profesyonel görünüm</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-gray-900">Otomatik Saatler</div>
-              <div className="text-xs text-gray-600">Yemek ve mola saatleri</div>
-            </div>
-            <div>
-              <div className="text-lg font-bold text-gray-900">Güvenli Saklama</div>
-              <div className="text-xs text-gray-600">Firebase altyapısı</div>
             </div>
           </div>
         </div>
@@ -150,7 +168,7 @@ const Home = () => {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="text-center">
           <p className="text-xs text-gray-500">
-            Modern, kullanıcı dostu ve güvenilir ders programı yönetim sistemi
+            Sihirbaz tabanlı otomatik program oluşturma sistemi
           </p>
         </div>
       </div>

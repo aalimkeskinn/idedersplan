@@ -11,11 +11,25 @@ import Select from '../components/UI/Select';
 import ConfirmationModal from '../components/UI/ConfirmationModal';
 import SchedulePrintView from '../components/UI/SchedulePrintView';
 
+// Schedule Template interface
+interface ScheduleTemplate {
+  id: string;
+  name: string;
+  description: string;
+  academicYear: string;
+  semester: string;
+  wizardData: any;
+  createdAt: Date;
+  updatedAt: Date;
+  status: 'draft' | 'published' | 'archived';
+}
+
 const AllSchedules = () => {
   const { data: teachers } = useFirestore<Teacher>('teachers');
   const { data: classes } = useFirestore<Class>('classes');
   const { data: subjects } = useFirestore<Subject>('subjects');
   const { data: schedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
+  const { data: templates } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { success, error, warning } = useToast();
   const { 
     confirmation, 
@@ -158,6 +172,16 @@ const AllSchedules = () => {
     });
 
     return [...new Set(conflicts)];
+  };
+
+  // Get template name for a teacher's schedule
+  const getTemplateNameForTeacher = (teacherId: string) => {
+    // Find the template that has this teacher in its selectedTeachers
+    const template = templates.find(t => 
+      t.wizardData?.teachers?.selectedTeachers?.includes(teacherId)
+    );
+    
+    return template ? template.name : null;
   };
 
   // NEW: Delete all teacher schedules function
@@ -548,6 +572,7 @@ const AllSchedules = () => {
       <div className="space-y-6">
         {filteredTeachers.map(teacher => {
           const schedule = getTeacherSchedule(teacher.id);
+          const templateName = getTemplateNameForTeacher(teacher.id);
           
           return (
             <div key={teacher.id} className="mobile-card overflow-hidden">
@@ -557,9 +582,16 @@ const AllSchedules = () => {
                     <h3 className="font-medium text-gray-900">
                       {teacher.name}
                     </h3>
-                    <p className="text-sm text-gray-600">
-                      {teacher.branch} - {teacher.level}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm text-gray-600">
+                        {teacher.branch} - {teacher.level}
+                      </p>
+                      {templateName && (
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                          {templateName}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     {schedule && (

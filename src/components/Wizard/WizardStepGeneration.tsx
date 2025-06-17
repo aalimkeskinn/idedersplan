@@ -78,7 +78,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
     if (!wizardData.teachers?.selectedTeachers || wizardData.teachers.selectedTeachers.length === 0) {
       issues.push('Hiç öğretmen seçilmemiş');
     }
-    if (!wizardData.classrooms?.selectedClassrooms || wizardData.classrooms.selectedClassrooms.length === 0) {
+    if (!wizardData.classrooms?.length) {
       issues.push('Hiç derslik seçilmemiş');
     }
 
@@ -159,7 +159,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
           </div>
           <div className="text-center p-3 bg-purple-50 rounded-lg">
             <div className="text-2xl font-bold text-purple-600">
-              {wizardData.classrooms?.selectedClassrooms?.length || 0}
+              {wizardData.classrooms?.length || 0}
             </div>
             <div className="text-xs text-purple-700">Derslik</div>
           </div>

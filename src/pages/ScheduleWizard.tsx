@@ -15,7 +15,7 @@ import {
   Settings,
   Zap
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useFirestore } from '../hooks/useFirestore';
 import { useToast } from '../hooks/useToast';
 import Button from '../components/UI/Button';
@@ -104,14 +104,16 @@ interface ScheduleTemplate {
 
 const ScheduleWizard = () => {
   const navigate = useNavigate();
-  const { data: teachers } = useFirestore<Teacher>('teachers');
+  const location = useLocation();
+  const { data: teachers, add: addTeacher, update: updateTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
   const { data: classes } = useFirestore<Class>('classes');
   const { data: subjects } = useFirestore<Subject>('subjects');
-  const { add: addTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
+  const { add: addTemplate, update: updateTemplate, data: templates } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { add: addSchedule } = useFirestore<Schedule>('schedules');
   const { success, error, warning } = useToast();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [wizardData, setWizardData] = useState<WizardData>({
     basicInfo: {
       name: '',
@@ -164,6 +166,36 @@ const ScheduleWizard = () => {
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Check for templateId in URL parameters to load existing template
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const templateId = urlParams.get('templateId');
+    
+    if (templateId && templates.length > 0) {
+      const template = templates.find(t => t.id === templateId);
+      if (template) {
+        console.log('📝 Mevcut şablon yükleniyor:', template.name);
+        setEditingTemplateId(templateId);
+        setWizardData(template.wizardData);
+        
+        // Mark completed steps based on loaded data
+        const completed = new Set<number>();
+        if (template.wizardData.basicInfo?.name) completed.add(0);
+        if (template.wizardData.subjects?.selectedSubjects?.length > 0) completed.add(1);
+        if (template.wizardData.classes?.selectedClasses?.length > 0) completed.add(2);
+        if (template.wizardData.classrooms?.length > 0) completed.add(3);
+        if (template.wizardData.teachers?.selectedTeachers?.length > 0) completed.add(4);
+        // Constraints are optional
+        completed.add(5);
+        if (template.wizardData.generationSettings?.algorithm) completed.add(6);
+        
+        setCompletedSteps(completed);
+        
+        success('✅ Şablon Yüklendi', `"${template.name}" şablonu düzenleme için yüklendi`);
+      }
+    }
+  }, [location.search, templates]);
 
   const currentStep = WIZARD_STEPS[currentStepIndex];
 
@@ -226,7 +258,7 @@ const ScheduleWizard = () => {
   const handleSaveTemplate = async () => {
     setIsSaving(true);
     try {
-      const template: Omit<ScheduleTemplate, 'id' | 'createdAt'> = {
+      const templateData: Omit<ScheduleTemplate, 'id' | 'createdAt'> = {
         name: wizardData.basicInfo.name,
         description: wizardData.basicInfo.description || '',
         academicYear: wizardData.basicInfo.academicYear,
@@ -237,8 +269,15 @@ const ScheduleWizard = () => {
         status: 'draft'
       };
 
-      await addTemplate(template);
-      success('✅ Şablon Kaydedildi', 'Program şablonu başarıyla kaydedildi');
+      if (editingTemplateId) {
+        // Update existing template
+        await updateTemplate(editingTemplateId, templateData);
+        success('✅ Şablon Güncellendi', 'Program şablonu başarıyla güncellendi');
+      } else {
+        // Create new template
+        await addTemplate(templateData);
+        success('✅ Şablon Kaydedildi', 'Program şablonu başarıyla kaydedildi');
+      }
     } catch (err) {
       error('❌ Kayıt Hatası', 'Şablon kaydedilirken bir hata oluştu');
     } finally {
@@ -555,8 +594,15 @@ const ScheduleWizard = () => {
             <div className="flex items-center">
               <Calendar className="w-8 h-8 text-blue-600 mr-3" />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Program Oluşturma Sihirbazı</h1>
-                <p className="text-sm text-gray-600">Adım {currentStepIndex + 1} / {WIZARD_STEPS.length}</p>
+                <h1 className="text-xl font-bold text-gray-900">
+                  {editingTemplateId ? 'Program Düzenleme' : 'Program Oluşturma Sihirbazı'}
+                </h1>
+                <p className="text-sm text-gray-600">
+                  {editingTemplateId ? 
+                    `"${wizardData.basicInfo.name}" düzenleniyor - Adım ${currentStepIndex + 1} / ${WIZARD_STEPS.length}` : 
+                    `Adım ${currentStepIndex + 1} / ${WIZARD_STEPS.length}`
+                  }
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -566,10 +612,10 @@ const ScheduleWizard = () => {
                 variant="secondary"
                 disabled={isSaving || !wizardData.basicInfo.name}
               >
-                {isSaving ? 'Kaydediliyor...' : 'Şablon Kaydet'}
+                {isSaving ? 'Kaydediliyor...' : editingTemplateId ? 'Güncelle' : 'Şablon Kaydet'}
               </Button>
               <Button
-                onClick={() => navigate('/schedules')}
+                onClick={() => navigate('/')}
                 variant="secondary"
               >
                 İptal

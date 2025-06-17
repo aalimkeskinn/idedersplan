@@ -10,7 +10,9 @@ import {
   Clock,
   Zap,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Edit,
+  Plus
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFirestore } from '../hooks/useFirestore';
@@ -20,12 +22,26 @@ import { Teacher, Class, Subject, Schedule } from '../types';
 import Button from '../components/UI/Button';
 import ConfirmationModal from '../components/UI/ConfirmationModal';
 
+// Schedule Template interface
+interface ScheduleTemplate {
+  id: string;
+  name: string;
+  description: string;
+  academicYear: string;
+  semester: string;
+  wizardData: any;
+  createdAt: Date;
+  updatedAt: Date;
+  status: 'draft' | 'published' | 'archived';
+}
+
 const Home = () => {
   const navigate = useNavigate();
   const { data: teachers, remove: removeTeacher } = useFirestore<Teacher>('teachers');
   const { data: classes, remove: removeClass } = useFirestore<Class>('classes');
   const { data: subjects, remove: removeSubject } = useFirestore<Subject>('subjects');
   const { data: schedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
+  const { data: templates, remove: removeTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { success, error, warning } = useToast();
   const { 
     confirmation, 
@@ -340,7 +356,30 @@ const Home = () => {
     );
   };
 
+  // Edit template
+  const handleEditTemplate = (templateId: string) => {
+    navigate(`/schedule-wizard?templateId=${templateId}`);
+  };
+
+  // Delete template
+  const handleDeleteTemplate = (template: ScheduleTemplate) => {
+    confirmDelete(
+      template.name,
+      async () => {
+        try {
+          await removeTemplate(template.id);
+          success('🗑️ Şablon Silindi', `${template.name} başarıyla silindi`);
+        } catch (err) {
+          error('❌ Silme Hatası', 'Şablon silinirken bir hata oluştu');
+        }
+      }
+    );
+  };
+
   const totalDataCount = teachers.length + classes.length + subjects.length + schedules.length;
+  const sortedTemplates = [...templates].sort((a, b) => 
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -373,6 +412,104 @@ const Home = () => {
           </p>
         </div>
       </div>
+
+      {/* Program Templates Section */}
+      {templates.length > 0 && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 flex items-center">
+                  <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+                  Oluşturulan Program Şablonları
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {templates.length} program şablonu • Düzenlemek için tıklayın
+                </p>
+              </div>
+              <Button
+                onClick={() => navigate('/schedule-wizard')}
+                icon={Plus}
+                variant="primary"
+                size="sm"
+              >
+                Yeni Program
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sortedTemplates.map((template) => (
+                <div
+                  key={template.id}
+                  className="group bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                  onClick={() => handleEditTemplate(template.id)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                        {template.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {template.academicYear} {template.semester} Dönemi
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditTemplate(template.id);
+                        }}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Düzenle"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTemplate(template);
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                        title="Sil"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {template.description && (
+                    <p className="text-xs text-gray-500 mb-3 line-clamp-2">
+                      {template.description}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                      template.status === 'published' ? 'bg-green-100 text-green-800' :
+                      template.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {template.status === 'published' ? 'Yayınlandı' :
+                       template.status === 'draft' ? 'Taslak' : 'Arşivlendi'}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(template.updatedAt).toLocaleDateString('tr-TR')}
+                    </span>
+                  </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="flex items-center text-xs text-gray-500">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      <span>Düzenlemek için tıklayın</span>
+                      <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Data Management Section */}
       {totalDataCount > 0 && (

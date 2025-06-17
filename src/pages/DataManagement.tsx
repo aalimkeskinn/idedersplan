@@ -14,7 +14,9 @@ import {
   Download,
   Upload,
   MapPin,
-  FileText
+  FileText,
+  Check,
+  X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useFirestore } from '../hooks/useFirestore';
@@ -25,7 +27,6 @@ import Button from '../components/UI/Button';
 import ConfirmationModal from '../components/UI/ConfirmationModal';
 import Modal from '../components/UI/Modal';
 import Select from '../components/UI/Select';
-import Input from '../components/UI/Input';
 
 // Schedule Template interface
 interface ScheduleTemplate {
@@ -53,15 +54,33 @@ interface Classroom {
   color?: string;
 }
 
+// CSV Import Preview interface
+interface TeacherImportPreview {
+  name: string;
+  branch: string;
+  level: string;
+  status: 'new' | 'exists' | 'error';
+  message?: string;
+}
+
+interface SubjectImportPreview {
+  name: string;
+  branch: string;
+  level: string;
+  weeklyHours: number;
+  status: 'new' | 'exists' | 'error';
+  message?: string;
+}
+
 const DataManagement = () => {
   const navigate = useNavigate();
-  const { data: teachers, remove: removeTeacher, add: addTeacher } = useFirestore<Teacher>('teachers');
+  const { data: teachers, add: addTeacher, update: updateTeacher, remove: removeTeacher } = useFirestore<Teacher>('teachers');
   const { data: classes, remove: removeClass } = useFirestore<Class>('classes');
-  const { data: subjects, remove: removeSubject, add: addSubject } = useFirestore<Subject>('subjects');
+  const { data: subjects, add: addSubject, remove: removeSubject } = useFirestore<Subject>('subjects');
   const { data: schedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
   const { data: templates, remove: removeTemplate } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { data: classrooms, remove: removeClassroom } = useFirestore<Classroom>('classrooms');
-  const { success, error, warning } = useToast();
+  const { success, error, warning, info } = useToast();
   const { 
     confirmation, 
     showConfirmation, 
@@ -77,25 +96,18 @@ const DataManagement = () => {
   const [isDeletingClassrooms, setIsDeletingClassrooms] = useState(false);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
   
-  // CSV İçe Aktarma için state'ler
+  // CSV Import States
   const [isTeacherImportModalOpen, setIsTeacherImportModalOpen] = useState(false);
   const [isSubjectImportModalOpen, setIsSubjectImportModalOpen] = useState(false);
-  const [csvData, setCsvData] = useState<string[][]>([]);
-  const [csvFileName, setCsvFileName] = useState('');
-  const [selectedLevel, setSelectedLevel] = useState('İlkokul');
-  const [importStatus, setImportStatus] = useState<{
-    total: number;
-    success: number;
-    error: number;
-    duplicates: number;
-  }>({
-    total: 0,
-    success: 0,
-    error: 0,
-    duplicates: 0
-  });
+  const [teacherImportPreview, setTeacherImportPreview] = useState<TeacherImportPreview[]>([]);
+  const [subjectImportPreview, setSubjectImportPreview] = useState<SubjectImportPreview[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [defaultTeacherLevel, setDefaultTeacherLevel] = useState('İlkokul');
+  const [defaultSubjectLevel, setDefaultSubjectLevel] = useState('İlkokul');
+  const [defaultWeeklyHours, setDefaultWeeklyHours] = useState('4');
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const teacherFileInputRef = useRef<HTMLInputElement>(null);
+  const subjectFileInputRef = useRef<HTMLInputElement>(null);
 
   // Delete all teachers
   const handleDeleteAllTeachers = () => {
@@ -449,193 +461,290 @@ const DataManagement = () => {
       }
     );
   };
-  
-  // CSV dosyasını yükleme ve işleme
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'teacher' | 'subject') => {
+
+  // CSV Import Functions
+  const handleTeacherFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    setCsvFileName(file.name);
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const text = event.target?.result as string;
-        
-        // CSV dosyasını işle (Türkçe karakter desteğiyle)
-        const rows = text.split('\n')
-          .map(row => row.trim())
-          .filter(row => row.length > 0)
-          .map(row => {
-            // CSV ayrıştırma (basit virgülle ayrılmış değerler)
-            // Türkçe karakterleri koruyarak
-            return row.split(',').map(cell => cell.trim());
-          });
-        
-        setCsvData(rows);
-        
-        if (type === 'teacher') {
-          setIsTeacherImportModalOpen(true);
-        } else {
-          setIsSubjectImportModalOpen(true);
-        }
+        const csvContent = event.target?.result as string;
+        const preview = parseTeacherCSV(csvContent);
+        setTeacherImportPreview(preview);
+        setIsTeacherImportModalOpen(true);
       } catch (err) {
-        console.error('CSV dosyası işlenirken hata:', err);
-        error('❌ Dosya Hatası', 'CSV dosyası işlenirken bir hata oluştu');
+        error('❌ CSV Okuma Hatası', 'CSV dosyası okunurken bir hata oluştu');
       }
     };
-    
     reader.readAsText(file, 'UTF-8');
-    
-    // Dosya seçiciyi sıfırla (aynı dosyayı tekrar seçebilmek için)
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
-  
-  // Öğretmenleri CSV'den içe aktar
-  const importTeachersFromCsv = async () => {
-    if (csvData.length === 0) {
-      error('❌ Veri Yok', 'İçe aktarılacak veri bulunamadı');
-      return;
+
+  const handleSubjectFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const csvContent = event.target?.result as string;
+        const preview = parseSubjectCSV(csvContent);
+        setSubjectImportPreview(preview);
+        setIsSubjectImportModalOpen(true);
+      } catch (err) {
+        error('❌ CSV Okuma Hatası', 'CSV dosyası okunurken bir hata oluştu');
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  const parseTeacherCSV = (csvContent: string): TeacherImportPreview[] => {
+    // Split by lines and remove empty lines
+    const lines = csvContent.split(/\r?\n/).filter(line => line.trim() !== '');
+    
+    // Check if there's at least one line (header)
+    if (lines.length === 0) {
+      throw new Error('CSV dosyası boş');
+    }
+
+    // Parse header to determine column indices
+    const header = lines[0].split(',').map(h => h.trim().toUpperCase());
+    const nameIndex = header.findIndex(h => h === 'ADI' || h === 'AD' || h === 'İSİM');
+    const surnameIndex = header.findIndex(h => h === 'SOYADI' || h === 'SOYAD');
+    const branchIndex = header.findIndex(h => h === 'GÖREVİ' || h === 'BRANŞ' || h === 'BRANŞI');
+    
+    // Validate required columns
+    if (nameIndex === -1 || branchIndex === -1) {
+      throw new Error('CSV dosyasında gerekli sütunlar bulunamadı (ADI, GÖREVİ)');
+    }
+
+    const preview: TeacherImportPreview[] = [];
+    
+    // Process data rows (skip header)
+    for (let i = 1; i < lines.length; i++) {
+      const columns = lines[i].split(',').map(col => col.trim());
+      
+      // Skip if not enough columns
+      if (columns.length <= Math.max(nameIndex, surnameIndex, branchIndex)) {
+        continue;
+      }
+      
+      let name = columns[nameIndex];
+      // Add surname if available
+      if (surnameIndex !== -1 && columns[surnameIndex]) {
+        name = `${name} ${columns[surnameIndex]}`;
+      }
+      
+      const branch = columns[branchIndex];
+      
+      // Skip empty rows
+      if (!name || !branch) {
+        continue;
+      }
+      
+      // Check if teacher already exists
+      const exists = teachers.some(t => 
+        t.name.toLowerCase() === name.toLowerCase() && 
+        t.branch.toLowerCase() === branch.toLowerCase()
+      );
+      
+      preview.push({
+        name,
+        branch,
+        level: defaultTeacherLevel, // Default level, will be set in UI
+        status: exists ? 'exists' : 'new',
+        message: exists ? 'Öğretmen zaten mevcut' : undefined
+      });
     }
     
-    const status = {
-      total: csvData.length,
-      success: 0,
-      error: 0,
-      duplicates: 0
-    };
+    return preview;
+  };
+
+  const parseSubjectCSV = (csvContent: string): SubjectImportPreview[] => {
+    // Split by lines and remove empty lines
+    const lines = csvContent.split(/\r?\n/).filter(line => line.trim() !== '');
+    
+    // Check if there's at least one line
+    if (lines.length === 0) {
+      throw new Error('CSV dosyası boş');
+    }
+
+    const preview: SubjectImportPreview[] = [];
+    
+    // Process each line as a subject name
+    for (let i = 0; i < lines.length; i++) {
+      const name = lines[i].trim();
+      
+      // Skip empty names
+      if (!name) {
+        continue;
+      }
+      
+      // Check if subject already exists
+      const exists = subjects.some(s => 
+        s.name.toLowerCase() === name.toLowerCase() && 
+        s.level === defaultSubjectLevel
+      );
+      
+      preview.push({
+        name,
+        branch: name, // Use name as branch by default
+        level: defaultSubjectLevel,
+        weeklyHours: parseInt(defaultWeeklyHours),
+        status: exists ? 'exists' : 'new',
+        message: exists ? 'Ders zaten mevcut' : undefined
+      });
+    }
+    
+    return preview;
+  };
+
+  const importTeachers = async () => {
+    setIsImporting(true);
     
     try {
-      for (const row of csvData) {
-        // CSV formatı: ADI, SOYADI, GÖREVİ
-        if (row.length >= 3) {
-          const firstName = row[0].trim();
-          const lastName = row[1].trim();
-          const branch = row[2].trim();
+      let addedCount = 0;
+      let skippedCount = 0;
+      let errorCount = 0;
+      
+      for (const teacher of teacherImportPreview) {
+        if (teacher.status === 'exists') {
+          skippedCount++;
+          continue;
+        }
+        
+        try {
+          await addTeacher({
+            name: teacher.name,
+            branch: teacher.branch,
+            level: teacher.level as 'Anaokulu' | 'İlkokul' | 'Ortaokul'
+          } as Omit<Teacher, 'id' | 'createdAt'>);
           
-          if (firstName && lastName && branch) {
-            const fullName = `${firstName} ${lastName}`;
-            
-            // Çift kayıt kontrolü
-            const existingTeacher = teachers.find(t => 
-              t.name.toLowerCase() === fullName.toLowerCase() && 
-              t.branch.toLowerCase() === branch.toLowerCase()
-            );
-            
-            if (existingTeacher) {
-              status.duplicates++;
-              continue;
-            }
-            
-            try {
-              await addTeacher({
-                name: fullName,
-                branch: branch,
-                level: selectedLevel as 'Anaokulu' | 'İlkokul' | 'Ortaokul'
-              });
-              
-              status.success++;
-            } catch (err) {
-              console.error(`Öğretmen eklenirken hata: ${fullName}`, err);
-              status.error++;
-            }
-          }
+          addedCount++;
+        } catch (err) {
+          console.error(`❌ Öğretmen eklenemedi: ${teacher.name}`, err);
+          errorCount++;
         }
       }
       
-      setImportStatus(status);
-      
-      if (status.success > 0) {
-        success('✅ İçe Aktarma Başarılı', `${status.success} öğretmen başarıyla eklendi`);
+      if (addedCount > 0) {
+        success('✅ İçe Aktarma Tamamlandı', `${addedCount} öğretmen başarıyla eklendi, ${skippedCount} öğretmen atlandı, ${errorCount} hata`);
+      } else if (skippedCount > 0) {
+        warning('⚠️ İçe Aktarma Tamamlandı', `Hiçbir öğretmen eklenmedi, ${skippedCount} öğretmen zaten mevcut`);
+      } else {
+        error('❌ İçe Aktarma Hatası', 'Hiçbir öğretmen eklenemedi');
       }
       
-      if (status.duplicates > 0) {
-        warning('⚠️ Çift Kayıtlar', `${status.duplicates} öğretmen zaten sistemde mevcut`);
-      }
+      setIsTeacherImportModalOpen(false);
+      setTeacherImportPreview([]);
       
-      if (status.error > 0) {
-        error('❌ İçe Aktarma Hataları', `${status.error} öğretmen eklenirken hata oluştu`);
+      // Reset file input
+      if (teacherFileInputRef.current) {
+        teacherFileInputRef.current.value = '';
       }
-      
     } catch (err) {
-      console.error('Toplu içe aktarma hatası:', err);
       error('❌ İçe Aktarma Hatası', 'Öğretmenler içe aktarılırken bir hata oluştu');
     } finally {
-      setIsTeacherImportModalOpen(false);
+      setIsImporting(false);
     }
   };
-  
-  // Dersleri CSV'den içe aktar
-  const importSubjectsFromCsv = async () => {
-    if (csvData.length === 0) {
-      error('❌ Veri Yok', 'İçe aktarılacak veri bulunamadı');
-      return;
-    }
-    
-    const status = {
-      total: csvData.length,
-      success: 0,
-      error: 0,
-      duplicates: 0
-    };
+
+  const importSubjects = async () => {
+    setIsImporting(true);
     
     try {
-      for (const row of csvData) {
-        // CSV formatı: DERS ADI
-        if (row.length >= 1) {
-          const subjectName = row[0].trim();
+      let addedCount = 0;
+      let skippedCount = 0;
+      let errorCount = 0;
+      
+      for (const subject of subjectImportPreview) {
+        if (subject.status === 'exists') {
+          skippedCount++;
+          continue;
+        }
+        
+        try {
+          await addSubject({
+            name: subject.name,
+            branch: subject.branch,
+            level: subject.level as 'Anaokulu' | 'İlkokul' | 'Ortaokul',
+            weeklyHours: subject.weeklyHours
+          } as Omit<Subject, 'id' | 'createdAt'>);
           
-          if (subjectName) {
-            // Çift kayıt kontrolü
-            const existingSubject = subjects.find(s => 
-              s.name.toLowerCase() === subjectName.toLowerCase() && 
-              s.level === selectedLevel
-            );
-            
-            if (existingSubject) {
-              status.duplicates++;
-              continue;
-            }
-            
-            try {
-              await addSubject({
-                name: subjectName,
-                branch: subjectName, // Branş olarak ders adını kullan
-                level: selectedLevel as 'Anaokulu' | 'İlkokul' | 'Ortaokul',
-                weeklyHours: 4 // Varsayılan haftalık saat
-              });
-              
-              status.success++;
-            } catch (err) {
-              console.error(`Ders eklenirken hata: ${subjectName}`, err);
-              status.error++;
-            }
-          }
+          addedCount++;
+        } catch (err) {
+          console.error(`❌ Ders eklenemedi: ${subject.name}`, err);
+          errorCount++;
         }
       }
       
-      setImportStatus(status);
-      
-      if (status.success > 0) {
-        success('✅ İçe Aktarma Başarılı', `${status.success} ders başarıyla eklendi`);
+      if (addedCount > 0) {
+        success('✅ İçe Aktarma Tamamlandı', `${addedCount} ders başarıyla eklendi, ${skippedCount} ders atlandı, ${errorCount} hata`);
+      } else if (skippedCount > 0) {
+        warning('⚠️ İçe Aktarma Tamamlandı', `Hiçbir ders eklenmedi, ${skippedCount} ders zaten mevcut`);
+      } else {
+        error('❌ İçe Aktarma Hatası', 'Hiçbir ders eklenemedi');
       }
       
-      if (status.duplicates > 0) {
-        warning('⚠️ Çift Kayıtlar', `${status.duplicates} ders zaten sistemde mevcut`);
-      }
+      setIsSubjectImportModalOpen(false);
+      setSubjectImportPreview([]);
       
-      if (status.error > 0) {
-        error('❌ İçe Aktarma Hataları', `${status.error} ders eklenirken hata oluştu`);
+      // Reset file input
+      if (subjectFileInputRef.current) {
+        subjectFileInputRef.current.value = '';
       }
-      
     } catch (err) {
-      console.error('Toplu içe aktarma hatası:', err);
       error('❌ İçe Aktarma Hatası', 'Dersler içe aktarılırken bir hata oluştu');
     } finally {
-      setIsSubjectImportModalOpen(false);
+      setIsImporting(false);
     }
+  };
+
+  const updateTeacherLevel = (index: number, level: string) => {
+    const updatedPreview = [...teacherImportPreview];
+    updatedPreview[index].level = level;
+    setTeacherImportPreview(updatedPreview);
+  };
+
+  const updateSubjectLevel = (index: number, level: string) => {
+    const updatedPreview = [...subjectImportPreview];
+    updatedPreview[index].level = level;
+    setSubjectImportPreview(updatedPreview);
+  };
+
+  const updateSubjectWeeklyHours = (index: number, hours: string) => {
+    const updatedPreview = [...subjectImportPreview];
+    updatedPreview[index].weeklyHours = parseInt(hours) || 1;
+    setSubjectImportPreview(updatedPreview);
+  };
+
+  const updateAllTeacherLevels = (level: string) => {
+    const updatedPreview = teacherImportPreview.map(teacher => ({
+      ...teacher,
+      level
+    }));
+    setTeacherImportPreview(updatedPreview);
+    setDefaultTeacherLevel(level);
+  };
+
+  const updateAllSubjectLevels = (level: string) => {
+    const updatedPreview = subjectImportPreview.map(subject => ({
+      ...subject,
+      level
+    }));
+    setSubjectImportPreview(updatedPreview);
+    setDefaultSubjectLevel(level);
+  };
+
+  const updateAllSubjectWeeklyHours = (hours: string) => {
+    const hoursNum = parseInt(hours) || 1;
+    const updatedPreview = subjectImportPreview.map(subject => ({
+      ...subject,
+      weeklyHours: hoursNum
+    }));
+    setSubjectImportPreview(updatedPreview);
+    setDefaultWeeklyHours(hours);
   };
 
   const totalDataCount = teachers.length + classes.length + subjects.length + schedules.length + templates.length + classrooms.length;
@@ -700,19 +809,19 @@ const DataManagement = () => {
                     Yönet
                   </Button>
                   <Button
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => teacherFileInputRef.current?.click()}
                     variant="secondary"
                     size="sm"
-                    icon={FileText}
+                    icon={Upload}
                   >
-                    CSV İçe Aktar
+                    CSV Yükle
                   </Button>
                   <input
                     type="file"
-                    ref={fileInputRef}
+                    ref={teacherFileInputRef}
+                    onChange={handleTeacherFileChange}
                     accept=".csv"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handleFileChange(e, 'teacher')}
+                    className="hidden"
                   />
                 </div>
                 {teachers.length > 0 && (
@@ -777,19 +886,20 @@ const DataManagement = () => {
                     Yönet
                   </Button>
                   <Button
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = '.csv';
-                      input.onchange = (e) => handleFileChange(e as React.ChangeEvent<HTMLInputElement>, 'subject');
-                      input.click();
-                    }}
+                    onClick={() => subjectFileInputRef.current?.click()}
                     variant="secondary"
                     size="sm"
-                    icon={FileText}
+                    icon={Upload}
                   >
-                    CSV İçe Aktar
+                    CSV Yükle
                   </Button>
+                  <input
+                    type="file"
+                    ref={subjectFileInputRef}
+                    onChange={handleSubjectFileChange}
+                    accept=".csv"
+                    className="hidden"
+                  />
                 </div>
                 {subjects.length > 0 && (
                   <Button
@@ -892,6 +1002,70 @@ const DataManagement = () => {
                     {isDeletingClassrooms ? 'Siliniyor...' : 'Tümünü Sil'}
                   </Button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CSV Import Guide */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <FileText className="w-6 h-6 text-blue-600 mr-2" />
+              <h2 className="text-lg font-bold text-gray-900">CSV İçe Aktarma Rehberi</h2>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+              <h3 className="font-medium text-blue-900 mb-3">Öğretmen CSV Formatı</h3>
+              <p className="text-sm text-blue-700 mb-3">
+                CSV dosyanızda aşağıdaki sütunlar olmalıdır:
+              </p>
+              <div className="bg-white p-3 rounded border border-blue-200 mb-3 font-mono text-xs">
+                ADI,SOYADI,GÖREVİ<br />
+                Ahmet,Yılmaz,MATEMATİK ÖĞRETMENİ<br />
+                Ayşe,Demir,TÜRKÇE ÖĞRETMENİ
+              </div>
+              <p className="text-sm text-blue-700">
+                <strong>Not:</strong> Eğitim seviyesi (Anaokulu, İlkokul, Ortaokul) içe aktarma sırasında seçilecektir.
+              </p>
+              <div className="mt-4">
+                <Button
+                  onClick={() => teacherFileInputRef.current?.click()}
+                  variant="primary"
+                  size="sm"
+                  icon={Upload}
+                  className="w-full"
+                >
+                  Öğretmen CSV Dosyası Yükle
+                </Button>
+              </div>
+            </div>
+            
+            <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-100">
+              <h3 className="font-medium text-indigo-900 mb-3">Ders CSV Formatı</h3>
+              <p className="text-sm text-indigo-700 mb-3">
+                CSV dosyanızda her satırda bir ders adı olmalıdır:
+              </p>
+              <div className="bg-white p-3 rounded border border-indigo-200 mb-3 font-mono text-xs">
+                MATEMATİK ÖĞRETMENİ<br />
+                TÜRKÇE ÖĞRETMENİ<br />
+                FEN BİLGİSİ ÖĞRETMENİ
+              </div>
+              <p className="text-sm text-indigo-700">
+                <strong>Not:</strong> Eğitim seviyesi ve haftalık ders saati içe aktarma sırasında seçilecektir.
+              </p>
+              <div className="mt-4">
+                <Button
+                  onClick={() => subjectFileInputRef.current?.click()}
+                  variant="primary"
+                  size="sm"
+                  icon={Upload}
+                  className="w-full"
+                >
+                  Ders CSV Dosyası Yükle
+                </Button>
               </div>
             </div>
           </div>
@@ -1033,32 +1207,6 @@ const DataManagement = () => {
                          classroom.type}
                       </span>
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <button
-                        onClick={() => navigate('/classrooms')}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                        title="Düzenle"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => confirmDelete(
-                          classroom.name,
-                          async () => {
-                            try {
-                              await removeClassroom(classroom.id);
-                              success('🗑️ Derslik Silindi', `${classroom.name} başarıyla silindi`);
-                            } catch (err) {
-                              error('❌ Silme Hatası', 'Derslik silinirken bir hata oluştu');
-                            }
-                          }
-                        )}
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Sil"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
                   </div>
                   
                   <div className="space-y-2 text-sm text-gray-600">
@@ -1070,18 +1218,6 @@ const DataManagement = () => {
                       <span>Konum:</span>
                       <span className="font-medium">{classroom.building} - {classroom.floor}. Kat</span>
                     </div>
-                    {classroom.equipment && classroom.equipment.length > 0 && (
-                      <div>
-                        <span className="text-xs text-gray-500">Ekipmanlar:</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {classroom.equipment.map((eq) => (
-                            <span key={eq} className="inline-flex items-center px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
-                              {eq}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
@@ -1092,6 +1228,7 @@ const DataManagement = () => {
                 <Button
                   onClick={() => navigate('/classrooms')}
                   variant="secondary"
+                  size="sm"
                 >
                   Tüm Derslikleri Görüntüle ({classrooms.length})
                 </Button>
@@ -1240,59 +1377,106 @@ const DataManagement = () => {
         </div>
       </div>
 
-      {/* Öğretmen CSV İçe Aktarma Modal */}
+      {/* Teacher Import Modal */}
       <Modal
         isOpen={isTeacherImportModalOpen}
         onClose={() => setIsTeacherImportModalOpen(false)}
-        title="CSV'den Öğretmen İçe Aktar"
-        size="lg"
+        title="Öğretmen CSV İçe Aktarma"
+        size="xl"
       >
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-800 mb-2">CSV Dosyası: {csvFileName}</h4>
-            <p className="text-sm text-blue-700">
-              Toplam {csvData.length} satır bulundu. Lütfen verileri kontrol edin ve eğitim seviyesini seçin.
-            </p>
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">Önizleme</h3>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Tüm öğretmenler için seviye:</span>
+              <Select
+                value={defaultTeacherLevel}
+                onChange={updateAllTeacherLevels}
+                options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
+                required
+              />
+            </div>
           </div>
           
-          <Select
-            label="Eğitim Seviyesi"
-            value={selectedLevel}
-            onChange={setSelectedLevel}
-            options={EDUCATION_LEVELS.map(level => ({
-              value: level,
-              label: level
-            }))}
-            required
-          />
-          
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 p-3 border-b border-gray-200">
-              <div className="grid grid-cols-3 gap-4 font-medium text-gray-700">
-                <div>ADI</div>
-                <div>SOYADI</div>
-                <div>GÖREVİ</div>
+          {teacherImportPreview.length > 0 ? (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ad Soyad
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Branş
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Seviye
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Durum
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {teacherImportPreview.map((teacher, index) => (
+                      <tr key={index} className={teacher.status === 'exists' ? 'bg-yellow-50' : ''}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{teacher.name}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">{teacher.branch}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Select
+                            value={teacher.level}
+                            onChange={(value) => updateTeacherLevel(index, value)}
+                            options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
+                            required
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {teacher.status === 'new' ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <Check className="w-3 h-3 mr-1" />
+                              Yeni Eklenecek
+                            </span>
+                          ) : teacher.status === 'exists' ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Zaten Mevcut
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              <X className="w-3 h-3 mr-1" />
+                              Hata
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-            <div className="max-h-60 overflow-y-auto">
-              {csvData.slice(0, 10).map((row, index) => (
-                <div key={index} className="p-3 border-b border-gray-200 last:border-b-0">
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>{row[0] || '-'}</div>
-                    <div>{row[1] || '-'}</div>
-                    <div>{row[2] || '-'}</div>
-                  </div>
-                </div>
-              ))}
-              {csvData.length > 10 && (
-                <div className="p-3 text-center text-sm text-gray-500">
-                  ... ve {csvData.length - 10} satır daha
-                </div>
-              )}
+          ) : (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">Önizleme için CSV dosyası yükleyin</p>
             </div>
+          )}
+        </div>
+
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            {teacherImportPreview.length > 0 && (
+              <>
+                <span className="font-medium">{teacherImportPreview.filter(t => t.status === 'new').length}</span> yeni öğretmen eklenecek,{' '}
+                <span className="font-medium">{teacherImportPreview.filter(t => t.status === 'exists').length}</span> öğretmen atlanacak
+              </>
+            )}
           </div>
-          
-          <div className="flex justify-end space-x-3">
+          <div className="flex space-x-3">
             <Button
               onClick={() => setIsTeacherImportModalOpen(false)}
               variant="secondary"
@@ -1300,64 +1484,133 @@ const DataManagement = () => {
               İptal
             </Button>
             <Button
-              onClick={importTeachersFromCsv}
+              onClick={importTeachers}
               variant="primary"
+              disabled={isImporting || teacherImportPreview.length === 0 || teacherImportPreview.every(t => t.status === 'exists')}
             >
-              İçe Aktar ({csvData.length} öğretmen)
+              {isImporting ? 'İçe Aktarılıyor...' : 'İçe Aktar'}
             </Button>
           </div>
         </div>
       </Modal>
-      
-      {/* Ders CSV İçe Aktarma Modal */}
+
+      {/* Subject Import Modal */}
       <Modal
         isOpen={isSubjectImportModalOpen}
         onClose={() => setIsSubjectImportModalOpen(false)}
-        title="CSV'den Ders İçe Aktar"
-        size="lg"
+        title="Ders CSV İçe Aktarma"
+        size="xl"
       >
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-800 mb-2">CSV Dosyası: {csvFileName}</h4>
-            <p className="text-sm text-blue-700">
-              Toplam {csvData.length} satır bulundu. Lütfen verileri kontrol edin ve eğitim seviyesini seçin.
-            </p>
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">Önizleme</h3>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Tüm dersler için:</span>
+              <Select
+                value={defaultSubjectLevel}
+                onChange={updateAllSubjectLevels}
+                options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
+                required
+              />
+              <Select
+                value={defaultWeeklyHours}
+                onChange={updateAllSubjectWeeklyHours}
+                options={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(h => ({ value: h.toString(), label: `${h} saat` }))}
+                required
+              />
+            </div>
           </div>
           
-          <Select
-            label="Eğitim Seviyesi"
-            value={selectedLevel}
-            onChange={setSelectedLevel}
-            options={EDUCATION_LEVELS.map(level => ({
-              value: level,
-              label: level
-            }))}
-            required
-          />
-          
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 p-3 border-b border-gray-200">
-              <div className="grid grid-cols-1 gap-4 font-medium text-gray-700">
-                <div>DERS ADI</div>
+          {subjectImportPreview.length > 0 ? (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ders Adı
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Branş
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Seviye
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Haftalık Saat
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Durum
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {subjectImportPreview.map((subject, index) => (
+                      <tr key={index} className={subject.status === 'exists' ? 'bg-yellow-50' : ''}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{subject.name}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">{subject.branch}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Select
+                            value={subject.level}
+                            onChange={(value) => updateSubjectLevel(index, value)}
+                            options={EDUCATION_LEVELS.map(level => ({ value: level, label: level }))}
+                            required
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Select
+                            value={subject.weeklyHours.toString()}
+                            onChange={(value) => updateSubjectWeeklyHours(index, value)}
+                            options={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(h => ({ value: h.toString(), label: `${h} saat` }))}
+                            required
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {subject.status === 'new' ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <Check className="w-3 h-3 mr-1" />
+                              Yeni Eklenecek
+                            </span>
+                          ) : subject.status === 'exists' ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Zaten Mevcut
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              <X className="w-3 h-3 mr-1" />
+                              Hata
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-            <div className="max-h-60 overflow-y-auto">
-              {csvData.slice(0, 10).map((row, index) => (
-                <div key={index} className="p-3 border-b border-gray-200 last:border-b-0">
-                  <div className="grid grid-cols-1 gap-4 text-sm">
-                    <div>{row[0] || '-'}</div>
-                  </div>
-                </div>
-              ))}
-              {csvData.length > 10 && (
-                <div className="p-3 text-center text-sm text-gray-500">
-                  ... ve {csvData.length - 10} satır daha
-                </div>
-              )}
+          ) : (
+            <div className="text-center py-8 bg-gray-50 rounded-lg">
+              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">Önizleme için CSV dosyası yükleyin</p>
             </div>
+          )}
+        </div>
+
+        <div className="flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            {subjectImportPreview.length > 0 && (
+              <>
+                <span className="font-medium">{subjectImportPreview.filter(s => s.status === 'new').length}</span> yeni ders eklenecek,{' '}
+                <span className="font-medium">{subjectImportPreview.filter(s => s.status === 'exists').length}</span> ders atlanacak
+              </>
+            )}
           </div>
-          
-          <div className="flex justify-end space-x-3">
+          <div className="flex space-x-3">
             <Button
               onClick={() => setIsSubjectImportModalOpen(false)}
               variant="secondary"
@@ -1365,10 +1618,11 @@ const DataManagement = () => {
               İptal
             </Button>
             <Button
-              onClick={importSubjectsFromCsv}
+              onClick={importSubjects}
               variant="primary"
+              disabled={isImporting || subjectImportPreview.length === 0 || subjectImportPreview.every(s => s.status === 'exists')}
             >
-              İçe Aktar ({csvData.length} ders)
+              {isImporting ? 'İçe Aktarılıyor...' : 'İçe Aktar'}
             </Button>
           </div>
         </div>

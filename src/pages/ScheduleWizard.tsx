@@ -50,7 +50,7 @@ const ScheduleWizard = () => {
   const [wizardData, setWizardData] = useState<WizardData>({
     basicInfo: {
       programName: '',
-      academicYear: '',
+      academicYear: '2024/2025',
       semester: 'fall'
     },
     subjects: {
@@ -62,7 +62,10 @@ const ScheduleWizard = () => {
       selectedClasses: [],
       classCapacities: {}
     },
-    classrooms: [],
+    classrooms: {
+      selectedClassrooms: [],
+      classroomAssignments: {}
+    },
     teachers: {
       selectedTeachers: [],
       teacherWorkloads: {},
@@ -149,8 +152,11 @@ const ScheduleWizard = () => {
 
   const handleSaveTemplate = async () => {
     try {
+      // CRITICAL: Use programName or name for the template name
+      const templateName = wizardData.basicInfo.programName || wizardData.basicInfo.name || 'Ders Programı';
+      
       const templateData = {
-        name: wizardData.basicInfo.programName || 'Ders Programı',
+        name: templateName,
         description: '',
         academicYear: wizardData.basicInfo.academicYear || '2024/2025',
         semester: wizardData.basicInfo.semester === 'fall' ? 'Güz' : 
@@ -211,7 +217,7 @@ const ScheduleWizard = () => {
       }, 1500);
       
     } catch (err) {
-      console.error('Program oluşturma hatası:', err);
+      console.error('❌ Program oluşturma hatası:', err);
       error('❌ Program Oluşturma Hatası', 'Program oluşturulurken bir hata oluştu');
     } finally {
       setIsGenerating(false);

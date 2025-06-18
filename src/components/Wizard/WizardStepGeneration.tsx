@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Zap, Settings, Play, CheckCircle, AlertTriangle, Clock, BarChart3 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Zap, Settings, Play, CheckCircle, AlertTriangle, Clock, BarChart3, Info } from 'lucide-react';
 import { WizardData } from '../../types/wizard';
 import Button from '../UI/Button';
 import Select from '../UI/Select';
@@ -20,6 +20,48 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
   isGenerating
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [weeklyHourSummary, setWeeklyHourSummary] = useState<{
+    totalHours: number;
+    subjectBreakdown: { name: string; hours: number }[];
+    isValid: boolean;
+  }>({ totalHours: 0, subjectBreakdown: [], isValid: true });
+
+  // CRITICAL: Haftalık saat özeti hesaplama
+  useEffect(() => {
+    const calculateWeeklyHourSummary = () => {
+      const subjectHours = wizardData.subjects?.subjectHours || {};
+      const selectedSubjects = wizardData.subjects?.selectedSubjects || [];
+      
+      let totalHours = 0;
+      const subjectBreakdown: { name: string; hours: number }[] = [];
+      
+      selectedSubjects.forEach(subjectId => {
+        const subject = subjects.find(s => s.id === subjectId);
+        if (subject) {
+          const hours = subjectHours[subjectId] || subject.weeklyHours;
+          totalHours += hours;
+          
+          subjectBreakdown.push({
+            name: subject.name,
+            hours
+          });
+        }
+      });
+      
+      // Sırala - en yüksek saat sayısına göre
+      subjectBreakdown.sort((a, b) => b.hours - a.hours);
+      
+      setWeeklyHourSummary({
+        totalHours,
+        subjectBreakdown,
+        isValid: totalHours <= 45
+      });
+      
+      console.log(`📊 Haftalık saat özeti hesaplandı: ${totalHours} saat`);
+    };
+    
+    calculateWeeklyHourSummary();
+  }, [wizardData.subjects]);
 
   const algorithmOptions = [
     { 
@@ -83,15 +125,15 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
       issues.push('Hiç derslik seçilmemiş');
     }
 
+    // CRITICAL: Haftalık saat limiti kontrolü
+    if (weeklyHourSummary.totalHours > 45) {
+      issues.push(`Haftalık toplam ders saati 45'i geçemez (şu an: ${weeklyHourSummary.totalHours})`);
+    }
+
     // Check ratios with safe access
-    const totalHours = wizardData.subjects?.subjectHours ? 
-      Object.values(wizardData.subjects.subjectHours).reduce((sum, hours) => sum + hours, 0) : 0;
     const totalClasses = wizardData.classes?.selectedClasses?.length || 0;
     const totalTeachers = wizardData.teachers?.selectedTeachers?.length || 0;
 
-    if (totalHours > 40) {
-      warnings.push('Haftalık toplam ders saati çok yüksek (40+ saat)');
-    }
     if (totalTeachers < totalClasses) {
       warnings.push('Öğretmen sayısı sınıf sayısından az');
     }
@@ -148,6 +190,16 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
     }
   };
 
+  // CRITICAL: Seçilen derslerin listesi
+  const subjects = (wizardData.subjects?.selectedSubjects || []).map(subjectId => {
+    const subject = allSubjects.find(s => s.id === subjectId);
+    const hours = wizardData.subjects?.subjectHours?.[subjectId] || (subject?.weeklyHours || 0);
+    return { id: subjectId, name: subject?.name || 'Bilinmeyen Ders', hours };
+  });
+
+  // CRITICAL: Tüm derslerin listesi
+  const allSubjects = []; // Bu kısmı gerçek veri ile doldurun
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -159,6 +211,52 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
         <p className="text-gray-600">
           Algoritma ayarlarını yapın ve otomatik program oluşturmayı başlatın
         </p>
+      </div>
+
+      {/* CRITICAL: Haftalık Saat Özeti */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+          <Clock className="w-5 h-5 mr-2 text-blue-600" />
+          Haftalık Saat Özeti
+        </h4>
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-gray-700">
+            Toplam Haftalık Saat:
+          </div>
+          <div className={`text-lg font-bold ${weeklyHourSummary.isValid ? 'text-green-600' : 'text-red-600'}`}>
+            {weeklyHourSummary.totalHours} / 45
+          </div>
+        </div>
+        
+        {/* Progress bar */}
+        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+          <div 
+            className={`h-2.5 rounded-full ${weeklyHourSummary.isValid ? 'bg-green-600' : 'bg-red-600'}`}
+            style={{ width: `${Math.min(100, (weeklyHourSummary.totalHours / 45) * 100)}%` }}
+          ></div>
+        </div>
+        
+        {/* Ders dağılımı */}
+        <div className="space-y-2 max-h-40 overflow-y-auto">
+          {weeklyHourSummary.subjectBreakdown.map((subject, index) => (
+            <div key={index} className="flex items-center justify-between text-sm">
+              <div className="flex-1 truncate">{subject.name}</div>
+              <div className="font-medium">{subject.hours} saat</div>
+            </div>
+          ))}
+        </div>
+        
+        {!weeklyHourSummary.isValid && (
+          <div className="mt-4 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="flex items-start">
+              <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 mr-2" />
+              <div className="text-xs text-red-700">
+                <strong>Uyarı:</strong> Haftalık toplam ders saati 45'i geçemez. Lütfen "Dersler" adımına geri dönerek bazı derslerin haftalık saat sayılarını azaltın.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Validation Summary */}
@@ -344,6 +442,23 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                 </label>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* CRITICAL: Haftalık Saat Limiti Bilgilendirmesi */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start space-x-3">
+          <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-blue-700">
+            <h4 className="font-medium mb-1">📚 Haftalık Saat Limitleri:</h4>
+            <ul className="space-y-1 text-xs">
+              <li>• <strong>Toplam haftalık ders saati 45'i geçemez</strong></li>
+              <li>• Her ders için ayarladığınız haftalık saat sayısı tam olarak uygulanır</li>
+              <li>• Örneğin: Matematik 5 saat, Türkçe 6 saat, Fen 4 saat...</li>
+              <li>• Ders saatleri "Dersler" adımında ayarlanabilir</li>
+              <li>• Ders programı oluşturulurken bu limitler dikkate alınır</li>
+            </ul>
           </div>
         </div>
       </div>

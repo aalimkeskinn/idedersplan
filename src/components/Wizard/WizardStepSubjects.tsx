@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Plus, Minus, Star, Clock, Edit, Trash2 } from 'lucide-react';
+import { BookOpen, Plus, Minus, Star, Clock, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { Subject, EDUCATION_LEVELS, Teacher } from '../../types';
 import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
@@ -155,13 +155,18 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
   };
 
   const handleHoursChange = (subjectId: string, hours: number) => {
+    // CRITICAL: Haftalık saat limiti 1-10 arası olmalı
+    const validHours = Math.max(1, Math.min(10, hours));
+    
     onUpdate({
       ...data,
       subjectHours: {
         ...data.subjectHours,
-        [subjectId]: hours
+        [subjectId]: validHours
       }
     });
+    
+    console.log(`📊 ${subjectId} dersi için haftalık saat: ${validHours}`);
   };
 
   const handlePriorityChange = (subjectId: string, priority: 'high' | 'medium' | 'low') => {
@@ -172,6 +177,8 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
         [subjectId]: priority
       }
     });
+    
+    console.log(`🔄 ${subjectId} dersi için öncelik: ${priority}`);
   };
 
   const getTotalWeeklyHours = () => {
@@ -294,6 +301,10 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
     }
   }, [formData.name, editingSubject]);
 
+  // CRITICAL: Haftalık saat limiti uyarısı
+  const totalWeeklyHours = getTotalWeeklyHours();
+  const isWeeklyHoursExceeded = totalWeeklyHours > 45;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -325,6 +336,24 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
           Yeni Ders Ekle
         </Button>
       </div>
+
+      {/* CRITICAL: Haftalık saat limiti uyarısı */}
+      {isWeeklyHoursExceeded && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 mr-3" />
+            <div>
+              <h4 className="font-medium text-red-800">Haftalık Saat Limiti Aşıldı!</h4>
+              <p className="text-sm text-red-700 mt-1">
+                Toplam haftalık ders saati 45'i geçemez. Şu anki toplam: <strong>{totalWeeklyHours} saat</strong>
+              </p>
+              <p className="text-sm text-red-700 mt-1">
+                Lütfen bazı derslerin haftalık saat sayılarını azaltın.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Subject Selection */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -390,7 +419,9 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-medium text-gray-900">Seçilen Dersler ({selectedSubjects.length})</h4>
             <div className="text-sm text-gray-600">
-              Toplam: <span className="font-bold text-blue-600">{getTotalWeeklyHours()} saat/hafta</span>
+              Toplam: <span className={`font-bold ${isWeeklyHoursExceeded ? 'text-red-600' : 'text-blue-600'}`}>
+                {getTotalWeeklyHours()} saat/hafta
+              </span>
             </div>
           </div>
           
@@ -439,6 +470,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
                             <input
                               type="number"
                               min="1"
+                              max="10"
                               value={hours}
                               onChange={(e) => handleHoursChange(subject.id, parseInt(e.target.value) || 1)}
                               className="w-12 text-center text-sm font-medium border border-gray-300 rounded py-1"
@@ -488,8 +520,12 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
               <div className="text-blue-700">Seçilen Ders</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{getTotalWeeklyHours()}</div>
-              <div className="text-blue-700">Toplam Saat/Hafta</div>
+              <div className={`text-2xl font-bold ${isWeeklyHoursExceeded ? 'text-red-600' : 'text-blue-600'}`}>
+                {getTotalWeeklyHours()}
+              </div>
+              <div className={`${isWeeklyHoursExceeded ? 'text-red-700' : 'text-blue-700'}`}>
+                Toplam Saat/Hafta {isWeeklyHoursExceeded && '(Limit aşıldı!)'}
+              </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
@@ -526,7 +562,8 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
           <div className="text-sm text-gray-700">
             <h4 className="font-medium mb-1">💡 İpuçları:</h4>
             <ul className="space-y-1 text-xs">
-              <li>• Haftalık toplam saat sayısı 25-35 arasında olması önerilir</li>
+              <li>• <strong>Haftalık toplam saat sayısı 45'i geçmemelidir</strong></li>
+              <li>• Her ders için haftalık saat sayısını ayarlayabilirsiniz (1-10 arası)</li>
               <li>• Yüksek öncelikli dersler daha iyi zaman dilimlerine yerleştirilir</li>
               <li>• Ders saatleri daha sonra öğretmen atamalarında kullanılır</li>
               <li>• Seviye filtresi ile ilgili dersleri daha kolay bulabilirsiniz</li>

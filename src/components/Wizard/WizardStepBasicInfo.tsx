@@ -5,6 +5,7 @@ import Select from '../UI/Select';
 
 interface BasicInfoData {
   name: string;
+  programName: string; // Added for compatibility
   academicYear: string;
   semester: string;
   startDate: string;
@@ -80,7 +81,7 @@ const WizardStepBasicInfo: React.FC<WizardStepBasicInfoProps> = ({ data, onUpdat
       }
     }
 
-    // CRITICAL: Update programName field for compatibility with validation
+    // CRITICAL: Update programName field for compatibility
     if (field === 'name') {
       updatedData.programName = value as string;
     }
@@ -125,7 +126,6 @@ const WizardStepBasicInfo: React.FC<WizardStepBasicInfoProps> = ({ data, onUpdat
             value={data.semester || 'fall'}
             onChange={(value) => handleChange('semester', value)}
             options={semesterOptions}
-            required
           />
         </div>
 

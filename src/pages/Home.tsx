@@ -177,14 +177,13 @@ const Home = () => {
       {/* Program Templates Section */}
       {templates.length > 0 && (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-gradient-to-br from-ide-primary-50 via-white to-ide-secondary-50 rounded-2xl shadow-lg border border-ide-primary-100 p-8">
+            <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 flex items-center">
-                  <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+                <h2 className="text-2xl font-extrabold text-ide-primary-800 flex items-center tracking-tight">
                   Oluşturulan Programlar
                 </h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-ide-primary-600 mt-1 font-medium">
                   {templates.length} program • Düzenlemek için tıklayın
                 </p>
               </div>
@@ -192,69 +191,64 @@ const Home = () => {
                 onClick={() => navigate('/schedule-wizard')}
                 icon={Plus}
                 variant="primary"
-                size="sm"
+                size="md"
+                className="shadow-md"
               >
                 Yeni Program
               </Button>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {sortedTemplates.map((template) => (
                 <div
                   key={template.id}
-                  className="group bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                  className="group bg-white rounded-2xl p-6 border border-ide-primary-100 shadow-sm hover:shadow-lg hover:border-ide-primary-300 transition-all duration-200 cursor-pointer relative flex flex-col min-h-[210px]"
                   onClick={() => handleEditTemplate(template.id)}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-                        {template.name}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {template.academicYear} {template.semester} Dönemi
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditTemplate(template.id);
-                        }}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                        title="Düzenle"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTemplate(template);
-                        }}
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Sil"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                  {/* Durum Rozeti */}
+                  <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-semibold shadow-sm border
+                    ${template.status === 'published' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      template.status === 'draft' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                      'bg-gray-50 text-gray-500 border-gray-200'}`}
+                  >
+                    {template.status === 'published' ? 'Yayınlandı' : template.status === 'draft' ? 'Taslak' : 'Arşivlendi'}
+                  </span>
+                  {/* Başlık ve Dönem */}
+                  <div className="flex items-center space-x-3 mb-2">
+                    <Calendar className="w-6 h-6 text-ide-primary-600 flex-shrink-0" />
+                    <h3 className="font-bold text-lg text-ide-primary-900 truncate group-hover:text-ide-primary-700 transition-colors">
+                      {template.name}
+                    </h3>
                   </div>
-                  
+                  <p className="text-xs text-ide-primary-500 mb-1 font-medium">
+                    {template.academicYear} {template.semester} Dönemi
+                  </p>
                   {template.description && (
-                    <p className="text-xs text-gray-500 mb-3 line-clamp-2">
+                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">
                       {template.description}
                     </p>
                   )}
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">
+                  <div className="flex-1" />
+                  {/* Alt Bilgi ve Aksiyonlar */}
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100">
+                    <span className="text-xs text-gray-400 flex items-center">
+                      <Clock className="w-4 h-4 mr-1" />
                       {new Date(template.updatedAt).toLocaleDateString('tr-TR')}
                     </span>
-                  </div>
-                  
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <div className="flex items-center text-xs text-gray-500">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      <span>Düzenlemek için tıklayın</span>
-                      <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={e => { e.stopPropagation(); handleEditTemplate(template.id); }}
+                        className="p-2 rounded-lg bg-ide-primary-50 hover:bg-ide-primary-100 text-ide-primary-700 hover:text-ide-primary-900 shadow-sm border border-transparent hover:border-ide-primary-200 transition"
+                        title="Düzenle"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDeleteTemplate(template); }}
+                        className="p-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-800 shadow-sm border border-transparent hover:border-red-200 transition"
+                        title="Sil"
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </div>
                 </div>

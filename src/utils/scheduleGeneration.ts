@@ -532,8 +532,8 @@ const calculateFinalStatistics = (
   // Öğretmen kullanımı hesapla
   const teacherUtilization: { [teacherId: string]: number } = {};
   Object.entries(context.teacherWorkloads).forEach(([teacherId, workload]) => {
-    // Maksimum 30 saat/hafta varsayımı
-    teacherUtilization[teacherId] = Math.min((workload / 30) * 100, 100);
+    // Maksimum 45 saat/hafta varsayımı
+    teacherUtilization[teacherId] = Math.min((workload / 45) * 100, 100);
   });
 
   return {

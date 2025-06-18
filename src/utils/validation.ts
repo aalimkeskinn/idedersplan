@@ -138,7 +138,7 @@ export const validateSubject = (subject: Partial<Subject>): string[] => {
   return errors;
 };
 
-// ENHANCED: Real-time conflict detection for slot assignment - ULTRA VERSION
+// IMPROVED: Real-time conflict detection for slot assignment - ENHANCED VERSION
 export const checkSlotConflict = (
   mode: 'teacher' | 'class',
   day: string,
@@ -164,7 +164,7 @@ export const checkSlotConflict = (
     return { hasConflict: true, message: 'Geçersiz gün veya ders saati' };
   }
 
-  console.log('🔍 ULTRA Çakışma kontrolü başlatıldı:', {
+  console.log('🔍 ENHANCED Çakışma kontrolü başlatıldı:', {
     mode,
     day: sanitizedDay,
     period: sanitizedPeriod,
@@ -174,7 +174,7 @@ export const checkSlotConflict = (
   });
 
   if (mode === 'teacher') {
-    // ULTRA: Teacher mode - Check if class is already assigned to another teacher at this time
+    // IMPROVED: Teacher mode - Check if class is already assigned to another teacher at this time
     const conflictingSchedules = allSchedules.filter(schedule => {
       // Skip current teacher's schedule
       if (schedule.teacherId === currentEntityId) {
@@ -213,7 +213,7 @@ export const checkSlotConflict = (
       };
     }
   } else {
-    // ULTRA: Class mode - Check if teacher is already assigned to another class at this time
+    // IMPROVED: Class mode - Check if teacher is already assigned to another class at this time
     const teacherSchedule = allSchedules.find(s => s.teacherId === targetId);
     
     console.log('🔍 Class mode - öğretmen programı kontrol ediliyor:', {
@@ -234,7 +234,7 @@ export const checkSlotConflict = (
         isFixedPeriod: existingSlot?.classId === 'fixed-period'
       });
       
-      // ULTRA: Check if teacher is already assigned to a different class (not fixed period)
+      // IMPROVED: Check if teacher is already assigned to a different class (not fixed period)
       if (existingSlot?.classId && 
           existingSlot.classId !== currentEntityId && 
           existingSlot.classId !== 'fixed-period') {
@@ -258,7 +258,7 @@ export const checkSlotConflict = (
   return { hasConflict: false, message: '' };
 };
 
-// ENHANCED: Enhanced schedule validation with detailed conflict detection - ULTRA VERSION
+// IMPROVED: Enhanced schedule validation with detailed conflict detection - ENHANCED VERSION
 export const validateSchedule = (
   mode: 'teacher' | 'class',
   currentSchedule: Schedule['schedule'],
@@ -283,7 +283,7 @@ export const validateSchedule = (
     return { isValid: false, errors, warnings };
   }
 
-  console.log('🔍 ULTRA Program doğrulama başlatıldı:', {
+  console.log('🔍 ENHANCED Program doğrulama başlatıldı:', {
     mode,
     selectedId,
     scheduleSlots: Object.keys(currentSchedule).length
@@ -306,7 +306,7 @@ export const validateSchedule = (
     }
   });
 
-  // ULTRA: Comprehensive conflict detection with better filtering
+  // IMPROVED: Comprehensive conflict detection with better filtering
   const conflictMap = new Map<string, string[]>(); // Track conflicts per slot
   
   DAYS.forEach(day => {
@@ -317,7 +317,7 @@ export const validateSchedule = (
       const slotKey = `${day}-${period}`;
 
       if (mode === 'teacher' && slot.classId) {
-        // ULTRA: Check if this class is assigned to another teacher at the same time
+        // IMPROVED: Check if this class is assigned to another teacher at the same time
         const conflictingSchedules = allSchedules.filter(schedule => {
           // Skip current teacher's schedule
           if (schedule.teacherId === selectedId) return false;
@@ -339,7 +339,7 @@ export const validateSchedule = (
         }
         
       } else if (mode === 'class' && slot.teacherId) {
-        // ULTRA: Check if this teacher is assigned to another class at the same time
+        // IMPROVED: Check if this teacher is assigned to another class at the same time
         const teacherSchedule = allSchedules.find(s => s.teacherId === slot.teacherId);
         
         if (teacherSchedule) {
@@ -375,7 +375,7 @@ export const validateSchedule = (
   });
   errors.push(...allConflicts);
 
-  console.log('📊 ULTRA Doğrulama sonuçları:', {
+  console.log('📊 ENHANCED Doğrulama sonuçları:', {
     isValid: errors.length === 0,
     errorsCount: errors.length,
     warningsCount: warnings.length,
@@ -391,7 +391,7 @@ export const validateSchedule = (
   };
 };
 
-// ULTRA: Check level and branch compatibility - ENHANCED VERSION
+// IMPROVED: Check level and branch compatibility - ENHANCED VERSION
 const checkCompatibility = (
   slot: any,
   teachers: Teacher[],

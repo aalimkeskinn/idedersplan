@@ -108,12 +108,12 @@ export const createSubjectTeacherMappings = (
 };
 
 /**
- * ULTRA: Bir ders için en uygun öğretmeni bulur
+ * IMPROVED: Bir ders için en uygun öğretmeni bulur
  * Öncelik sırası:
  * 1. Sınıfa atanan öğretmenler arasından branş ve seviye uyumlu olanlar
  * 2. Tüm seçili öğretmenler arasından branş ve seviye uyumlu olanlar
  * 3. Sınıfa atanan öğretmenler arasından sadece seviye uyumlu olanlar
- * 4. Tüm öğretmenler arasından sadece seviye uyumlu olanlar
+ * 4. Tüm seçili öğretmenler arasından sadece seviye uyumlu olanlar
  */
 export const findSuitableTeacher = (
   subject: Subject,
@@ -135,7 +135,7 @@ export const findSuitableTeacher = (
   // Tüm seçili öğretmenleri al (fallback için)
   const allSelectedTeachers = allTeachers; // Burada wizardData'dan seçili öğretmenleri alabilirsiniz
 
-  // ULTRA: Sınıf öğretmenini öncelikle kontrol et
+  // IMPROVED: Sınıf öğretmenini öncelikle kontrol et
   if (classItem.classTeacherId) {
     const classTeacher = allTeachers.find(t => t.id === classItem.classTeacherId);
     if (classTeacher) {
@@ -219,32 +219,12 @@ export const findSuitableTeacher = (
     return suitableTeacher;
   }
 
-  // 6. En son çare: Herhangi bir öğretmen
-  if (allSelectedTeachers.length > 0) {
-    // Seviye uyumluluğuna göre sırala
-    const sortedTeachers = [...allSelectedTeachers].sort((a, b) => {
-      // Seviye uyumluluğu
-      if (a.level === subject.level && b.level !== subject.level) return -1;
-      if (a.level !== subject.level && b.level === subject.level) return 1;
-      
-      // Branş uyumluluğu
-      if (a.branch === subject.branch && b.branch !== subject.branch) return -1;
-      if (a.branch !== subject.branch && b.branch === subject.branch) return 1;
-      
-      return 0;
-    });
-    
-    suitableTeacher = sortedTeachers[0];
-    console.log(`⚠️ Acil durum eşleştirmesi: ${suitableTeacher.name} (${suitableTeacher.branch} - ${suitableTeacher.level})`);
-    return suitableTeacher;
-  }
-
   console.error(`❌ ${subject.name} dersi için hiç uygun öğretmen bulunamadı!`);
   return null;
 };
 
 /**
- * ULTRA: Öğretmen-ders-sınıf uyumluluğu skorunu hesaplar
+ * IMPROVED: Öğretmen-ders-sınıf uyumluluğu skorunu hesaplar
  * 100: Mükemmel uyum (branş ve seviye eşleşiyor)
  * 75: İyi uyum (sadece seviye eşleşiyor)
  * 50: Orta uyum (sadece branş eşleşiyor)
@@ -272,12 +252,7 @@ export const calculateCompatibilityScore = (
     score += 25; // İlgili branş
   }
 
-  // Sınıf öğretmeni bonus (10 puan)
-  if (classItem.classTeacherId === teacher.id) {
-    score += 10;
-  }
-
-  return Math.min(score, 100); // Maksimum 100 puan
+  return score;
 };
 
 /**
@@ -301,7 +276,7 @@ const isRelatedBranch = (teacherBranch: string, subjectBranch: string): boolean 
 };
 
 /**
- * ULTRA: Haftalık saat limitlerini kontrol eder
+ * IMPROVED: Haftalık saat limitlerini kontrol eder
  * CRITICAL: Bu fonksiyon, bir dersin haftalık saat limitini kontrol eder
  * ve limit dolmuşsa false döndürür
  */
@@ -427,7 +402,7 @@ export const calculateMappingStatistics = (
 };
 
 /**
- * ULTRA: Eşleştirmeleri öncelik sırasına göre sıralar
+ * IMPROVED: Eşleştirmeleri öncelik sırasına göre sıralar
  */
 export const sortMappingsByPriority = (
   mappings: SubjectTeacherMapping[]
@@ -453,15 +428,14 @@ export const sortMappingsByPriority = (
 };
 
 /**
- * ULTRA: Belirli bir slot için en uygun eşleştirmeyi bulur
+ * IMPROVED: Belirli bir slot için en uygun eşleştirmeyi bulur
  * CRITICAL: Bu fonksiyon, bir slot için en uygun dersi seçer
  */
 export const findBestMappingForSlot = (
   mappings: SubjectTeacherMapping[],
   day: string,
   period: string,
-  classId: string,
-  existingSchedules: Schedule[] = [] // Mevcut programlar
+  classId: string
 ): SubjectTeacherMapping | null => {
   
   // CRITICAL: Bu sınıf için geçerli eşleştirmeleri al
@@ -479,27 +453,12 @@ export const findBestMappingForSlot = (
   // Öncelik sırasına göre sırala
   const sortedMappings = sortMappingsByPriority(classMappings);
   
-  // Çakışma kontrolü yap
-  for (const mapping of sortedMappings) {
-    // Öğretmen çakışması kontrolü
-    const teacherConflict = existingSchedules.some(schedule => {
-      const slot = schedule.schedule[day]?.[period];
-      return slot && 
-             slot.teacherId === mapping.teacherId && 
-             slot.classId !== 'fixed-period';
-    });
-    
-    if (!teacherConflict) {
-      return mapping;
-    }
-  }
-  
-  // Çakışma olmayan bir eşleştirme bulunamadı
-  return null;
+  // En yüksek öncelikli ve uyumlu olanı döndür
+  return sortedMappings[0] || null;
 };
 
 /**
- * ULTRA: Eşleştirme doğrulama
+ * IMPROVED: Eşleştirme doğrulama
  */
 export const validateMappings = (
   mappings: SubjectTeacherMapping[],

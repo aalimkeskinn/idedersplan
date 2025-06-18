@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Zap, Settings, Play, CheckCircle, AlertTriangle, Clock, BarChart3, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Zap, Settings, Play, CheckCircle, AlertTriangle, Clock, BarChart3 } from 'lucide-react';
 import { WizardData } from '../../types/wizard';
-import { useToast } from '../../hooks/useToast';
 import Button from '../UI/Button';
 import Select from '../UI/Select';
-import ErrorModal from '../UI/ErrorModal';
 
 interface WizardStepGenerationProps {
   data: WizardData['generationSettings'];
@@ -12,13 +10,6 @@ interface WizardStepGenerationProps {
   onUpdate: (data: WizardData['generationSettings']) => void;
   onGenerate: () => void;
   isGenerating: boolean;
-  generationResult?: {
-    success: boolean;
-    schedules: any[];
-    conflicts: string[];
-    warnings: string[];
-    errors: string[];
-  };
 }
 
 const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
@@ -26,44 +17,9 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
   wizardData,
   onUpdate,
   onGenerate,
-  isGenerating,
-  generationResult
+  isGenerating
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [retryCount, setRetryCount] = useState(0);
-  const [isAutoRetrying, setIsAutoRetrying] = useState(false);
-  const { error, warning, info } = useToast();
-
-  // Otomatik yeniden deneme mekanizması
-  useEffect(() => {
-    if (generationResult && !generationResult.success && generationResult.conflicts.length > 0) {
-      if (retryCount < 3 && !isAutoRetrying) {
-        setIsAutoRetrying(true);
-        const timer = setTimeout(() => {
-          console.log(`🔄 Çakışma tespit edildi, otomatik yeniden deneme #${retryCount + 1}...`);
-          warning('⚠️ Çakışma Tespit Edildi', `Otomatik yeniden deneme #${retryCount + 1} başlatılıyor...`);
-          setRetryCount(prev => prev + 1);
-          onGenerate();
-          setIsAutoRetrying(false);
-        }, 1500);
-        
-        return () => clearTimeout(timer);
-      } else if (retryCount >= 3) {
-        // 3 deneme sonrası hala çakışma varsa, hata göster
-        setErrorMessage(`Program oluşturma sırasında çakışmalar tespit edildi ve 3 deneme sonrası çözülemedi:\n\n${generationResult.conflicts.join('\n')}`);
-        setShowErrorModal(true);
-        error('❌ Program Oluşturulamadı', '3 deneme sonrası çakışmalar çözülemedi');
-      }
-    } else if (generationResult && generationResult.success) {
-      // Başarılı olduğunda retry sayacını sıfırla
-      setRetryCount(0);
-      if (retryCount > 0) {
-        info('✅ Program Başarıyla Oluşturuldu', `${retryCount} deneme sonrası çakışmalar çözüldü`);
-      }
-    }
-  }, [generationResult, retryCount, isAutoRetrying, onGenerate, error, warning, info]);
 
   const algorithmOptions = [
     { 
@@ -171,7 +127,6 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
     prioritizeClassPreferences: true,
     generateMultipleOptions: false,
     allowOverlaps: false,
-    maxRetries: 3,
     ...data
   };
 
@@ -187,22 +142,9 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
     });
     
     if (canGenerate && onGenerate) {
-      // Retry sayacını sıfırla
-      setRetryCount(0);
       onGenerate();
     } else {
       console.warn('⚠️ Program oluşturulamıyor:', issues);
-      setErrorMessage(`Program oluşturulamıyor:\n\n${issues.join('\n')}`);
-      setShowErrorModal(true);
-    }
-  };
-
-  const handleManualRetry = () => {
-    if (canGenerate && onGenerate) {
-      console.log('🔄 Manuel yeniden deneme başlatılıyor...');
-      warning('🔄 Yeniden Deneme', 'Program oluşturma yeniden başlatılıyor...');
-      setRetryCount(prev => prev + 1);
-      onGenerate();
     }
   };
 
@@ -287,95 +229,8 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
           </div>
         )}
 
-        {/* Generation Results */}
-        {generationResult && (
-          <div className={`mb-4 p-3 border rounded-lg ${
-            generationResult.success 
-              ? 'bg-green-50 border-green-200' 
-              : 'bg-red-50 border-red-200'
-          }`}>
-            <div className="flex items-start space-x-2">
-              {generationResult.success ? (
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-              ) : (
-                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-              )}
-              <div>
-                <h5 className={`font-medium mb-1 ${
-                  generationResult.success ? 'text-green-800' : 'text-red-800'
-                }`}>
-                  {generationResult.success 
-                    ? 'Program Başarıyla Oluşturuldu!' 
-                    : 'Program Oluşturma Sorunları:'}
-                </h5>
-                
-                {generationResult.success ? (
-                  <div className="text-sm text-green-700">
-                    <p>✅ {generationResult.schedules.length} program oluşturuldu</p>
-                    {generationResult.warnings.length > 0 && (
-                      <div className="mt-2">
-                        <p className="font-medium">Uyarılar:</p>
-                        <ul className="list-disc list-inside space-y-1 mt-1">
-                          {generationResult.warnings.slice(0, 3).map((warning, index) => (
-                            <li key={index}>{warning}</li>
-                          ))}
-                          {generationResult.warnings.length > 3 && (
-                            <li>...ve {generationResult.warnings.length - 3} uyarı daha</li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    {generationResult.conflicts.length > 0 && (
-                      <div className="mt-1">
-                        <p className="text-sm font-medium text-red-800">Çakışmalar:</p>
-                        <ul className="text-sm text-red-700 list-disc list-inside space-y-1 mt-1">
-                          {generationResult.conflicts.slice(0, 3).map((conflict, index) => (
-                            <li key={index}>{conflict}</li>
-                          ))}
-                          {generationResult.conflicts.length > 3 && (
-                            <li>...ve {generationResult.conflicts.length - 3} çakışma daha</li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                    
-                    {generationResult.errors.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-sm font-medium text-red-800">Hatalar:</p>
-                        <ul className="text-sm text-red-700 list-disc list-inside space-y-1 mt-1">
-                          {generationResult.errors.slice(0, 3).map((error, index) => (
-                            <li key={index}>{error}</li>
-                          ))}
-                          {generationResult.errors.length > 3 && (
-                            <li>...ve {generationResult.errors.length - 3} hata daha</li>
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                    
-                    <div className="mt-3">
-                      <Button
-                        onClick={handleManualRetry}
-                        icon={RefreshCw}
-                        variant="primary"
-                        size="sm"
-                        disabled={isGenerating}
-                      >
-                        Yeniden Dene
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Success */}
-        {canGenerate && !generationResult && (
+        {canGenerate && (
           <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center space-x-2">
               <CheckCircle className="w-5 h-5 text-green-600" />
@@ -487,26 +342,6 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
                   />
                   <span className="text-sm">Çakışmalara izin ver (acil durumlar için)</span>
                 </label>
-
-                {/* Yeni: Maksimum yeniden deneme sayısı */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Maksimum Yeniden Deneme Sayısı
-                  </label>
-                  <select
-                    value={currentData.maxRetries || 3}
-                    onChange={(e) => handleChange('maxRetries', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="1">1 deneme</option>
-                    <option value="3">3 deneme</option>
-                    <option value="5">5 deneme</option>
-                    <option value="10">10 deneme</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Çakışma durumunda kaç kez yeniden deneneceğini belirler
-                  </p>
-                </div>
               </div>
             )}
           </div>
@@ -519,22 +354,13 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
           <h4 className="font-semibold text-gray-900 mb-2">Program Oluşturmaya Hazır!</h4>
           <p className="text-sm text-gray-600 mb-4">
             Tahmini süre: <span className="font-medium text-purple-600">{getEstimatedTime()} dakika</span>
-            {retryCount > 0 && (
-              <span className="ml-2 text-yellow-600">
-                (Deneme #{retryCount})
-              </span>
-            )}
           </p>
           
           {isGenerating ? (
             <div className="space-y-4">
               <div className="flex items-center justify-center space-x-2">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
-                <span className="text-purple-600 font-medium">
-                  {isAutoRetrying 
-                    ? `Çakışma tespit edildi, yeniden deneniyor (${retryCount}/3)...` 
-                    : 'Program oluşturuluyor...'}
-                </span>
+                <span className="text-purple-600 font-medium">Program oluşturuluyor...</span>
               </div>
               <div className="w-full bg-purple-200 rounded-full h-2">
                 <div className="bg-purple-600 h-2 rounded-full animate-pulse" style={{ width: '45%' }}></div>
@@ -571,19 +397,10 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
               <li>• Birden fazla alternatif program oluşturabilir</li>
               <li>• Sonuçları PDF olarak indirebilirsiniz</li>
               <li>• Haftalık ders saati 45'e kadar desteklenir</li>
-              <li>• <strong>Çakışma durumunda otomatik olarak yeniden denenir</strong></li>
             </ul>
           </div>
         </div>
       </div>
-
-      {/* Error Modal */}
-      <ErrorModal
-        isOpen={showErrorModal}
-        onClose={() => setShowErrorModal(false)}
-        title="Program Oluşturma Hatası"
-        message={errorMessage}
-      />
     </div>
   );
 };

@@ -90,8 +90,7 @@ export const generateSystematicSchedule = async (
           wizardData,
           teachers,
           classes,
-          subjects,
-          schedules // Mevcut programları da geçir
+          subjects
         );
         
         // Eğer program oluşturuldu ama çakışma varsa, yeniden dene
@@ -226,8 +225,7 @@ const generateClassSchedule = async (
   wizardData: WizardData,
   teachers: Teacher[],
   classes: Class[],
-  subjects: Subject[],
-  existingSchedules: Schedule[] = [] // Mevcut programlar
+  subjects: Subject[]
 ): Promise<Schedule | null> => {
   
   const classItem = classes.find(c => c.id === classId);
@@ -336,8 +334,8 @@ const generateClassSchedule = async (
       // IMPROVED: Çakışma kontrolü - Hem öğretmen hem de sınıf bazlı
       let hasConflict = false;
       
-      // 1. Öğretmen çakışması kontrolü - Mevcut programlarda ve oluşturulmuş programlarda
-      const teacherConflict = [...Object.values(context.classSchedules), ...existingSchedules].some(existingSchedule => {
+      // 1. Öğretmen çakışması kontrolü
+      const teacherConflict = Object.values(context.classSchedules).some(existingSchedule => {
         const existingSlot = existingSchedule.schedule[day]?.[period];
         return existingSlot && 
                existingSlot.teacherId === mapping.teacherId && 
@@ -350,8 +348,8 @@ const generateClassSchedule = async (
         hasConflict = true;
       }
       
-      // 2. Sınıf çakışması kontrolü - Mevcut programlarda ve oluşturulmuş programlarda
-      const classConflict = [...Object.values(context.classSchedules), ...existingSchedules].some(existingSchedule => {
+      // 2. Sınıf çakışması kontrolü
+      const classConflict = Object.values(context.classSchedules).some(existingSchedule => {
         const existingSlot = existingSchedule.schedule[day]?.[period];
         return existingSlot && 
                existingSlot.classId === classId && 
@@ -459,8 +457,8 @@ const generateClassSchedule = async (
         // IMPROVED: Çakışma kontrolü - Hem öğretmen hem de sınıf bazlı
         let hasConflict = false;
         
-        // 1. Öğretmen çakışması kontrolü - Mevcut programlarda ve oluşturulmuş programlarda
-        const teacherConflict = [...Object.values(context.classSchedules), ...existingSchedules].some(existingSchedule => {
+        // 1. Öğretmen çakışması kontrolü
+        const teacherConflict = Object.values(context.classSchedules).some(existingSchedule => {
           const existingSlot = existingSchedule.schedule[slot.day]?.[slot.period];
           return existingSlot && 
                  existingSlot.teacherId === selectedMapping.teacherId && 
@@ -473,8 +471,8 @@ const generateClassSchedule = async (
           hasConflict = true;
         }
         
-        // 2. Sınıf çakışması kontrolü - Mevcut programlarda ve oluşturulmuş programlarda
-        const classConflict = [...Object.values(context.classSchedules), ...existingSchedules].some(existingSchedule => {
+        // 2. Sınıf çakışması kontrolü
+        const classConflict = Object.values(context.classSchedules).some(existingSchedule => {
           const existingSlot = existingSchedule.schedule[slot.day]?.[slot.period];
           return existingSlot && 
                  existingSlot.classId === classId && 
@@ -547,8 +545,8 @@ const generateClassSchedule = async (
         DAYS.forEach(day => {
           dailySlots[day].forEach(slot => {
             if (!slot.filled) {
-              // Çakışma kontrolü - Mevcut programlarda ve oluşturulmuş programlarda
-              const teacherConflict = [...Object.values(context.classSchedules), ...existingSchedules].some(existingSchedule => {
+              // Çakışma kontrolü
+              const teacherConflict = Object.values(context.classSchedules).some(existingSchedule => {
                 const existingSlot = existingSchedule.schedule[day]?.[slot.period];
                 return existingSlot && 
                        existingSlot.teacherId === classTeacherId && 
@@ -571,59 +569,6 @@ const generateClassSchedule = async (
             }
           });
         });
-      }
-      
-      // Hala boş slotlar varsa, herhangi bir öğretmenle doldur
-      filledSlots = 0;
-      DAYS.forEach(day => {
-        PERIODS.forEach(period => {
-          if (schedule.schedule[day][period] && 
-              schedule.schedule[day][period]?.classId !== 'fixed-period') {
-            filledSlots++;
-          }
-        });
-      });
-      
-      if (filledSlots < 45) {
-        console.log(`⚠️ ${classItem.name} için hala ${45 - filledSlots} boş slot var, rastgele öğretmenlerle dolduruluyor...`);
-        
-        // Tüm öğretmenleri al
-        const availableTeachers = teachers.filter(t => t.level === classItem.level);
-        
-        if (availableTeachers.length > 0) {
-          // Boş slotları bul
-          DAYS.forEach(day => {
-            dailySlots[day].forEach(slot => {
-              if (!slot.filled) {
-                // Rastgele bir öğretmen seç
-                const randomTeacherIndex = Math.floor(Math.random() * availableTeachers.length);
-                const randomTeacher = availableTeachers[randomTeacherIndex];
-                
-                // Çakışma kontrolü - Mevcut programlarda ve oluşturulmuş programlarda
-                const teacherConflict = [...Object.values(context.classSchedules), ...existingSchedules].some(existingSchedule => {
-                  const existingSlot = existingSchedule.schedule[day]?.[slot.period];
-                  return existingSlot && 
-                         existingSlot.teacherId === randomTeacher.id && 
-                         existingSlot.classId !== 'fixed-period';
-                });
-                
-                if (!teacherConflict) {
-                  // Rastgele öğretmen ile doldur
-                  schedule.schedule[day][slot.period] = {
-                    subjectId: '', // Genel ders
-                    classId: classId,
-                    teacherId: randomTeacher.id
-                  };
-                  
-                  // Slot'u doldurulmuş olarak işaretle
-                  slot.filled = true;
-                  
-                  console.log(`✅ Boş slot rastgele öğretmen ile dolduruldu: ${day} ${slot.period}. ders: ${randomTeacher.name}`);
-                }
-              }
-            });
-          });
-        }
       }
     }
   }
@@ -664,8 +609,7 @@ const fillEmptySlots = (
   context: ScheduleGenerationContext,
   teachers: Teacher[],
   classes: Class[],
-  subjects: Subject[],
-  existingSchedules: Schedule[] = [] // Mevcut programlar
+  subjects: Subject[]
 ) => {
   // Boş slotları bul
   DAYS.forEach(day => {
@@ -681,8 +625,8 @@ const fillEmptySlots = (
           // IMPROVED: Çakışma kontrolü - Hem öğretmen hem de sınıf bazlı
           let hasConflict = false;
           
-          // 1. Öğretmen çakışması kontrolü - Mevcut programlarda ve oluşturulmuş programlarda
-          const teacherConflict = [...Object.values(context.classSchedules), ...existingSchedules].some(existingSchedule => {
+          // 1. Öğretmen çakışması kontrolü
+          const teacherConflict = Object.values(context.classSchedules).some(existingSchedule => {
             const existingSlot = existingSchedule.schedule[day]?.[period];
             return existingSlot && 
                    existingSlot.teacherId === availableMapping.teacherId && 
@@ -695,8 +639,8 @@ const fillEmptySlots = (
             hasConflict = true;
           }
           
-          // 2. Sınıf çakışması kontrolü - Mevcut programlarda ve oluşturulmuş programlarda
-          const classConflict = [...Object.values(context.classSchedules), ...existingSchedules].some(existingSchedule => {
+          // 2. Sınıf çakışması kontrolü
+          const classConflict = Object.values(context.classSchedules).some(existingSchedule => {
             const existingSlot = existingSchedule.schedule[day]?.[period];
             return existingSlot && 
                    existingSlot.classId === availableMapping.classId && 

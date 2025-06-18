@@ -24,11 +24,11 @@ dist-ssr
 *.sw?
 
 # Environment variables - CRITICAL SECURITY
-.env
-.env.local
-.env.development
-.env.production
-.env.test
+#.env
+#.env.local
+#.env.development
+#.env.production
+#.env.test
 
 # Firebase
 .firebase/

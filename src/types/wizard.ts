@@ -57,6 +57,54 @@ export interface WizardData {
   };
 }
 
+// CRITICAL: NEW - Subject-Teacher Mapping System
+export interface SubjectTeacherMapping {
+  id: string;
+  subjectId: string;
+  teacherId: string;
+  classId: string;
+  weeklyHours: number;
+  assignedHours: number;
+  priority: 'high' | 'medium' | 'low';
+  isValid: boolean;
+  compatibilityScore: number;
+  createdAt: Date;
+}
+
+// CRITICAL: NEW - Schedule Generation Context
+export interface ScheduleGenerationContext {
+  mappings: SubjectTeacherMapping[];
+  totalSlotsNeeded: number;
+  totalSlotsAvailable: number;
+  classSchedules: { [classId: string]: Schedule };
+  teacherWorkloads: { [teacherId: string]: number };
+  subjectDistribution: { [subjectId: string]: number };
+  conflicts: string[];
+  warnings: string[];
+}
+
+// CRITICAL: NEW - Generation Result with detailed feedback
+export interface EnhancedGenerationResult {
+  success: boolean;
+  schedules: Schedule[];
+  context: ScheduleGenerationContext;
+  statistics: {
+    totalSlots: number;
+    filledSlots: number;
+    emptySlots: number;
+    conflictCount: number;
+    satisfiedConstraints: number;
+    totalConstraints: number;
+    subjectCoverage: { [subjectId: string]: number };
+    teacherUtilization: { [teacherId: string]: number };
+  };
+  warnings: string[];
+  errors: string[];
+  generationTime: number;
+  algorithm: string;
+  optimizationLevel: string;
+}
+
 export interface Classroom {
   id: string;
   name: string;

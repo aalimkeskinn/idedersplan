@@ -209,7 +209,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
 
   // Filtrelenmiş öğretmen listesi - sınıf seviyesine göre
   const getFilteredTeachers = () => {
-    if (!formData.level) return [];
+    if (!formData.level || !teachers || !Array.isArray(teachers)) return [];
     
     return teachers
       .filter(teacher => teacher.level === formData.level)
@@ -312,7 +312,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   // Get classroom options for select
   const classroomOptions = [
     { value: '', label: 'Seçiniz...' },
-    ...classrooms.map(classroom => ({
+    ...(classrooms || []).map(classroom => ({
       value: classroom.id,
       label: classroom.name
     }))
@@ -321,7 +321,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   // Get teacher options for select
   const teacherOptions = [
     { value: '', label: 'Seçiniz...' },
-    ...teachers.map(teacher => ({
+    ...(teachers || []).map(teacher => ({
       value: teacher.id,
       label: `${teacher.name} (${teacher.branch})`
     }))
@@ -329,14 +329,14 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
 
   // Sınıf öğretmeni adını getir
   const getClassTeacherName = (classTeacherId: string | undefined) => {
-    if (!classTeacherId) return '';
+    if (!classTeacherId || !teachers || !Array.isArray(teachers)) return '';
     const teacher = teachers.find(t => t.id === classTeacherId);
     return teacher ? teacher.name : '';
   };
 
   // Sınıf öğretmenlerinin adlarını getir
   const getClassTeacherNames = (teacherIds: string[] | undefined) => {
-    if (!teacherIds || !Array.isArray(teacherIds) || teacherIds.length === 0) return '';
+    if (!teacherIds || !Array.isArray(teacherIds) || teacherIds.length === 0 || !teachers || !Array.isArray(teachers)) return '';
     
     const classTeachers = teachers.filter(t => teacherIds.includes(t.id));
     return classTeachers.map(t => t.name).join(', ');
@@ -491,7 +491,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
                           <Users className="w-3 h-3 text-blue-600 mr-1" />
                           <p className="text-xs text-blue-700">
                             {classItem.teacherIds.length} öğretmen atanmış
-                            {classItem.classTeacherId && (
+                            {classItem.classTeacherId && teachers && Array.isArray(teachers) && (
                               <span className="ml-1 font-medium">
                                 (Sınıf öğretmeni: {teachers.find(t => t.id === classItem.classTeacherId)?.name})
                               </span>

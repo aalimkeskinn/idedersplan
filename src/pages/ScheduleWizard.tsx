@@ -518,7 +518,7 @@ const ScheduleWizard = () => {
     return !!subjectConstraint;
   };
 
-  // Enhanced schedule generation algorithm with constraint checking
+  // ENHANCED: Track subject assignment counts to respect weekly hour limits
   const generateScheduleForTeacher = (
     teacherId: string,
     selectedClasses: Class[],
@@ -608,6 +608,24 @@ const ScheduleWizard = () => {
       return true;
     });
 
+    // NEW: Track subject assignment counts to respect weekly hour limits
+    const subjectAssignmentCounts: { [subjectId: string]: { [classId: string]: number } } = {};
+    
+    // Initialize subject assignment counts
+    compatibleSubjects.forEach(subject => {
+      subjectAssignmentCounts[subject.id] = {};
+      teacherClasses.forEach(classItem => {
+        subjectAssignmentCounts[subject.id][classItem.id] = 0;
+      });
+    });
+
+    // NEW: Get weekly hour limit for each subject from wizard data
+    const getSubjectWeeklyHourLimit = (subjectId: string): number => {
+      return wizardData.subjects.subjectHours[subjectId] || 
+             subjects.find(s => s.id === subjectId)?.weeklyHours || 
+             4; // Default to 4 if not specified
+    };
+
     let assignedHours = 0;
     const targetHours = Math.floor(Math.random() * 11) + 15;
 
@@ -637,7 +655,21 @@ const ScheduleWizard = () => {
       if (!schedule[randomDay][randomPeriod].classId && !isSlotUnavailable(teacherId, randomDay, randomPeriod)) {
         // CRITICAL: Sadece öğretmenin atandığı sınıflardan birini seç
         const randomClass = teacherClasses[Math.floor(Math.random() * teacherClasses.length)];
-        const randomSubject = compatibleSubjects[Math.floor(Math.random() * compatibleSubjects.length)];
+        
+        // NEW: Select a subject that hasn't reached its weekly hour limit for this class
+        const availableSubjects = compatibleSubjects.filter(subject => {
+          const currentCount = subjectAssignmentCounts[subject.id][randomClass.id] || 0;
+          const weeklyLimit = getSubjectWeeklyHourLimit(subject.id);
+          return currentCount < weeklyLimit;
+        });
+        
+        // Skip if no subjects are available for this class
+        if (availableSubjects.length === 0) {
+          console.log(`⚠️ ${randomClass.name} sınıfı için tüm dersler haftalık limitlerini doldurmuş`);
+          continue;
+        }
+        
+        const randomSubject = availableSubjects[Math.floor(Math.random() * availableSubjects.length)];
         
         // ENHANCED: Check all constraint types before assignment
         const hasTeacherConstraint = isSlotUnavailable(teacherId, randomDay, randomPeriod);
@@ -650,8 +682,20 @@ const ScheduleWizard = () => {
             subjectId: randomSubject.id
           };
           
+          // NEW: Update subject assignment count
+          if (!subjectAssignmentCounts[randomSubject.id]) {
+            subjectAssignmentCounts[randomSubject.id] = {};
+          }
+          if (!subjectAssignmentCounts[randomSubject.id][randomClass.id]) {
+            subjectAssignmentCounts[randomSubject.id][randomClass.id] = 0;
+          }
+          subjectAssignmentCounts[randomSubject.id][randomClass.id]++;
+          
+          const weeklyLimit = getSubjectWeeklyHourLimit(randomSubject.id);
+          const currentCount = subjectAssignmentCounts[randomSubject.id][randomClass.id];
+          
           assignedHours++;
-          console.log(`✅ Ders atandı: ${randomDay} ${randomPeriod}. ders - ${randomClass.name} - ${randomSubject.name}`);
+          console.log(`✅ Ders atandı: ${randomDay} ${randomPeriod}. ders - ${randomClass.name} - ${randomSubject.name} (${currentCount}/${weeklyLimit} saat)`);
         } else {
           // Log which constraint blocked the assignment
           const constraintReasons = [];
@@ -669,6 +713,19 @@ const ScheduleWizard = () => {
     if (attempts >= maxAttempts && assignedHours < targetHours) {
       console.warn(`⚠️ ${teacher.name} için maksimum deneme sayısına ulaşıldı. Hedef: ${targetHours}, Atanan: ${assignedHours}`);
     }
+
+    // NEW: Log subject assignment statistics
+    console.log('📊 Ders atama istatistikleri:');
+    Object.entries(subjectAssignmentCounts).forEach(([subjectId, classAssignments]) => {
+      const subject = subjects.find(s => s.id === subjectId);
+      if (subject) {
+        Object.entries(classAssignments).forEach(([classId, count]) => {
+          const classItem = classes.find(c => c.id === classId);
+          const weeklyLimit = getSubjectWeeklyHourLimit(subjectId);
+          console.log(`- ${subject.name} (${classItem?.name || 'Bilinmeyen Sınıf'}): ${count}/${weeklyLimit} saat`);
+        });
+      }
+    });
 
     console.log(`🎯 ${teacher.name} için ${assignedHours} saatlik program oluşturuldu`);
     return schedule;

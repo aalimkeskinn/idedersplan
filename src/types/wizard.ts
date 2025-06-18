@@ -2,7 +2,6 @@ export interface WizardData {
   // Step 1: Basic Info
   basicInfo: {
     programName: string;
-    name?: string; // For backward compatibility
     academicYear: string;
     semester: 'fall' | 'spring' | 'summer';
     startDate?: Date;
@@ -82,7 +81,6 @@ export interface ScheduleGenerationContext {
   subjectDistribution: { [subjectId: string]: number };
   conflicts: string[];
   warnings: string[];
-  errors?: string[]; // Added for error tracking
 }
 
 // CRITICAL: NEW - Generation Result with detailed feedback
@@ -115,8 +113,6 @@ export interface Classroom {
   floor: string;
   building: string;
   equipment: string[]; // equipment IDs
-  shortName?: string;
-  color?: string;
 }
 
 export interface GlobalConstraints {
@@ -190,12 +186,7 @@ export const getStepById = (stepId: WizardStepId) => {
 export const isStepComplete = (stepId: WizardStepId, data: WizardData): boolean => {
   switch (stepId) {
     case 'basic':
-      // CRITICAL: Check both programName and name fields for backward compatibility
-      return !!(
-        (data.basicInfo?.programName || data.basicInfo?.name) && 
-        data.basicInfo?.academicYear && 
-        data.basicInfo?.semester
-      );
+      return !!(data.basicInfo?.programName && data.basicInfo?.academicYear && data.basicInfo?.semester);
     case 'subjects':
       return !!(data.subjects?.selectedSubjects && data.subjects.selectedSubjects.length > 0);
     case 'classes':
@@ -218,8 +209,7 @@ export const validateStep = (stepId: WizardStepId, data: WizardData): string[] =
   
   switch (stepId) {
     case 'basic':
-      // CRITICAL: Check both programName and name fields for backward compatibility
-      if (!data.basicInfo?.programName && !data.basicInfo?.name) errors.push('Program adı gereklidir');
+      if (!data.basicInfo?.programName) errors.push('Program adı gereklidir');
       if (!data.basicInfo?.academicYear) errors.push('Akademik yıl gereklidir');
       if (!data.basicInfo?.semester) errors.push('Dönem seçimi gereklidir');
       break;

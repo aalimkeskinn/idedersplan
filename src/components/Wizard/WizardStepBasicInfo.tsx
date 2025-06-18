@@ -5,7 +5,6 @@ import Select from '../UI/Select';
 
 interface BasicInfoData {
   name: string;
-  programName: string; // Added for compatibility
   academicYear: string;
   semester: string;
   startDate: string;
@@ -48,9 +47,9 @@ const WizardStepBasicInfo: React.FC<WizardStepBasicInfoProps> = ({ data, onUpdat
 
   const semesterOptions = [
     { value: '', label: 'Seçiniz (İsteğe bağlı)' },
-    { value: 'fall', label: 'Güz Dönemi' },
-    { value: 'spring', label: 'Bahar Dönemi' },
-    { value: 'summer', label: 'Yaz Dönemi' }
+    { value: 'Güz', label: 'Güz Dönemi' },
+    { value: 'Bahar', label: 'Bahar Dönemi' },
+    { value: 'Yaz', label: 'Yaz Dönemi' }
   ];
 
   const dailyHoursOptions = [
@@ -79,11 +78,6 @@ const WizardStepBasicInfo: React.FC<WizardStepBasicInfoProps> = ({ data, onUpdat
         updatedData.startDate = selectedYear.startDate;
         updatedData.endDate = selectedYear.endDate;
       }
-    }
-
-    // CRITICAL: Update programName field for compatibility
-    if (field === 'name') {
-      updatedData.programName = value as string;
     }
 
     onUpdate(updatedData);
@@ -123,7 +117,7 @@ const WizardStepBasicInfo: React.FC<WizardStepBasicInfoProps> = ({ data, onUpdat
 
           <Select
             label="Dönem"
-            value={data.semester || 'fall'}
+            value={data.semester || ''}
             onChange={(value) => handleChange('semester', value)}
             options={semesterOptions}
           />
@@ -224,7 +218,7 @@ const WizardStepBasicInfo: React.FC<WizardStepBasicInfoProps> = ({ data, onUpdat
             </h4>
             <div className="text-sm text-gray-700 space-y-1">
               <p><strong>Program:</strong> {data.name}</p>
-              <p><strong>Dönem:</strong> {data.academicYear} {data.semester ? `${semesterOptions.find(opt => opt.value === data.semester)?.label}` : ''}</p>
+              <p><strong>Dönem:</strong> {data.academicYear} {data.semester ? `${data.semester} Dönemi` : ''}</p>
               <p><strong>Yetkilisi:</strong> {data.institutionTitle || 'Belirtilmemiş'}</p>
               <p><strong>Ders Saati:</strong> Günde {data.dailyHours || 8} saat, Haftada {data.weekDays || 5} gün</p>
               {data.weekendClasses && (

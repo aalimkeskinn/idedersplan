@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Users, Plus, Minus, Edit, Trash2 } from 'lucide-react';
+import { Building, Users, Plus, Minus, AlertTriangle, Edit, Trash2 } from 'lucide-react';
 import { Class, EDUCATION_LEVELS, Teacher } from '../../types';
 import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
@@ -209,12 +209,9 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
 
   // Filtrelenmiş öğretmen listesi - sınıf seviyesine göre
   const getFilteredTeachers = () => {
-    // Ensure teachers is always treated as an array
-    const teachersArray = Array.isArray(teachers) ? teachers : [];
-    
     if (!formData.level) return [];
     
-    return teachersArray
+    return teachers
       .filter(teacher => teacher.level === formData.level)
       .sort((a, b) => a.name.localeCompare(b.name, 'tr'));
   };
@@ -315,7 +312,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   // Get classroom options for select
   const classroomOptions = [
     { value: '', label: 'Seçiniz...' },
-    ...(classrooms || []).map(classroom => ({
+    ...classrooms.map(classroom => ({
       value: classroom.id,
       label: classroom.name
     }))
@@ -324,7 +321,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   // Get teacher options for select
   const teacherOptions = [
     { value: '', label: 'Seçiniz...' },
-    ...(Array.isArray(teachers) ? teachers : []).map(teacher => ({
+    ...teachers.map(teacher => ({
       value: teacher.id,
       label: `${teacher.name} (${teacher.branch})`
     }))
@@ -333,17 +330,15 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
   // Sınıf öğretmeni adını getir
   const getClassTeacherName = (classTeacherId: string | undefined) => {
     if (!classTeacherId) return '';
-    const teachersArray = Array.isArray(teachers) ? teachers : [];
-    const teacher = teachersArray.find(t => t.id === classTeacherId);
+    const teacher = teachers.find(t => t.id === classTeacherId);
     return teacher ? teacher.name : '';
   };
 
   // Sınıf öğretmenlerinin adlarını getir
   const getClassTeacherNames = (teacherIds: string[] | undefined) => {
-    if (!teacherIds || !Array.isArray(teacherIds) || teacherIds.length === 0) return '';
-    const teachersArray = Array.isArray(teachers) ? teachers : [];
+    if (!teacherIds || teacherIds.length === 0) return '';
     
-    const classTeachers = teachersArray.filter(t => teacherIds.includes(t.id));
+    const classTeachers = teachers.filter(t => teacherIds.includes(t.id));
     return classTeachers.map(t => t.name).join(', ');
   };
 
@@ -490,13 +485,13 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
                     </div>
                     
                     {/* Öğretmen Bilgisi */}
-                    {classItem.teacherIds && Array.isArray(classItem.teacherIds) && classItem.teacherIds.length > 0 && (
+                    {classItem.teacherIds && classItem.teacherIds.length > 0 && (
                       <div className="mt-2 mb-2 p-2 bg-blue-50 rounded border border-blue-100">
                         <div className="flex items-center">
                           <Users className="w-3 h-3 text-blue-600 mr-1" />
                           <p className="text-xs text-blue-700">
                             {classItem.teacherIds.length} öğretmen atanmış
-                            {classItem.classTeacherId && Array.isArray(teachers) && (
+                            {classItem.classTeacherId && (
                               <span className="ml-1 font-medium">
                                 (Sınıf öğretmeni: {teachers.find(t => t.id === classItem.classTeacherId)?.name})
                               </span>
@@ -574,7 +569,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
       {classesData.selectedClasses.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-start">
-            <Users className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" />
+            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" />
             <div>
               <h4 className="font-medium text-yellow-800">Sınıf Kapasitesi Önerileri</h4>
               <ul className="text-sm text-yellow-700 mt-2 space-y-1">

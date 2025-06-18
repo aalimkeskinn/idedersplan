@@ -15,10 +15,10 @@ import Select from '../components/UI/Select';
 import ScheduleSlotModal from '../components/UI/ScheduleSlotModal';
 import ConfirmationModal from '../components/UI/ConfirmationModal';
 import ErrorModal from '../components/UI/ErrorModal';
-import { createSubjectTeacherMappings, checkWeeklyHourLimit } from './subjectTeacherMapping';
-import { createWeeklyHourTrackers, canAssignHour, assignHourToTracker } from './weeklyHourManager';
-import { checkAllConflicts, summarizeConflicts } from './conflictDetection';
-import { optimizeSchedules, OptimizationStrategy } from './scheduleOptimization';
+import { createSubjectTeacherMappings, checkWeeklyHourLimit } from '../utils/subjectTeacherMapping';
+import { createWeeklyHourTrackers, canAssignHour, assignHourToTracker } from '../utils/weeklyHourManager';
+import { checkAllConflicts, summarizeConflicts } from '../utils/conflictDetection';
+import { optimizeSchedules, OptimizationStrategy } from '../utils/scheduleOptimization';
 
 // Schedule Template interface
 interface ScheduleTemplate {

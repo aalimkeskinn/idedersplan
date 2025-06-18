@@ -336,7 +336,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
 
   // Sınıf öğretmenlerinin adlarını getir
   const getClassTeacherNames = (teacherIds: string[] | undefined) => {
-    if (!teacherIds || teacherIds.length === 0) return '';
+    if (!teacherIds || !Array.isArray(teacherIds) || teacherIds.length === 0) return '';
     
     const classTeachers = teachers.filter(t => teacherIds.includes(t.id));
     return classTeachers.map(t => t.name).join(', ');
@@ -485,7 +485,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
                     </div>
                     
                     {/* Öğretmen Bilgisi */}
-                    {classItem.teacherIds?.length > 0 && (
+                    {classItem.teacherIds && Array.isArray(classItem.teacherIds) && classItem.teacherIds.length > 0 && (
                       <div className="mt-2 mb-2 p-2 bg-blue-50 rounded border border-blue-100">
                         <div className="flex items-center">
                           <Users className="w-3 h-3 text-blue-600 mr-1" />

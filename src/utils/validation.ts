@@ -1,5 +1,8 @@
 import { Teacher, Class, Subject, Schedule, DAYS, PERIODS } from '../types';
 import { CONFLICT_MESSAGES, VALIDATION_ERRORS } from './messages';
+import { ConflictResult, checkAllConflicts, summarizeConflicts } from './conflictDetection';
+import { TimeConstraint } from '../types/constraints';
+import { SubjectTeacherMapping } from '../types/wizard';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -258,7 +261,7 @@ export const checkSlotConflict = (
   return { hasConflict: false, message: '' };
 };
 
-// FIXED: Enhanced schedule validation with detailed conflict detection - IMPROVED VERSION
+// ENHANCED: Comprehensive schedule validation with conflict detection
 export const validateSchedule = (
   mode: 'teacher' | 'class',
   currentSchedule: Schedule['schedule'],
@@ -266,7 +269,9 @@ export const validateSchedule = (
   allSchedules: Schedule[],
   teachers: Teacher[],
   classes: Class[],
-  subjects: Subject[]
+  subjects: Subject[],
+  constraints: TimeConstraint[] = [],
+  mappings: SubjectTeacherMapping[] = []
 ): ValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -283,157 +288,63 @@ export const validateSchedule = (
     return { isValid: false, errors, warnings };
   }
 
-  console.log('🔍 IMPROVED Program doğrulama başlatıldı:', {
+  console.log('🔍 ENHANCED Program doğrulama başlatıldı:', {
     mode,
     selectedId,
     scheduleSlots: Object.keys(currentSchedule).length
   });
 
-  // Calculate weekly and daily hours
-  const weeklyHours = calculateWeeklyHours(currentSchedule, mode);
-  const dailyHours = calculateDailyHours(currentSchedule, mode);
-
-  // Check weekly hour limits
-  if (weeklyHours > 30) {
-    errors.push('Haftalık ders saati 30\'u geçemez');
-  }
-
-  // Check daily hour limits
-  DAYS.forEach(day => {
-    const dayHours = dailyHours[day] || 0;
-    if (dayHours > 9) {
-      errors.push(`${day} günü için günlük ders saati 9'u geçemez (şu an: ${dayHours})`);
-    }
-  });
-
-  // FIXED: Comprehensive conflict detection with better filtering
-  const conflictMap = new Map<string, string[]>(); // Track conflicts per slot
+  // Tüm çakışmaları tespit et
+  const allConflicts: ConflictResult[] = [];
   
   DAYS.forEach(day => {
     PERIODS.forEach(period => {
       const slot = currentSchedule[day]?.[period];
       if (!slot || slot.classId === 'fixed-period') return;
 
-      const slotKey = `${day}-${period}`;
-
-      if (mode === 'teacher' && slot.classId) {
-        // Check if this class is assigned to another teacher at the same time
-        const conflictingSchedules = allSchedules.filter(schedule => {
-          // Skip current teacher's schedule
-          if (schedule.teacherId === selectedId) return false;
-          
-          const otherSlot = schedule.schedule[day]?.[period];
-          return otherSlot?.classId === slot.classId && otherSlot.classId !== 'fixed-period';
-        });
-        
-        if (conflictingSchedules.length > 0) {
-          const conflictingTeacher = teachers.find(t => t.id === conflictingSchedules[0].teacherId);
-          const className = classes.find(c => c.id === slot.classId)?.name || 'Bilinmeyen Sınıf';
-          
-          const conflictMessage = `${className} sınıfı ${day} günü ${period}. ders saatinde ${conflictingTeacher?.name || 'başka bir öğretmen'} ile çakışıyor`;
-          
-          if (!conflictMap.has(slotKey)) {
-            conflictMap.set(slotKey, []);
-          }
-          conflictMap.get(slotKey)!.push(conflictMessage);
-        }
-        
-      } else if (mode === 'class' && slot.teacherId) {
-        // Check if this teacher is assigned to another class at the same time
-        const teacherSchedule = allSchedules.find(s => s.teacherId === slot.teacherId);
-        
-        if (teacherSchedule) {
-          const existingSlot = teacherSchedule.schedule[day]?.[period];
-          
-          if (existingSlot?.classId && 
-              existingSlot.classId !== selectedId && 
-              existingSlot.classId !== 'fixed-period') {
-            
-            const teacher = teachers.find(t => t.id === slot.teacherId);
-            const conflictingClass = classes.find(c => c.id === existingSlot.classId);
-            
-            const conflictMessage = `${teacher?.name || 'Öğretmen'} ${day} günü ${period}. ders saatinde ${conflictingClass?.name || 'başka bir sınıf'} ile çakışıyor`;
-            
-            if (!conflictMap.has(slotKey)) {
-              conflictMap.set(slotKey, []);
-            }
-            conflictMap.get(slotKey)!.push(conflictMessage);
-          }
-        }
-      }
-
-      // Check level and branch compatibility
-      const compatibilityIssues = checkCompatibility(slot, teachers, classes, subjects);
-      warnings.push(...compatibilityIssues);
+      // Tüm çakışma kontrollerini yap
+      const conflicts = checkAllConflicts(
+        slot.teacherId || '',
+        slot.classId || '',
+        slot.subjectId || '',
+        day,
+        period,
+        allSchedules,
+        teachers,
+        classes,
+        subjects,
+        constraints,
+        mappings
+      );
+      
+      allConflicts.push(...conflicts);
     });
   });
 
-  // Add all unique conflicts to errors
-  const allConflicts: string[] = [];
-  conflictMap.forEach(conflicts => {
-    allConflicts.push(...conflicts);
-  });
-  errors.push(...allConflicts);
+  // Çakışma özetini al
+  const summary = summarizeConflicts(allConflicts);
+  
+  // Hata ve uyarıları ekle
+  errors.push(...summary.errorMessages);
+  warnings.push(...summary.warningMessages);
 
-  console.log('📊 IMPROVED Doğrulama sonuçları:', {
-    isValid: errors.length === 0,
-    errorsCount: errors.length,
-    warningsCount: warnings.length,
-    conflictsFound: allConflicts.length,
+  console.log('📊 ENHANCED Doğrulama sonuçları:', {
+    isValid: !summary.hasBlockingConflict,
+    errorsCount: summary.errorMessages.length,
+    warningsCount: summary.warningMessages.length,
     errors,
     warnings
   });
 
   return {
-    isValid: errors.length === 0,
+    isValid: !summary.hasBlockingConflict,
     errors: [...new Set(errors)], // Remove duplicates
     warnings: [...new Set(warnings)] // Remove duplicates
   };
 };
 
-// Check level and branch compatibility - SECURE VERSION
-const checkCompatibility = (
-  slot: any,
-  teachers: Teacher[],
-  classes: Class[],
-  subjects: Subject[]
-): string[] => {
-  const warnings: string[] = [];
-
-  // SECURITY: Input validation
-  if (!slot || typeof slot !== 'object') {
-    return warnings;
-  }
-
-  if (slot.teacherId && slot.classId && slot.classId !== 'fixed-period') {
-    const teacher = teachers.find(t => t.id === slot.teacherId);
-    const classItem = classes.find(c => c.id === slot.classId);
-
-    if (teacher && classItem) {
-      // Check level compatibility
-      if (teacher.level !== classItem.level) {
-        warnings.push(`${teacher.name} (${teacher.level}) ile ${classItem.name} (${classItem.level}) seviye uyumsuzluğu`);
-      }
-    }
-  }
-
-  if (slot.teacherId && slot.subjectId) {
-    const teacher = teachers.find(t => t.id === slot.teacherId);
-    const subject = subjects.find(s => s.id === slot.subjectId);
-
-    if (teacher && subject) {
-      // Check branch compatibility
-      if (teacher.branch !== subject.branch) {
-        warnings.push(`${teacher.name} (${teacher.branch}) ile ${subject.name} (${subject.branch}) branş uyumsuzluğu`);
-      }
-    }
-  }
-
-  return warnings;
-};
-
-// Calculate weekly hours for a schedule - SECURE VERSION
-const calculateWeeklyHours = (
+// Calculate weekly hours for a schedule
+export const calculateWeeklyHours = (
   schedule: Schedule['schedule'],
   mode: 'teacher' | 'class'
 ): number => {
@@ -461,8 +372,8 @@ const calculateWeeklyHours = (
   return Math.min(totalHours, 50); // SECURITY: Cap at reasonable limit
 };
 
-// Calculate daily hours for each day - SECURE VERSION
-const calculateDailyHours = (
+// Calculate daily hours for each day
+export const calculateDailyHours = (
   schedule: Schedule['schedule'],
   mode: 'teacher' | 'class'
 ): { [day: string]: number } => {
@@ -490,4 +401,88 @@ const calculateDailyHours = (
   });
   
   return dailyHours;
+};
+
+// Calculate subject distribution
+export const calculateSubjectDistribution = (
+  schedule: Schedule['schedule'],
+  subjects: Subject[]
+): { [subjectId: string]: { count: number; name: string } } => {
+  const distribution: { [subjectId: string]: { count: number; name: string } } = {};
+  
+  // SECURITY: Input validation
+  if (!schedule || typeof schedule !== 'object') {
+    return distribution;
+  }
+  
+  DAYS.forEach(day => {
+    PERIODS.forEach(period => {
+      const slot = schedule[day]?.[period];
+      if (slot && slot.subjectId && slot.classId !== 'fixed-period') {
+        const subject = subjects.find(s => s.id === slot.subjectId);
+        if (!distribution[slot.subjectId]) {
+          distribution[slot.subjectId] = { 
+            count: 0, 
+            name: subject?.name || 'Bilinmeyen Ders' 
+          };
+        }
+        distribution[slot.subjectId].count++;
+      }
+    });
+  });
+  
+  return distribution;
+};
+
+// Check if weekly hours match the target for each subject
+export const validateWeeklyHourLimits = (
+  schedule: Schedule['schedule'],
+  mappings: SubjectTeacherMapping[],
+  classId: string
+): { isValid: boolean; errors: string[]; warnings: string[] } => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  
+  // SECURITY: Input validation
+  if (!schedule || typeof schedule !== 'object') {
+    errors.push('Geçersiz program verisi');
+    return { isValid: false, errors, warnings };
+  }
+  
+  // Her ders için haftalık saat sayısını hesapla
+  const subjectHours: { [subjectId: string]: number } = {};
+  
+  DAYS.forEach(day => {
+    PERIODS.forEach(period => {
+      const slot = schedule[day]?.[period];
+      if (slot && slot.subjectId && slot.classId !== 'fixed-period') {
+        if (!subjectHours[slot.subjectId]) {
+          subjectHours[slot.subjectId] = 0;
+        }
+        subjectHours[slot.subjectId]++;
+      }
+    });
+  });
+  
+  // Her ders için hedef saat sayısını kontrol et
+  Object.entries(subjectHours).forEach(([subjectId, hours]) => {
+    const mapping = mappings.find(m => 
+      m.subjectId === subjectId && 
+      m.classId === classId
+    );
+    
+    if (mapping) {
+      if (hours > mapping.weeklyHours) {
+        errors.push(`${subjectId} dersi için haftalık saat limiti aşıldı: ${hours}/${mapping.weeklyHours}`);
+      } else if (hours < mapping.weeklyHours) {
+        warnings.push(`${subjectId} dersi için haftalık saat hedefine ulaşılamadı: ${hours}/${mapping.weeklyHours}`);
+      }
+    }
+  });
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings
+  };
 };

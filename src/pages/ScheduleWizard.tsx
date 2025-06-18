@@ -518,7 +518,249 @@ const ScheduleWizard = () => {
     return !!subjectConstraint;
   };
 
-  // ENHANCED: Track subject assignment counts to respect weekly hour limits
+  // ENHANCED: Generate schedule for a class with respect to weekly hour limits
+  const generateScheduleForClass = (
+    classId: string,
+    selectedTeachers: Teacher[],
+    selectedSubjects: Subject[]
+  ): { [teacherId: string]: { [day: string]: { [period: string]: any } } } => {
+    console.log('🎯 Sınıf için program oluşturuluyor:', { classId });
+    
+    const classItem = classes.find(c => c.id === classId);
+    if (!classItem) {
+      console.error('❌ Sınıf bulunamadı:', classId);
+      return {};
+    }
+
+    console.log('🏫 Sınıf bilgileri:', {
+      name: classItem.name,
+      level: classItem.level
+    });
+
+    // Get teachers assigned to this class
+    const classTeachers = selectedTeachers.filter(teacher => 
+      (classItem.teacherIds?.includes(teacher.id) || classItem.classTeacherId === teacher.id) &&
+      teacher.level === classItem.level
+    );
+
+    console.log('👨‍🏫 Sınıf öğretmenleri:', {
+      count: classTeachers.length,
+      teachers: classTeachers.map(t => `${t.name} (${t.branch})`)
+    });
+
+    if (classTeachers.length === 0) {
+      console.warn(`⚠️ ${classItem.name} sınıfı için uyumlu öğretmen bulunamadı`);
+      return {};
+    }
+
+    // Get compatible subjects for this class level
+    const classSubjects = selectedSubjects.filter(subject => 
+      subject.level === classItem.level
+    );
+
+    console.log('📚 Sınıf dersleri:', {
+      count: classSubjects.length,
+      subjects: classSubjects.map(s => `${s.name} (${s.branch})`)
+    });
+
+    if (classSubjects.length === 0) {
+      console.warn(`⚠️ ${classItem.name} sınıfı için uyumlu ders bulunamadı`);
+      return {};
+    }
+
+    // Initialize teacher schedules
+    const teacherSchedules: { [teacherId: string]: { [day: string]: { [period: string]: any } } } = {};
+    
+    classTeachers.forEach(teacher => {
+      teacherSchedules[teacher.id] = {};
+      DAYS.forEach(day => {
+        teacherSchedules[teacher.id][day] = {};
+        PERIODS.forEach(period => {
+          teacherSchedules[teacher.id][day][period] = {};
+        });
+      });
+    });
+
+    // Add fixed periods based on class level
+    classTeachers.forEach(teacher => {
+      DAYS.forEach(day => {
+        teacherSchedules[teacher.id][day]['prep'] = {
+          classId: 'fixed-period',
+          subjectId: 'fixed-prep'
+        };
+
+        if (classItem.level === 'Ortaokul') {
+          teacherSchedules[teacher.id][day]['breakfast'] = {
+            classId: 'fixed-period',
+            subjectId: 'fixed-breakfast'
+          };
+        }
+
+        const lunchPeriod = (classItem.level === 'İlkokul' || classItem.level === 'Anaokulu') ? '5' : '6';
+        teacherSchedules[teacher.id][day][lunchPeriod] = {
+          classId: 'fixed-period',
+          subjectId: 'fixed-lunch'
+        };
+
+        teacherSchedules[teacher.id][day]['afternoon-breakfast'] = {
+          classId: 'fixed-period',
+          subjectId: 'fixed-afternoon-breakfast'
+        };
+      });
+    });
+
+    // Get available periods (excluding fixed periods)
+    const availablePeriods = PERIODS.filter(period => {
+      if ((classItem.level === 'İlkokul' || classItem.level === 'Anaokulu') && period === '5') return false;
+      if (classItem.level === 'Ortaokul' && period === '6') return false;
+      if (period === 'prep' || period === 'breakfast' || period === 'afternoon-breakfast') return false;
+      return true;
+    });
+
+    // Track subject assignment counts to respect weekly hour limits
+    const subjectAssignmentCounts: { [subjectId: string]: number } = {};
+    
+    // Initialize subject assignment counts
+    classSubjects.forEach(subject => {
+      subjectAssignmentCounts[subject.id] = 0;
+    });
+
+    // Get weekly hour limit for each subject from wizard data
+    const getSubjectWeeklyHourLimit = (subjectId: string): number => {
+      return wizardData.subjects.subjectHours[subjectId] || 
+             subjects.find(s => s.id === subjectId)?.weeklyHours || 
+             4; // Default to 4 if not specified
+    };
+
+    // Calculate total weekly hours needed based on subject limits
+    const totalWeeklyHoursNeeded = classSubjects.reduce((total, subject) => {
+      return total + getSubjectWeeklyHourLimit(subject.id);
+    }, 0);
+
+    console.log('📊 Haftalık toplam ders saati hedefi:', {
+      totalWeeklyHoursNeeded,
+      targetHours: 45, // Fixed target of 45 hours per week
+      subjects: classSubjects.map(s => `${s.name}: ${getSubjectWeeklyHourLimit(s.id)} saat`)
+    });
+
+    // Adjust if total hours exceed 45
+    const targetTotalHours = 45; // Fixed target of 45 hours per week
+    let assignedHours = 0;
+
+    // Track which slots have been tried to avoid infinite loops
+    const triedSlots = new Set<string>();
+    
+    // Maximum attempts to avoid infinite loops
+    const maxAttempts = targetTotalHours * 5;
+    let attempts = 0;
+
+    // Assign subjects to available slots
+    while (assignedHours < targetTotalHours && attempts < maxAttempts) {
+      attempts++;
+      
+      // Select a random day and period
+      const randomDay = DAYS[Math.floor(Math.random() * DAYS.length)];
+      const randomPeriod = availablePeriods[Math.floor(Math.random() * availablePeriods.length)];
+      
+      const slotKey = `${randomDay}-${randomPeriod}`;
+      
+      // Skip if we've already tried this slot
+      if (triedSlots.has(slotKey)) {
+        continue;
+      }
+      
+      triedSlots.add(slotKey);
+      
+      // Check if slot is already assigned in any teacher's schedule
+      let isSlotAssigned = false;
+      for (const teacherId in teacherSchedules) {
+        if (teacherSchedules[teacherId][randomDay][randomPeriod].classId) {
+          isSlotAssigned = true;
+          break;
+        }
+      }
+      
+      if (isSlotAssigned) {
+        continue;
+      }
+
+      // Select a subject that hasn't reached its weekly hour limit
+      const availableSubjects = classSubjects.filter(subject => {
+        const currentCount = subjectAssignmentCounts[subject.id] || 0;
+        const weeklyLimit = getSubjectWeeklyHourLimit(subject.id);
+        return currentCount < weeklyLimit;
+      });
+      
+      // Skip if no subjects are available
+      if (availableSubjects.length === 0) {
+        console.log(`⚠️ ${classItem.name} sınıfı için tüm dersler haftalık limitlerini doldurmuş`);
+        break; // Exit the loop if all subjects have reached their limits
+      }
+      
+      // Select a random subject from available subjects
+      const randomSubject = availableSubjects[Math.floor(Math.random() * availableSubjects.length)];
+      
+      // Find a teacher who can teach this subject
+      const compatibleTeachers = classTeachers.filter(teacher => 
+        teacher.branch === randomSubject.branch &&
+        !isSlotUnavailable(teacher.id, randomDay, randomPeriod)
+      );
+      
+      if (compatibleTeachers.length === 0) {
+        console.log(`⚠️ ${randomSubject.name} dersi için uyumlu öğretmen bulunamadı`);
+        continue;
+      }
+      
+      const randomTeacher = compatibleTeachers[Math.floor(Math.random() * compatibleTeachers.length)];
+      
+      // Check constraints
+      const hasTeacherConstraint = isSlotUnavailable(randomTeacher.id, randomDay, randomPeriod);
+      const hasClassConstraint = isClassUnavailable(classId, randomDay, randomPeriod);
+      const hasSubjectConstraint = isSubjectUnavailable(randomSubject.id, randomDay, randomPeriod);
+      
+      if (!hasTeacherConstraint && !hasClassConstraint && !hasSubjectConstraint) {
+        // Assign the subject to this slot
+        teacherSchedules[randomTeacher.id][randomDay][randomPeriod] = {
+          classId: classId,
+          subjectId: randomSubject.id
+        };
+        
+        // Update subject assignment count
+        subjectAssignmentCounts[randomSubject.id] = (subjectAssignmentCounts[randomSubject.id] || 0) + 1;
+        
+        const weeklyLimit = getSubjectWeeklyHourLimit(randomSubject.id);
+        const currentCount = subjectAssignmentCounts[randomSubject.id];
+        
+        assignedHours++;
+        console.log(`✅ Ders atandı: ${randomDay} ${randomPeriod}. ders - ${classItem.name} - ${randomSubject.name} (${currentCount}/${weeklyLimit} saat) - Öğretmen: ${randomTeacher.name}`);
+      } else {
+        // Log which constraint blocked the assignment
+        const constraintReasons = [];
+        if (hasTeacherConstraint) constraintReasons.push(`Öğretmen (${randomTeacher.name})`);
+        if (hasClassConstraint) constraintReasons.push(`Sınıf (${classItem.name})`);
+        if (hasSubjectConstraint) constraintReasons.push(`Ders (${randomSubject.name})`);
+        
+        console.log(`⚠️ Kısıtlama nedeniyle atama yapılamadı: ${randomDay} ${randomPeriod}. ders - ${constraintReasons.join(', ')} kısıtlaması`);
+      }
+    }
+
+    if (attempts >= maxAttempts && assignedHours < targetTotalHours) {
+      console.warn(`⚠️ ${classItem.name} için maksimum deneme sayısına ulaşıldı. Hedef: ${targetTotalHours}, Atanan: ${assignedHours}`);
+    }
+
+    // Log subject assignment statistics
+    console.log('📊 Ders atama istatistikleri:');
+    Object.entries(subjectAssignmentCounts).forEach(([subjectId, count]) => {
+      const subject = subjects.find(s => s.id === subjectId);
+      const weeklyLimit = getSubjectWeeklyHourLimit(subjectId);
+      console.log(`- ${subject?.name || 'Bilinmeyen Ders'}: ${count}/${weeklyLimit} saat`);
+    });
+
+    console.log(`🎯 ${classItem.name} için ${assignedHours} saatlik program oluşturuldu`);
+    return teacherSchedules;
+  };
+
+  // ENHANCED: Generate schedule for a teacher with respect to weekly hour limits
   const generateScheduleForTeacher = (
     teacherId: string,
     selectedClasses: Class[],
@@ -605,6 +847,7 @@ const ScheduleWizard = () => {
     const availablePeriods = PERIODS.filter(period => {
       if ((teacher.level === 'İlkokul' || teacher.level === 'Anaokulu') && period === '5') return false;
       if (teacher.level === 'Ortaokul' && period === '6') return false;
+      if (period === 'prep' || period === 'breakfast' || period === 'afternoon-breakfast') return false;
       return true;
     });
 
@@ -626,17 +869,26 @@ const ScheduleWizard = () => {
              4; // Default to 4 if not specified
     };
 
+    // Calculate total weekly hours needed for all classes
+    let totalWeeklyHoursNeeded = 0;
+    teacherClasses.forEach(classItem => {
+      compatibleSubjects.forEach(subject => {
+        totalWeeklyHoursNeeded += getSubjectWeeklyHourLimit(subject.id);
+      });
+    });
+
+    // Target 45 hours per week, distributed across classes
+    const targetTotalHours = Math.min(45, totalWeeklyHoursNeeded);
     let assignedHours = 0;
-    const targetHours = Math.floor(Math.random() * 11) + 15;
 
     // CRITICAL: Track which slots have been tried to avoid infinite loops
     const triedSlots = new Set<string>();
     
     // Maximum attempts to avoid infinite loops
-    const maxAttempts = targetHours * 5;
+    const maxAttempts = targetTotalHours * 5;
     let attempts = 0;
 
-    while (assignedHours < targetHours && attempts < maxAttempts) {
+    while (assignedHours < targetTotalHours && attempts < maxAttempts) {
       attempts++;
       
       const randomDay = DAYS[Math.floor(Math.random() * DAYS.length)];
@@ -710,8 +962,8 @@ const ScheduleWizard = () => {
       }
     }
 
-    if (attempts >= maxAttempts && assignedHours < targetHours) {
-      console.warn(`⚠️ ${teacher.name} için maksimum deneme sayısına ulaşıldı. Hedef: ${targetHours}, Atanan: ${assignedHours}`);
+    if (attempts >= maxAttempts && assignedHours < targetTotalHours) {
+      console.warn(`⚠️ ${teacher.name} için maksimum deneme sayısına ulaşıldı. Hedef: ${targetTotalHours}, Atanan: ${assignedHours}`);
     }
 
     // NEW: Log subject assignment statistics

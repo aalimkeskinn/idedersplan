@@ -526,7 +526,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
           <div className="text-sm text-gray-700">
             <h4 className="font-medium mb-1">💡 İpuçları:</h4>
             <ul className="space-y-1 text-xs">
-              <li>• Haftalık toplam saat sayısı 25-35 arasında olması önerilir</li>
+              <li>• Haftalık toplam saat sayısı 45'e kadar çıkabilir</li>
               <li>• Yüksek öncelikli dersler daha iyi zaman dilimlerine yerleştirilir</li>
               <li>• Ders saatleri daha sonra öğretmen atamalarında kullanılır</li>
               <li>• Seviye filtresi ile ilgili dersleri daha kolay bulabilirsiniz</li>
@@ -587,7 +587,7 @@ const WizardStepSubjects: React.FC<WizardStepSubjectsProps> = ({ data, onUpdate 
             onChange={(value) => setFormData({ ...formData, weeklyHours: value })}
             placeholder="4"
             min="1"
-            max="10"
+            max="45"
             required
           />
 

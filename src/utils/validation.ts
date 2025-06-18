@@ -125,8 +125,8 @@ export const validateSubject = (subject: Partial<Subject>): string[] => {
   }
   
   // Validate weekly hours
-  if (!subject.weeklyHours || subject.weeklyHours < 1 || subject.weeklyHours > 10) {
-    errors.push('Haftalık ders saati 1-10 arasında olmalıdır');
+  if (!subject.weeklyHours || subject.weeklyHours < 1 || subject.weeklyHours > 45) {
+    errors.push('Haftalık ders saati 1-45 arasında olmalıdır');
   }
   
   // Check for suspicious patterns
@@ -293,16 +293,16 @@ export const validateSchedule = (
   const weeklyHours = calculateWeeklyHours(currentSchedule, mode);
   const dailyHours = calculateDailyHours(currentSchedule, mode);
 
-  // Check weekly hour limits
-  if (weeklyHours > 30) {
-    errors.push('Haftalık ders saati 30\'u geçemez');
+  // Check weekly hour limits - UPDATED: Limit increased to 45
+  if (weeklyHours > 45) {
+    errors.push('Haftalık ders saati 45\'i geçemez');
   }
 
   // Check daily hour limits
   DAYS.forEach(day => {
     const dayHours = dailyHours[day] || 0;
-    if (dayHours > 9) {
-      errors.push(`${day} günü için günlük ders saati 9'u geçemez (şu an: ${dayHours})`);
+    if (dayHours > 10) {
+      errors.push(`${day} günü için günlük ders saati 10'u geçemez (şu an: ${dayHours})`);
     }
   });
 

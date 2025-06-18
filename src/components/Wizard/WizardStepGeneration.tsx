@@ -89,8 +89,8 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
     const totalClasses = wizardData.classes?.selectedClasses?.length || 0;
     const totalTeachers = wizardData.teachers?.selectedTeachers?.length || 0;
 
-    if (totalHours > 40) {
-      warnings.push('Haftalık toplam ders saati çok yüksek (40+ saat)');
+    if (totalHours > 45) {
+      warnings.push('Haftalık toplam ders saati çok yüksek (45+ saat)');
     }
     if (totalTeachers < totalClasses) {
       warnings.push('Öğretmen sayısı sınıf sayısından az');
@@ -396,6 +396,7 @@ const WizardStepGeneration: React.FC<WizardStepGenerationProps> = ({
               <li>• En optimal ders dağılımını hesaplar</li>
               <li>• Birden fazla alternatif program oluşturabilir</li>
               <li>• Sonuçları PDF olarak indirebilirsiniz</li>
+              <li>• Haftalık ders saati 45'e kadar desteklenir</li>
             </ul>
           </div>
         </div>

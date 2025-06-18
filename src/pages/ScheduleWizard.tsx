@@ -253,7 +253,8 @@ const ScheduleWizard = () => {
           subjectsCount: loadedData.subjects.selectedSubjects.length,
           classesCount: loadedData.classes.selectedClasses.length,
           teachersCount: loadedData.teachers.selectedTeachers.length,
-          classroomsCount: loadedData.classrooms.length
+          classroomsCount: loadedData.classrooms.length,
+          constraintsCount: loadedData.constraints.timeConstraints.length
         });
         
         setWizardData(loadedData);
@@ -358,6 +359,15 @@ const ScheduleWizard = () => {
     setIsSaving(true);
     
     try {
+      // CRITICAL: Ensure we include the latest constraints in the template
+      const updatedWizardData = {
+        ...wizardData,
+        constraints: {
+          ...wizardData.constraints,
+          timeConstraints: constraints // Use the latest constraints from Firebase
+        }
+      };
+      
       // CRITICAL: Create a complete template data object
       const templateData = {
         name: wizardData.basicInfo.name,
@@ -365,7 +375,7 @@ const ScheduleWizard = () => {
         academicYear: wizardData.basicInfo.academicYear,
         semester: wizardData.basicInfo.semester,
         updatedAt: new Date(),
-        wizardData: JSON.parse(JSON.stringify(wizardData)), // Deep clone to avoid reference issues
+        wizardData: JSON.parse(JSON.stringify(updatedWizardData)), // Deep clone to avoid reference issues
         generatedSchedules: [],
         status: 'published' as const
       };
@@ -375,7 +385,8 @@ const ScheduleWizard = () => {
         templateId: editingTemplateId,
         templateName: templateData.name,
         dataSize: JSON.stringify(templateData).length,
-        wizardDataKeys: Object.keys(templateData.wizardData)
+        wizardDataKeys: Object.keys(templateData.wizardData),
+        constraintsCount: constraints.length
       });
 
       let result;

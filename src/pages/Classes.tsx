@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Building, Eye, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Building, Eye, Calendar, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Class, EDUCATION_LEVELS, Schedule } from '../types';
+import { Class, EDUCATION_LEVELS, Schedule, Teacher } from '../types';
 import { useFirestore } from '../hooks/useFirestore';
 import { useToast } from '../hooks/useToast';
 import { useConfirmation } from '../hooks/useConfirmation';
@@ -15,6 +15,7 @@ const Classes = () => {
   const navigate = useNavigate();
   const { data: classes, loading, add, update, remove } = useFirestore<Class>('classes');
   const { data: schedules } = useFirestore<Schedule>('schedules');
+  const { data: teachers } = useFirestore<Teacher>('teachers');
   const { success, error, warning } = useToast();
   const { 
     confirmation, 
@@ -33,7 +34,9 @@ const Classes = () => {
   ]);
   const [formData, setFormData] = useState({
     name: '',
-    level: ''
+    level: '',
+    teacherIds: [] as string[],
+    classTeacherId: ''
   });
 
   // Check if a class has a schedule
@@ -132,10 +135,19 @@ const Classes = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    const classData = {
+      name: formData.name,
+      level: formData.level,
+      teacherIds: formData.teacherIds,
+      classTeacherId: formData.classTeacherId
+    };
+    
     if (editingClass) {
-      await update(editingClass.id, formData);
+      await update(editingClass.id, classData);
+      success('✅ Sınıf Güncellendi', `${formData.name} sınıfı başarıyla güncellendi`);
     } else {
-      await add(formData as Omit<Class, 'id' | 'createdAt'>);
+      await add(classData as Omit<Class, 'id' | 'createdAt'>);
+      success('✅ Sınıf Eklendi', `${formData.name} sınıfı başarıyla eklendi`);
     }
     
     resetForm();
@@ -149,7 +161,8 @@ const Classes = () => {
         if (EDUCATION_LEVELS.includes(classItem.level as any)) {
           await add({
             name: classItem.name,
-            level: classItem.level as Class['level']
+            level: classItem.level as Class['level'],
+            teacherIds: []
           } as Omit<Class, 'id' | 'createdAt'>);
         }
       }
@@ -157,10 +170,16 @@ const Classes = () => {
     
     setBulkClasses([{ name: '', level: '' }]);
     setIsBulkModalOpen(false);
+    success('✅ Sınıflar Eklendi', `${bulkClasses.filter(c => c.name && c.level).length} sınıf başarıyla eklendi`);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', level: '' });
+    setFormData({ 
+      name: '', 
+      level: '', 
+      teacherIds: [],
+      classTeacherId: ''
+    });
     setEditingClass(null);
     setIsModalOpen(false);
   };
@@ -168,7 +187,9 @@ const Classes = () => {
   const handleEdit = (classItem: Class) => {
     setFormData({
       name: classItem.name,
-      level: classItem.level
+      level: classItem.level,
+      teacherIds: classItem.teacherIds || [],
+      classTeacherId: classItem.classTeacherId || ''
     });
     setEditingClass(classItem);
     setIsModalOpen(true);
@@ -201,6 +222,72 @@ const Classes = () => {
     const updated = [...bulkClasses];
     updated[index] = { ...updated[index], [field]: value };
     setBulkClasses(updated);
+  };
+
+  // Öğretmen seçimi için yardımcı fonksiyonlar
+  const handleTeacherToggle = (teacherId: string) => {
+    setFormData(prev => {
+      const isSelected = prev.teacherIds.includes(teacherId);
+      
+      if (isSelected) {
+        // Öğretmeni kaldır
+        const newTeacherIds = prev.teacherIds.filter(id => id !== teacherId);
+        
+        // Eğer sınıf öğretmeni de kaldırılıyorsa, sınıf öğretmeni ID'sini de temizle
+        const newClassTeacherId = prev.classTeacherId === teacherId ? '' : prev.classTeacherId;
+        
+        return {
+          ...prev,
+          teacherIds: newTeacherIds,
+          classTeacherId: newClassTeacherId
+        };
+      } else {
+        // Öğretmeni ekle
+        return {
+          ...prev,
+          teacherIds: [...prev.teacherIds, teacherId]
+        };
+      }
+    });
+  };
+
+  const handleSetClassTeacher = (teacherId: string) => {
+    setFormData(prev => {
+      // Eğer öğretmen seçili değilse, önce öğretmenler listesine ekle
+      const newTeacherIds = prev.teacherIds.includes(teacherId) 
+        ? prev.teacherIds 
+        : [...prev.teacherIds, teacherId];
+      
+      return {
+        ...prev,
+        teacherIds: newTeacherIds,
+        classTeacherId: teacherId
+      };
+    });
+  };
+
+  // Filtrelenmiş öğretmen listesi - sınıf seviyesine göre
+  const getFilteredTeachers = () => {
+    if (!formData.level) return [];
+    
+    return teachers
+      .filter(teacher => teacher.level === formData.level)
+      .sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+  };
+
+  // Sınıf öğretmeni adını getir
+  const getClassTeacherName = (classTeacherId: string | undefined) => {
+    if (!classTeacherId) return '';
+    const teacher = teachers.find(t => t.id === classTeacherId);
+    return teacher ? teacher.name : '';
+  };
+
+  // Sınıf öğretmenlerinin adlarını getir
+  const getClassTeacherNames = (teacherIds: string[] | undefined) => {
+    if (!teacherIds || teacherIds.length === 0) return '';
+    
+    const classTeachers = teachers.filter(t => teacherIds.includes(t.id));
+    return classTeachers.map(t => t.name).join(', ');
   };
 
   const levelOptions = EDUCATION_LEVELS.map(level => ({
@@ -315,6 +402,8 @@ const Classes = () => {
           {sortedClasses.map((classItem) => {
             const classHasSchedule = hasSchedule(classItem.id);
             const weeklyHours = getWeeklyHours(classItem.id);
+            const classTeacherName = getClassTeacherName(classItem.classTeacherId);
+            const classTeacherNames = getClassTeacherNames(classItem.teacherIds);
             
             return (
               <div key={classItem.id} className="mobile-card mobile-spacing hover:shadow-md transition-shadow">
@@ -328,6 +417,27 @@ const Classes = () => {
                     {classItem.level}
                   </span>
                 </div>
+                
+                {/* Öğretmen Bilgisi */}
+                {(classTeacherName || classTeacherNames) && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                    <div className="flex items-center">
+                      <Users className="w-4 h-4 text-blue-600 mr-2" />
+                      <div>
+                        {classTeacherName && (
+                          <p className="text-sm font-medium text-blue-700">
+                            <span className="font-bold">Sınıf Öğretmeni:</span> {classTeacherName}
+                          </p>
+                        )}
+                        {classTeacherNames && (
+                          <p className="text-sm text-blue-600 mt-1">
+                            <span className="font-medium">Öğretmenler:</span> {classTeacherNames}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Schedule Status */}
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg">
@@ -399,23 +509,140 @@ const Classes = () => {
         isOpen={isModalOpen}
         onClose={resetForm}
         title={editingClass ? 'Sınıf Düzenle' : 'Yeni Sınıf Ekle'}
+        size="lg"
       >
         <form onSubmit={handleSubmit}>
-          <Input
-            label="Sınıf Adı"
-            value={formData.name}
-            onChange={(value) => setFormData({ ...formData, name: value })}
-            placeholder="Örn: 5A, 7B"
-            required
-          />
-          
-          <Select
-            label="Eğitim Seviyesi"
-            value={formData.level}
-            onChange={(value) => setFormData({ ...formData, level: value })}
-            options={levelOptions}
-            required
-          />
+          <div className="space-y-6">
+            {/* Temel Bilgiler */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Sınıf Bilgileri</h3>
+              <div className="space-y-4">
+                <Input
+                  label="Sınıf Adı"
+                  value={formData.name}
+                  onChange={(value) => setFormData({ ...formData, name: value })}
+                  placeholder="Örn: 5A, 7B"
+                  required
+                />
+                
+                <Select
+                  label="Eğitim Seviyesi"
+                  value={formData.level}
+                  onChange={(value) => setFormData({ ...formData, level: value })}
+                  options={levelOptions}
+                  required
+                />
+              </div>
+            </div>
+            
+            {/* Öğretmen Seçimi - Sadece seviye seçildiğinde göster */}
+            {formData.level && (
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                  <Users className="w-5 h-5 mr-2 text-blue-600" />
+                  Sınıf Öğretmenleri
+                </h3>
+                
+                {getFilteredTeachers().length === 0 ? (
+                  <div className="text-center py-6 bg-gray-50 rounded-lg">
+                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500">
+                      {formData.level} seviyesinde öğretmen bulunamadı
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Önce öğretmen ekleyin veya farklı bir seviye seçin
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Sınıf Öğretmeni Seçimi */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Sınıf Öğretmeni
+                      </label>
+                      <select
+                        value={formData.classTeacherId}
+                        onChange={(e) => handleSetClassTeacher(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Sınıf öğretmeni seçin...</option>
+                        {getFilteredTeachers().map(teacher => (
+                          <option key={teacher.id} value={teacher.id}>
+                            {teacher.name} ({teacher.branch})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Öğretmen Listesi */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Sınıfta Ders Verecek Öğretmenler
+                      </label>
+                      <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                        <div className="divide-y divide-gray-200">
+                          {getFilteredTeachers().map(teacher => {
+                            const isSelected = formData.teacherIds.includes(teacher.id);
+                            const isClassTeacher = formData.classTeacherId === teacher.id;
+                            
+                            return (
+                              <div 
+                                key={teacher.id}
+                                className={`p-3 flex items-center justify-between hover:bg-gray-50 transition-colors ${
+                                  isClassTeacher ? 'bg-blue-50' : ''
+                                }`}
+                              >
+                                <div className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    id={`teacher-${teacher.id}`}
+                                    checked={isSelected}
+                                    onChange={() => handleTeacherToggle(teacher.id)}
+                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                  />
+                                  <label 
+                                    htmlFor={`teacher-${teacher.id}`}
+                                    className="ml-3 block text-sm font-medium text-gray-700 cursor-pointer"
+                                  >
+                                    {teacher.name}
+                                    <span className="text-xs text-gray-500 ml-1">
+                                      ({teacher.branch})
+                                    </span>
+                                    {isClassTeacher && (
+                                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                        Sınıf Öğretmeni
+                                      </span>
+                                    )}
+                                  </label>
+                                </div>
+                                
+                                {!isClassTeacher && isSelected && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetClassTeacher(teacher.id)}
+                                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                  >
+                                    Sınıf öğretmeni yap
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      
+                      <div className="mt-2 text-sm text-gray-500 flex items-center">
+                        <Users className="w-4 h-4 mr-1" />
+                        <span>
+                          {formData.teacherIds.length} öğretmen seçildi
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="button-group-mobile mt-6">
             <Button

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Building, Users, Plus, Minus, AlertTriangle, Edit, Trash2 } from 'lucide-react';
-import { Class, EDUCATION_LEVELS } from '../../types';
+import { Class, EDUCATION_LEVELS, Teacher } from '../../types';
 import { useFirestore } from '../../hooks/useFirestore';
 import Button from '../UI/Button';
 import Select from '../UI/Select';
@@ -26,13 +26,15 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
 }) => {
   const { add: addClass, update: updateClass, remove: removeClass } = useFirestore<Class>('classes');
   const { data: classrooms } = useFirestore('classrooms');
+  const { data: teachers } = useFirestore<Teacher>('teachers');
   const [selectedLevel, setSelectedLevel] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     shortName: '',
-    classTeacher: '',
+    classTeacherId: '',
+    teacherIds: [] as string[],
     color: '',
     mainClassroom: '',
     level: ''
@@ -162,6 +164,57 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
     });
   };
 
+  // Öğretmen seçimi için yardımcı fonksiyonlar
+  const handleTeacherToggle = (teacherId: string) => {
+    setFormData(prev => {
+      const isSelected = prev.teacherIds.includes(teacherId);
+      
+      if (isSelected) {
+        // Öğretmeni kaldır
+        const newTeacherIds = prev.teacherIds.filter(id => id !== teacherId);
+        
+        // Eğer sınıf öğretmeni de kaldırılıyorsa, sınıf öğretmeni ID'sini de temizle
+        const newClassTeacherId = prev.classTeacherId === teacherId ? '' : prev.classTeacherId;
+        
+        return {
+          ...prev,
+          teacherIds: newTeacherIds,
+          classTeacherId: newClassTeacherId
+        };
+      } else {
+        // Öğretmeni ekle
+        return {
+          ...prev,
+          teacherIds: [...prev.teacherIds, teacherId]
+        };
+      }
+    });
+  };
+
+  const handleSetClassTeacher = (teacherId: string) => {
+    setFormData(prev => {
+      // Eğer öğretmen seçili değilse, önce öğretmenler listesine ekle
+      const newTeacherIds = prev.teacherIds.includes(teacherId) 
+        ? prev.teacherIds 
+        : [...prev.teacherIds, teacherId];
+      
+      return {
+        ...prev,
+        teacherIds: newTeacherIds,
+        classTeacherId: teacherId
+      };
+    });
+  };
+
+  // Filtrelenmiş öğretmen listesi - sınıf seviyesine göre
+  const getFilteredTeachers = () => {
+    if (!formData.level) return [];
+    
+    return teachers
+      .filter(teacher => teacher.level === formData.level)
+      .sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+  };
+
   // New Class Modal Functions
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,6 +223,8 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
       const classData = {
         name: formData.name,
         level: formData.level,
+        teacherIds: formData.teacherIds,
+        classTeacherId: formData.classTeacherId,
         // Store additional metadata in a way that's compatible with existing Class type
         shortName: formData.shortName || generateShortName(formData.name),
         color: formData.color || generateColor(formData.level)
@@ -190,7 +245,8 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
     setFormData({ 
       name: '', 
       shortName: '',
-      classTeacher: '',
+      classTeacherId: '',
+      teacherIds: [],
       color: '',
       mainClassroom: '',
       level: '' 
@@ -203,7 +259,8 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
     setFormData({
       name: classItem.name,
       shortName: (classItem as any).shortName || generateShortName(classItem.name),
-      classTeacher: '',
+      classTeacherId: classItem.classTeacherId || '',
+      teacherIds: classItem.teacherIds || [],
       color: (classItem as any).color || generateColor(classItem.level),
       mainClassroom: '',
       level: classItem.level
@@ -262,8 +319,11 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
 
   // Get teacher options for select
   const teacherOptions = [
-    { value: '', label: 'Seçiniz...' }
-    // Teachers would be added here
+    { value: '', label: 'Seçiniz...' },
+    ...teachers.map(teacher => ({
+      value: teacher.id,
+      label: `${teacher.name} (${teacher.branch})`
+    }))
   ];
 
   const filteredClasses = selectedLevel 
@@ -406,6 +466,23 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
                       </div>
                     </div>
                     
+                    {/* Öğretmen Bilgisi */}
+                    {classItem.teacherIds && classItem.teacherIds.length > 0 && (
+                      <div className="mt-2 mb-2 p-2 bg-blue-50 rounded border border-blue-100">
+                        <div className="flex items-center">
+                          <Users className="w-3 h-3 text-blue-600 mr-1" />
+                          <p className="text-xs text-blue-700">
+                            {classItem.teacherIds.length} öğretmen atanmış
+                            {classItem.classTeacherId && (
+                              <span className="ml-1 font-medium">
+                                (Sınıf öğretmeni: {teachers.find(t => t.id === classItem.classTeacherId)?.name})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
                     {isSelected && (
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -496,57 +573,161 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
         size="lg"
       >
         <form onSubmit={handleSubmit}>
-          {/* Required Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="İsim"
-              value={formData.name}
-              onChange={(value) => setFormData({ ...formData, name: value })}
-              placeholder="Örn: 5A, 7B"
-              required
-            />
-            
-            <Input
-              label="Kısaltma"
-              value={formData.shortName}
-              onChange={(value) => setFormData({ ...formData, shortName: value })}
-              placeholder="Otomatik oluşturulur"
-              disabled
-            />
-          </div>
+          {/* Temel Bilgiler */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Sınıf Bilgileri</h3>
+            <div className="space-y-4">
+              {/* Required Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="İsim"
+                  value={formData.name}
+                  onChange={(value) => setFormData({ ...formData, name: value })}
+                  placeholder="Örn: 5A, 7B"
+                  required
+                />
+                
+                <Input
+                  label="Kısaltma"
+                  value={formData.shortName}
+                  onChange={(value) => setFormData({ ...formData, shortName: value })}
+                  placeholder="Otomatik oluşturulur"
+                  disabled
+                />
+              </div>
 
-          {/* Optional Fields */}
-          <Select
-            label="Sınıf öğretmeni"
-            value={formData.classTeacher}
-            onChange={(value) => setFormData({ ...formData, classTeacher: value })}
-            options={teacherOptions}
-          />
+              <Select
+                label="Seviye"
+                value={formData.level}
+                onChange={(value) => setFormData({ ...formData, level: value })}
+                options={levelOptions.filter(option => option.value !== '')}
+                required
+              />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Renk"
-              value={formData.color}
-              onChange={(value) => setFormData({ ...formData, color: value })}
-              placeholder="Otomatik atanır"
-              disabled
-            />
-            
-            <Select
-              label="Ana derslik"
-              value={formData.mainClassroom}
-              onChange={(value) => setFormData({ ...formData, mainClassroom: value })}
-              options={classroomOptions}
-            />
+              <Input
+                label="Renk"
+                value={formData.color}
+                onChange={(value) => setFormData({ ...formData, color: value })}
+                placeholder="Otomatik atanır"
+                disabled
+              />
+              
+              <Select
+                label="Ana derslik"
+                value={formData.mainClassroom}
+                onChange={(value) => setFormData({ ...formData, mainClassroom: value })}
+                options={classroomOptions}
+              />
+            </div>
           </div>
           
-          <Select
-            label="Sınıf"
-            value={formData.level}
-            onChange={(value) => setFormData({ ...formData, level: value })}
-            options={levelOptions.filter(option => option.value !== '')}
-            required
-          />
+          {/* Öğretmen Seçimi - Sadece seviye seçildiğinde göster */}
+          {formData.level && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <Users className="w-5 h-5 mr-2 text-blue-600" />
+                Sınıf Öğretmenleri
+              </h3>
+              
+              {getFilteredTeachers().length === 0 ? (
+                <div className="text-center py-6 bg-gray-50 rounded-lg">
+                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500">
+                    {formData.level} seviyesinde öğretmen bulunamadı
+                  </p>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Önce öğretmen ekleyin veya farklı bir seviye seçin
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Sınıf Öğretmeni Seçimi */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sınıf Öğretmeni
+                    </label>
+                    <select
+                      value={formData.classTeacherId}
+                      onChange={(e) => handleSetClassTeacher(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Sınıf öğretmeni seçin...</option>
+                      {getFilteredTeachers().map(teacher => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacher.name} ({teacher.branch})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Öğretmen Listesi */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sınıfta Ders Verecek Öğretmenler
+                    </label>
+                    <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                      <div className="divide-y divide-gray-200">
+                        {getFilteredTeachers().map(teacher => {
+                          const isSelected = formData.teacherIds.includes(teacher.id);
+                          const isClassTeacher = formData.classTeacherId === teacher.id;
+                          
+                          return (
+                            <div 
+                              key={teacher.id}
+                              className={`p-3 flex items-center justify-between hover:bg-gray-50 transition-colors ${
+                                isClassTeacher ? 'bg-blue-50' : ''
+                              }`}
+                            >
+                              <div className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  id={`teacher-${teacher.id}`}
+                                  checked={isSelected}
+                                  onChange={() => handleTeacherToggle(teacher.id)}
+                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                                <label 
+                                  htmlFor={`teacher-${teacher.id}`}
+                                  className="ml-3 block text-sm font-medium text-gray-700 cursor-pointer"
+                                >
+                                  {teacher.name}
+                                  <span className="text-xs text-gray-500 ml-1">
+                                    ({teacher.branch})
+                                  </span>
+                                  {isClassTeacher && (
+                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                      Sınıf Öğretmeni
+                                    </span>
+                                  )}
+                                </label>
+                              </div>
+                              
+                              {!isClassTeacher && isSelected && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetClassTeacher(teacher.id)}
+                                  className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                  Sınıf öğretmeni yap
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-2 text-sm text-gray-500 flex items-center">
+                      <Users className="w-4 h-4 mr-1" />
+                      <span>
+                        {formData.teacherIds.length} öğretmen seçildi
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="button-group-mobile mt-6">
             <Button

@@ -11,6 +11,8 @@ export interface Class {
   name: string;
   level: 'Anaokulu' | 'İlkokul' | 'Ortaokul';
   createdAt: Date;
+  teacherIds?: string[]; // Birden fazla öğretmen ID'si
+  classTeacherId?: string; // Sınıf öğretmeni ID'si (opsiyonel)
 }
 
 export interface Subject {

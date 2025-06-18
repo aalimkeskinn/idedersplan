@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Building, Users, Plus, Minus, AlertTriangle, Edit, Trash2 } from 'lucide-react';
 import { Class, EDUCATION_LEVELS, Teacher } from '../../types';
+import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
 import Button from '../UI/Button';
 import Select from '../UI/Select';
@@ -326,6 +327,21 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
     }))
   ];
 
+  // Sınıf öğretmeni adını getir
+  const getClassTeacherName = (classTeacherId: string | undefined) => {
+    if (!classTeacherId) return '';
+    const teacher = teachers.find(t => t.id === classTeacherId);
+    return teacher ? teacher.name : '';
+  };
+
+  // Sınıf öğretmenlerinin adlarını getir
+  const getClassTeacherNames = (teacherIds: string[] | undefined) => {
+    if (!teacherIds || teacherIds.length === 0) return '';
+    
+    const classTeachers = teachers.filter(t => teacherIds.includes(t.id));
+    return classTeachers.map(t => t.name).join(', ');
+  };
+
   const filteredClasses = selectedLevel 
     ? classes.filter(c => c.level === selectedLevel)
     : classes;
@@ -409,6 +425,8 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
               {levelClasses.map((classItem) => {
                 const isSelected = classesData.selectedClasses.includes(classItem.id);
                 const capacity = classesData.classCapacities[classItem.id] || 30;
+                const classTeacherName = getClassTeacherName(classItem.classTeacherId);
+                const classTeacherNames = getClassTeacherNames(classItem.teacherIds);
                 
                 return (
                   <div

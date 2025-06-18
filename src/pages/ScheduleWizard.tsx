@@ -292,6 +292,65 @@ const ScheduleWizard = () => {
     }
   }, [constraints]);
 
+  // CRITICAL: Sınıflara atanan öğretmenleri otomatik olarak seçme
+  useEffect(() => {
+    // Sınıf adımı tamamlandıktan sonra öğretmen adımına geçildiğinde
+    if (currentStepIndex === 4) { // Öğretmenler adımı
+      // Seçilen sınıfları al
+      const selectedClassIds = wizardData.classes.selectedClasses;
+      
+      if (selectedClassIds.length > 0) {
+        // Seçilen sınıfları bul
+        const selectedClasses = classes.filter(c => selectedClassIds.includes(c.id));
+        
+        // Tüm sınıflara atanmış öğretmenleri topla
+        const teacherIdsFromClasses = new Set<string>();
+        
+        selectedClasses.forEach(classItem => {
+          if (classItem.teacherIds && classItem.teacherIds.length > 0) {
+            classItem.teacherIds.forEach(teacherId => {
+              teacherIdsFromClasses.add(teacherId);
+            });
+          }
+          
+          if (classItem.classTeacherId) {
+            teacherIdsFromClasses.add(classItem.classTeacherId);
+          }
+        });
+        
+        // Öğretmen listesini güncelle
+        if (teacherIdsFromClasses.size > 0) {
+          const teacherIdsArray = Array.from(teacherIdsFromClasses);
+          
+          console.log('🔄 Sınıflardan öğretmenler otomatik seçiliyor:', {
+            selectedClassCount: selectedClassIds.length,
+            teacherCount: teacherIdsArray.length,
+            teacherIds: teacherIdsArray
+          });
+          
+          // Mevcut seçili öğretmenleri koru ve yeni öğretmenleri ekle
+          const updatedSelectedTeachers = Array.from(
+            new Set([...wizardData.teachers.selectedTeachers, ...teacherIdsArray])
+          );
+          
+          setWizardData(prev => ({
+            ...prev,
+            teachers: {
+              ...prev.teachers,
+              selectedTeachers: updatedSelectedTeachers
+            }
+          }));
+          
+          // Bilgi mesajı göster
+          if (teacherIdsArray.length > 0 && teacherIdsArray.length !== wizardData.teachers.selectedTeachers.length) {
+            info('🔄 Öğretmenler Otomatik Seçildi', 
+              `Seçilen sınıflara atanmış ${teacherIdsArray.length} öğretmen otomatik olarak seçildi`);
+          }
+        }
+      }
+    }
+  }, [currentStepIndex, wizardData.classes.selectedClasses, classes, wizardData.teachers.selectedTeachers, info]);
+
   const currentStep = WIZARD_STEPS[currentStepIndex];
 
   // Validate current step
@@ -514,7 +573,17 @@ const ScheduleWizard = () => {
       };
     });
 
-    const compatibleClasses = selectedClasses.filter(c => c.level === teacher.level);
+    // CRITICAL: Sadece öğretmenin atandığı sınıflarla çalış
+    const teacherClasses = selectedClasses.filter(c => {
+      // Sınıf seviyesi öğretmen seviyesi ile aynı olmalı
+      const levelMatches = c.level === teacher.level;
+      
+      // Öğretmen bu sınıfa atanmış olmalı
+      const isTeacherAssigned = c.teacherIds?.includes(teacherId) || c.classTeacherId === teacherId;
+      
+      return levelMatches && isTeacherAssigned;
+    });
+    
     const compatibleSubjects = selectedSubjects.filter(s => 
       s.level === teacher.level && s.branch === teacher.branch
     );
@@ -522,13 +591,13 @@ const ScheduleWizard = () => {
     console.log('🔍 Uyumlu veriler:', {
       teacherLevel: teacher.level,
       teacherBranch: teacher.branch,
-      compatibleClasses: compatibleClasses.map(c => c.name),
+      compatibleClasses: teacherClasses.map(c => c.name),
       compatibleSubjects: compatibleSubjects.map(s => s.name),
-      totalClasses: compatibleClasses.length,
+      totalClasses: teacherClasses.length,
       totalSubjects: compatibleSubjects.length
     });
 
-    if (compatibleClasses.length === 0 || compatibleSubjects.length === 0) {
+    if (teacherClasses.length === 0 || compatibleSubjects.length === 0) {
       console.warn(`⚠️ ${teacher.name} için uyumlu sınıf/ders bulunamadı`);
       return schedule;
     }
@@ -566,7 +635,8 @@ const ScheduleWizard = () => {
       
       // CRITICAL: Check if slot is empty AND not unavailable due to constraints
       if (!schedule[randomDay][randomPeriod].classId && !isSlotUnavailable(teacherId, randomDay, randomPeriod)) {
-        const randomClass = compatibleClasses[Math.floor(Math.random() * compatibleClasses.length)];
+        // CRITICAL: Sadece öğretmenin atandığı sınıflardan birini seç
+        const randomClass = teacherClasses[Math.floor(Math.random() * teacherClasses.length)];
         const randomSubject = compatibleSubjects[Math.floor(Math.random() * compatibleSubjects.length)];
         
         // ENHANCED: Check all constraint types before assignment

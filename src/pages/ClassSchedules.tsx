@@ -69,29 +69,28 @@ const ClassSchedules = () => {
   };
 
   const getClassSchedule = (classId: string) => {
-    // Her slot için birden fazla öğretmen/ders olabileceği için dizi olarak topla
-    const classSchedule: { [day: string]: { [period: string]: { teacher: Teacher; subject?: Subject; teacherId: string }[] } } = {};
-
+    const classSchedule: { [day: string]: { [period: string]: { teacher: Teacher; subject?: Subject } | null } } = {};
+    
     DAYS.forEach(day => {
       classSchedule[day] = {};
       PERIODS.forEach(period => {
-        // schedules listesindeki tüm eşleşenleri topla
-        const matches = schedules
-          .map(schedule => {
-            const slot = schedule.schedule[day]?.[period];
-            if (slot?.classId === classId) {
-              const teacher = teachers.find(t => t.id === schedule.teacherId);
-              const subject = subjects.find(s => s.id === slot.subjectId);
-              if (teacher) {
-                return { teacher, subject, teacherId: schedule.teacherId };
-              }
+        classSchedule[day][period] = null;
+        
+        // Find which teacher has this class at this time
+        schedules.forEach(schedule => {
+          const slot = schedule.schedule[day]?.[period];
+          if (slot?.classId === classId) {
+            const teacher = teachers.find(t => t.id === schedule.teacherId);
+            const subject = subjects.find(s => s.id === slot.subjectId);
+            
+            if (teacher) {
+              classSchedule[day][period] = { teacher, subject };
             }
-            return null;
-          })
-          .filter(Boolean) as { teacher: Teacher; subject?: Subject; teacherId: string }[];
-        classSchedule[day][period] = matches;
+          }
+        });
       });
     });
+    
     return classSchedule;
   };
 
@@ -135,29 +134,34 @@ const ClassSchedules = () => {
     return null;
   };
 
+  // CRITICAL: Düzeltilmiş haftalık ders saati hesaplama
   const calculateWeeklyHours = (classId: string) => {
     let totalHours = 0;
     const classSchedule = getClassSchedule(classId);
+    
     DAYS.forEach(day => {
       PERIODS.forEach(period => {
-        const slots = classSchedule[day][period];
-        if (Array.isArray(slots) && slots.length > 0) {
-          totalHours += slots.filter(slot => slot.teacherId).length;
+        // Sabit periyotlar hariç tüm dolu slotları say
+        if (classSchedule[day][period] && !isFixedPeriod(day, period)) {
+          totalHours++;
         }
       });
     });
+    
     return totalHours;
   };
 
   const calculateDailyHours = (classId: string, day: string) => {
     let dailyHours = 0;
     const classSchedule = getClassSchedule(classId);
+    
     PERIODS.forEach(period => {
-      const slots = classSchedule[day][period];
-      if (Array.isArray(slots) && slots.length > 0) {
-        dailyHours += slots.filter(slot => slot.teacherId).length;
+      // Sabit periyotlar hariç tüm dolu slotları say
+      if (classSchedule[day][period] && !isFixedPeriod(day, period)) {
+        dailyHours++;
       }
     });
+    
     return dailyHours;
   };
 
@@ -385,6 +389,9 @@ const ClassSchedules = () => {
   // Check if selected class has schedule
   const selectedClassHasSchedule = selectedClass ? calculateWeeklyHours(selectedClass.id) > 0 : false;
 
+  // CRITICAL: Tüm PERIODS dizisini kullan, sabit periyotları da dahil et
+  const allPeriods = ['prep', ...PERIODS, 'afternoon-breakfast'];
+
   return (
     <div className="container-mobile">
       {/* FIXED: Mobile-optimized header with consistent spacing */}
@@ -573,6 +580,7 @@ const ClassSchedules = () => {
                     })}
                   </tr>
 
+                  {/* CRITICAL: Tüm ders saatlerini göster */}
                   {PERIODS.map((period, index) => {
                     const classSchedule = getClassSchedule(selectedClass.id);
                     const isLunchPeriod = (
@@ -622,20 +630,18 @@ const ClassSchedules = () => {
                             
                             return (
                               <td key={`${day}-${period}`} className="px-3 py-3">
-                                {Array.isArray(slot) && slot.length > 0 ? (
-                                  slot.map(slotItem => (
-                                    <div key={`${day}-${period}-${slotItem.teacherId}`} className="text-center p-3 bg-emerald-50 rounded-lg border-2 border-emerald-200 hover:bg-emerald-100 transition-colors">
-                                      <div className="font-bold text-emerald-900 text-sm">
-                                        {slotItem.teacher.name.length > 20 
-                                          ? slotItem.teacher.name.substring(0, 20) + '...'
-                                          : slotItem.teacher.name
-                                        }
-                                      </div>
-                                      <div className="text-emerald-700 text-xs mt-1 font-medium">
-                                        {slotItem.teacher.branch}
-                                      </div>
+                                {slot ? (
+                                  <div className="text-center p-3 bg-emerald-50 rounded-lg border-2 border-emerald-200 hover:bg-emerald-100 transition-colors">
+                                    <div className="font-bold text-emerald-900 text-sm">
+                                      {slot.teacher.name.length > 20 
+                                        ? slot.teacher.name.substring(0, 20) + '...'
+                                        : slot.teacher.name
+                                      }
                                     </div>
-                                  ))
+                                    <div className="text-emerald-700 text-xs mt-1 font-medium">
+                                      {slot.teacher.branch}
+                                    </div>
+                                  </div>
                                 ) : (
                                   <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
                                     <div className="text-gray-400 text-xs font-medium">Boş Ders</div>
@@ -853,4 +859,3 @@ const ClassSchedules = () => {
 };
 
 export default ClassSchedules;
-

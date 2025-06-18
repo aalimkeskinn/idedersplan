@@ -45,7 +45,7 @@ export const createSubjectTeacherMappings = (
         return;
       }
 
-      // Bu ders için haftalık saat sayısı
+      // CRITICAL: Bu ders için haftalık saat sayısı - wizardData'dan al, yoksa subject'ten
       const weeklyHours = wizardData.subjects?.subjectHours?.[subjectId] || subject.weeklyHours || 1;
       
       // Bu ders için öncelik
@@ -242,6 +242,8 @@ const isRelatedBranch = (teacherBranch: string, subjectBranch: string): boolean 
 
 /**
  * Haftalık saat limitlerini kontrol eder
+ * CRITICAL: Bu fonksiyon, bir dersin haftalık saat limitini kontrol eder
+ * ve limit dolmuşsa false döndürür
  */
 export const checkWeeklyHourLimits = (
   mappings: SubjectTeacherMapping[],
@@ -249,6 +251,7 @@ export const checkWeeklyHourLimits = (
   classId: string
 ): { canAssign: boolean; reason: string; remainingHours: number } => {
   
+  // CRITICAL: Doğru mapping'i bul
   const mapping = mappings.find(m => 
     m.subjectId === subjectId && 
     m.classId === classId && 
@@ -263,8 +266,10 @@ export const checkWeeklyHourLimits = (
     };
   }
 
+  // CRITICAL: Kalan saat sayısını hesapla
   const remainingHours = mapping.weeklyHours - mapping.assignedHours;
 
+  // CRITICAL: Limit dolmuşsa false döndür
   if (remainingHours <= 0) {
     return {
       canAssign: false,
@@ -282,6 +287,8 @@ export const checkWeeklyHourLimits = (
 
 /**
  * Bir dersin atanması durumunda mapping'i günceller
+ * CRITICAL: Bu fonksiyon, bir ders atandığında ilgili mapping'in
+ * assignedHours değerini artırır
  */
 export const updateMappingAssignment = (
   mappings: SubjectTeacherMapping[],
@@ -387,6 +394,7 @@ export const sortMappingsByPriority = (
 
 /**
  * Belirli bir slot için en uygun eşleştirmeyi bulur
+ * CRITICAL: Bu fonksiyon, bir slot için en uygun dersi seçer
  */
 export const findBestMappingForSlot = (
   mappings: SubjectTeacherMapping[],
@@ -395,11 +403,12 @@ export const findBestMappingForSlot = (
   classId: string
 ): SubjectTeacherMapping | null => {
   
-  // Bu sınıf için geçerli eşleştirmeleri al
+  // CRITICAL: Bu sınıf için geçerli eşleştirmeleri al
+  // Sadece haftalık limiti dolmamış eşleştirmeleri seç
   const classMappings = mappings.filter(m => 
     m.classId === classId && 
     m.isValid &&
-    m.assignedHours < m.weeklyHours // Henüz limit dolmamış
+    m.assignedHours < m.weeklyHours // CRITICAL: Haftalık limit kontrolü
   );
 
   if (classMappings.length === 0) {

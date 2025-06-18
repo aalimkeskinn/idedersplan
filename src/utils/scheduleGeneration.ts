@@ -10,7 +10,7 @@ import {
 } from './subjectTeacherMapping';
 import { checkSlotConflict } from './validation';
 
-// CRITICAL: Enhanced Schedule Generation System
+// CRITICAL: Geliştirilmiş Program Oluşturma Sistemi
 // Bu sistem, ders-öğretmen eşleştirmelerini kullanarak sistematik program oluşturur
 
 /**
@@ -66,7 +66,7 @@ export const generateSystematicSchedule = async (
     for (const classId of wizardData.classes?.selectedClasses || []) {
       const classItem = classes.find(c => c.id === classId);
       if (!classItem) {
-        context.errors.push(`Sınıf bulunamadı: ${classId}`);
+        context.warnings.push(`Sınıf bulunamadı: ${classId}`);
         continue;
       }
 
@@ -139,6 +139,8 @@ export const generateSystematicSchedule = async (
 
 /**
  * Tek bir sınıf için program oluşturur
+ * CRITICAL: Bu fonksiyon, bir sınıf için program oluştururken
+ * her dersin haftalık saat limitini kontrol eder ve aşmaz
  */
 const generateClassSchedule = async (
   classId: string,
@@ -176,6 +178,10 @@ const generateClassSchedule = async (
 
   console.log(`📋 ${classItem.name} için ${classMappings.length} ders eşleştirmesi bulundu`);
 
+  // CRITICAL: Toplam haftalık saat sayısını hesapla
+  const totalWeeklyHours = classMappings.reduce((sum, mapping) => sum + mapping.weeklyHours, 0);
+  console.log(`📊 ${classItem.name} için toplam haftalık saat: ${totalWeeklyHours}`);
+
   // Sabit periyotları ekle (kahvaltı, yemek, vb.)
   addFixedPeriods(schedule, classItem.level);
 
@@ -183,89 +189,106 @@ const generateClassSchedule = async (
   let totalAssignments = 0;
   let successfulAssignments = 0;
 
-  for (const day of DAYS) {
-    for (const period of PERIODS) {
-      // Sabit periyotları atla
-      if (schedule.schedule[day][period]?.classId === 'fixed-period') {
-        continue;
-      }
+  // CRITICAL: Ders atama stratejisi - Önce yüksek öncelikli dersler
+  // Öncelik sırasına göre sıralanmış eşleştirmeler
+  const prioritizedMappings = [...classMappings].sort((a, b) => {
+    const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
+    return priorityOrder[b.priority] - priorityOrder[a.priority];
+  });
 
-      totalAssignments++;
-
-      // Bu slot için en uygun eşleştirmeyi bul
-      const bestMapping = findBestMappingForSlot(
-        classMappings,
-        day,
-        period,
-        classId
-      );
-
-      if (!bestMapping) {
-        console.log(`⚠️ ${classItem.name} - ${day} ${period}. ders: Uygun eşleştirme bulunamadı`);
-        continue;
-      }
-
-      // Haftalık saat limitini kontrol et
-      const hourCheck = checkWeeklyHourLimits(
-        classMappings,
-        bestMapping.subjectId,
-        classId
-      );
-
-      if (!hourCheck.canAssign) {
-        console.log(`⚠️ ${classItem.name} - ${day} ${period}. ders: ${hourCheck.reason}`);
-        continue;
-      }
-
-      // Çakışma kontrolü
-      const conflictCheck = checkSlotConflict(
-        'class',
-        day,
-        period,
-        bestMapping.teacherId,
-        classId,
-        Object.values(context.classSchedules),
-        teachers,
-        classes
-      );
-
-      if (conflictCheck.hasConflict) {
-        console.log(`⚠️ ${classItem.name} - ${day} ${period}. ders: ${conflictCheck.message}`);
-        context.conflicts.push(conflictCheck.message);
-        continue;
-      }
-
-      // Dersi ata
-      schedule.schedule[day][period] = {
-        subjectId: bestMapping.subjectId,
-        classId: classId,
-        teacherId: bestMapping.teacherId
-      };
-
-      // Eşleştirmedeki atanan saat sayısını artır
-      const mappingIndex = classMappings.findIndex(m => m.id === bestMapping.id);
-      if (mappingIndex !== -1) {
-        classMappings[mappingIndex].assignedHours++;
-      }
-
-      // Context'i güncelle
-      if (!context.teacherWorkloads[bestMapping.teacherId]) {
-        context.teacherWorkloads[bestMapping.teacherId] = 0;
-      }
-      context.teacherWorkloads[bestMapping.teacherId]++;
-
-      if (!context.subjectDistribution[bestMapping.subjectId]) {
-        context.subjectDistribution[bestMapping.subjectId] = 0;
-      }
-      context.subjectDistribution[bestMapping.subjectId]++;
-
-      successfulAssignments++;
-
-      const subject = subjects.find(s => s.id === bestMapping.subjectId);
-      const teacher = teachers.find(t => t.id === bestMapping.teacherId);
+  // CRITICAL: Önce her dersin haftalık saat sayısını doldurmaya çalış
+  for (const mapping of prioritizedMappings) {
+    const subject = subjects.find(s => s.id === mapping.subjectId);
+    const teacher = teachers.find(t => t.id === mapping.teacherId);
+    
+    if (!subject || !teacher) continue;
+    
+    console.log(`🔄 ${classItem.name} - ${subject.name} dersi için ${mapping.weeklyHours} saat atanacak`);
+    
+    // Bu ders için atanması gereken saat sayısı
+    const hoursToAssign = mapping.weeklyHours;
+    let assignedHours = 0;
+    
+    // Günleri ve saatleri karıştır (daha dengeli dağılım için)
+    const shuffledDays = [...DAYS].sort(() => Math.random() - 0.5);
+    const shuffledPeriods = [...PERIODS].sort(() => Math.random() - 0.5);
+    
+    // Her gün ve saat için deneme yap
+    for (const day of shuffledDays) {
+      if (assignedHours >= hoursToAssign) break; // Yeterli saat atandıysa dur
       
-      console.log(`✅ ${classItem.name} - ${day} ${period}. ders: ${subject?.name} - ${teacher?.name}`);
+      for (const period of shuffledPeriods) {
+        if (assignedHours >= hoursToAssign) break; // Yeterli saat atandıysa dur
+        
+        // Sabit periyotları atla
+        if (schedule.schedule[day][period]?.classId === 'fixed-period') {
+          continue;
+        }
+        
+        // Slot boş mu kontrol et
+        if (schedule.schedule[day][period] !== null) {
+          continue;
+        }
+        
+        totalAssignments++;
+        
+        // Çakışma kontrolü
+        const conflictCheck = checkSlotConflict(
+          'class',
+          day,
+          period,
+          mapping.teacherId,
+          classId,
+          Object.values(context.classSchedules),
+          teachers,
+          classes
+        );
+
+        if (conflictCheck.hasConflict) {
+          console.log(`⚠️ ${classItem.name} - ${day} ${period}. ders: ${conflictCheck.message}`);
+          context.conflicts.push(conflictCheck.message);
+          continue;
+        }
+
+        // Dersi ata
+        schedule.schedule[day][period] = {
+          subjectId: mapping.subjectId,
+          classId: classId,
+          teacherId: mapping.teacherId
+        };
+
+        // Eşleştirmedeki atanan saat sayısını artır
+        assignedHours++;
+        mapping.assignedHours++;
+
+        // Context'i güncelle
+        if (!context.teacherWorkloads[mapping.teacherId]) {
+          context.teacherWorkloads[mapping.teacherId] = 0;
+        }
+        context.teacherWorkloads[mapping.teacherId]++;
+
+        if (!context.subjectDistribution[mapping.subjectId]) {
+          context.subjectDistribution[mapping.subjectId] = 0;
+        }
+        context.subjectDistribution[mapping.subjectId]++;
+
+        successfulAssignments++;
+        
+        console.log(`✅ ${classItem.name} - ${day} ${period}. ders: ${subject.name} - ${teacher.name} (${assignedHours}/${hoursToAssign})`);
+      }
     }
+    
+    // Atama sonrası durum raporu
+    console.log(`📊 ${classItem.name} - ${subject.name}: ${assignedHours}/${hoursToAssign} saat atandı`);
+    
+    if (assignedHours < hoursToAssign) {
+      context.warnings.push(`${classItem.name} - ${subject.name} için ${hoursToAssign} saat yerine sadece ${assignedHours} saat atanabildi`);
+    }
+  }
+
+  // Kalan boş slotları doldur (opsiyonel)
+  if (wizardData.generationSettings?.algorithm === 'compact') {
+    fillEmptySlots(schedule, classMappings, context, teachers, classes, subjects);
   }
 
   const successRate = totalAssignments > 0 ? (successfulAssignments / totalAssignments) * 100 : 0;
@@ -276,6 +299,76 @@ const generateClassSchedule = async (
   }
 
   return schedule;
+};
+
+/**
+ * Boş slotları doldurur (compact algoritması için)
+ */
+const fillEmptySlots = (
+  schedule: Schedule,
+  mappings: SubjectTeacherMapping[],
+  context: ScheduleGenerationContext,
+  teachers: Teacher[],
+  classes: Class[],
+  subjects: Subject[]
+) => {
+  // Boş slotları bul
+  DAYS.forEach(day => {
+    PERIODS.forEach(period => {
+      if (schedule.schedule[day][period] === null) {
+        // Hala atanabilecek ders var mı kontrol et
+        const availableMapping = mappings.find(m => 
+          m.isValid && 
+          checkWeeklyHourLimits(mappings, m.subjectId, m.classId).canAssign
+        );
+        
+        if (availableMapping) {
+          // Çakışma kontrolü
+          const conflictCheck = checkSlotConflict(
+            'class',
+            day,
+            period,
+            availableMapping.teacherId,
+            availableMapping.classId,
+            Object.values(context.classSchedules),
+            teachers,
+            classes
+          );
+
+          if (!conflictCheck.hasConflict) {
+            // Dersi ata
+            schedule.schedule[day][period] = {
+              subjectId: availableMapping.subjectId,
+              classId: availableMapping.classId,
+              teacherId: availableMapping.teacherId
+            };
+            
+            // Eşleştirmedeki atanan saat sayısını artır
+            const mappingIndex = mappings.findIndex(m => m.id === availableMapping.id);
+            if (mappingIndex !== -1) {
+              mappings[mappingIndex].assignedHours++;
+            }
+            
+            // Context'i güncelle
+            if (!context.teacherWorkloads[availableMapping.teacherId]) {
+              context.teacherWorkloads[availableMapping.teacherId] = 0;
+            }
+            context.teacherWorkloads[availableMapping.teacherId]++;
+            
+            if (!context.subjectDistribution[availableMapping.subjectId]) {
+              context.subjectDistribution[availableMapping.subjectId] = 0;
+            }
+            context.subjectDistribution[availableMapping.subjectId]++;
+            
+            const subject = subjects.find(s => s.id === availableMapping.subjectId);
+            const teacher = teachers.find(t => t.id === availableMapping.teacherId);
+            
+            console.log(`✅ Boş slot dolduruldu: ${day} ${period}. ders: ${subject?.name} - ${teacher?.name}`);
+          }
+        }
+      }
+    });
+  });
 };
 
 /**

@@ -115,7 +115,7 @@ const ScheduleWizard = () => {
   const { data: subjects } = useFirestore<Subject>('subjects');
   const { add: addTemplate, update: updateTemplate, data: templates } = useFirestore<ScheduleTemplate>('schedule-templates');
   const { add: addSchedule, data: existingSchedules, remove: removeSchedule } = useFirestore<Schedule>('schedules');
-  const { data: constraints, add: addConstraint, update: updateConstraint, remove: removeConstraint } = useFirestore<TimeConstraint>('constraints');
+  const { data: constraints } = useFirestore<TimeConstraint>('constraints');
   const { success, error, warning, info } = useToast();
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -177,7 +177,7 @@ const ScheduleWizard = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // CRITICAL: Enhanced template loading with constraint synchronization
+  // CRITICAL: Enhanced template loading with better error handling
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const templateId = urlParams.get('templateId');
@@ -253,48 +253,10 @@ const ScheduleWizard = () => {
           subjectsCount: loadedData.subjects.selectedSubjects.length,
           classesCount: loadedData.classes.selectedClasses.length,
           teachersCount: loadedData.teachers.selectedTeachers.length,
-          classroomsCount: loadedData.classrooms.length,
-          constraintsCount: loadedData.constraints.timeConstraints.length
+          classroomsCount: loadedData.classrooms.length
         });
         
         setWizardData(loadedData);
-        
-        // CRITICAL: Sync template constraints to Firebase if they don't exist
-        if (loadedData.constraints.timeConstraints.length > 0) {
-          console.log('🔄 Template kısıtlamaları Firebase\'e senkronize ediliyor:', loadedData.constraints.timeConstraints.length);
-          
-          // Clear existing constraints and add template constraints
-          loadedData.constraints.timeConstraints.forEach(async (constraint) => {
-            try {
-              // Check if constraint already exists
-              const existingConstraint = constraints.find(c => 
-                c.entityType === constraint.entityType &&
-                c.entityId === constraint.entityId &&
-                c.day === constraint.day &&
-                c.period === constraint.period
-              );
-              
-              if (!existingConstraint) {
-                await addConstraint({
-                  entityType: constraint.entityType,
-                  entityId: constraint.entityId,
-                  day: constraint.day,
-                  period: constraint.period,
-                  constraintType: constraint.constraintType,
-                  reason: constraint.reason || `Template kısıtlaması - ${template.name}`
-                });
-                console.log('✅ Template kısıtlaması Firebase\'e eklendi:', {
-                  entityType: constraint.entityType,
-                  entityId: constraint.entityId,
-                  day: constraint.day,
-                  period: constraint.period
-                });
-              }
-            } catch (err) {
-              console.error('❌ Template kısıtlaması eklenemedi:', err);
-            }
-          });
-        }
         
         // Mark completed steps based on loaded data
         const completed = new Set<number>();
@@ -314,51 +276,19 @@ const ScheduleWizard = () => {
         warning('⚠️ Template Yüklenemedi', 'Şablon verisi bulunamadı veya bozuk');
       }
     }
-  }, [location.search, templates, success, warning, constraints, addConstraint]);
+  }, [location.search, templates, success, warning]);
 
-  // CRITICAL: Enhanced constraint synchronization - merge template and Firebase constraints
+  // Sync constraints from Firebase to wizard data
   useEffect(() => {
     if (constraints.length > 0) {
       console.log('🔄 Kısıtlamalar Firebase\'den yükleniyor:', constraints.length);
-      
-      // CRITICAL: Merge template constraints with Firebase constraints
-      setWizardData(prev => {
-        const templateConstraints = prev.constraints.timeConstraints;
-        const firebaseConstraints = constraints;
-        
-        // Create a map to avoid duplicates
-        const constraintMap = new Map<string, TimeConstraint>();
-        
-        // Add template constraints first (they have priority)
-        templateConstraints.forEach(constraint => {
-          const key = `${constraint.entityType}-${constraint.entityId}-${constraint.day}-${constraint.period}`;
-          constraintMap.set(key, constraint);
-        });
-        
-        // Add Firebase constraints that don't exist in template
-        firebaseConstraints.forEach(constraint => {
-          const key = `${constraint.entityType}-${constraint.entityId}-${constraint.day}-${constraint.period}`;
-          if (!constraintMap.has(key)) {
-            constraintMap.set(key, constraint);
-          }
-        });
-        
-        const mergedConstraints = Array.from(constraintMap.values());
-        
-        console.log('🔄 Kısıtlamalar birleştirildi:', {
-          templateConstraints: templateConstraints.length,
-          firebaseConstraints: firebaseConstraints.length,
-          mergedConstraints: mergedConstraints.length
-        });
-        
-        return {
-          ...prev,
-          constraints: {
-            ...prev.constraints,
-            timeConstraints: mergedConstraints
-          }
-        };
-      });
+      setWizardData(prev => ({
+        ...prev,
+        constraints: {
+          ...prev.constraints,
+          timeConstraints: constraints
+        }
+      }));
     }
   }, [constraints]);
 
@@ -428,15 +358,6 @@ const ScheduleWizard = () => {
     setIsSaving(true);
     
     try {
-      // CRITICAL: Ensure we include the latest constraints in the template
-      const updatedWizardData = {
-        ...wizardData,
-        constraints: {
-          ...wizardData.constraints,
-          timeConstraints: wizardData.constraints.timeConstraints // Use wizard data constraints (already merged)
-        }
-      };
-      
       // CRITICAL: Create a complete template data object
       const templateData = {
         name: wizardData.basicInfo.name,
@@ -444,7 +365,7 @@ const ScheduleWizard = () => {
         academicYear: wizardData.basicInfo.academicYear,
         semester: wizardData.basicInfo.semester,
         updatedAt: new Date(),
-        wizardData: JSON.parse(JSON.stringify(updatedWizardData)), // Deep clone to avoid reference issues
+        wizardData: JSON.parse(JSON.stringify(wizardData)), // Deep clone to avoid reference issues
         generatedSchedules: [],
         status: 'published' as const
       };
@@ -454,8 +375,7 @@ const ScheduleWizard = () => {
         templateId: editingTemplateId,
         templateName: templateData.name,
         dataSize: JSON.stringify(templateData).length,
-        wizardDataKeys: Object.keys(templateData.wizardData),
-        constraintsCount: updatedWizardData.constraints.timeConstraints.length
+        wizardDataKeys: Object.keys(templateData.wizardData)
       });
 
       let result;

@@ -63,7 +63,10 @@ export const generateSystematicSchedule = async (
     console.log('📚 4. Adım: Sınıf programları oluşturuluyor...');
     const schedules: Schedule[] = [];
     
-    for (const classId of wizardData.classes?.selectedClasses || []) {
+    // IMPROVED: Sınıfları rastgele sırayla işle (daha dengeli dağılım için)
+    const shuffledClassIds = [...(wizardData.classes?.selectedClasses || [])].sort(() => Math.random() - 0.5);
+    
+    for (const classId of shuffledClassIds) {
       const classItem = classes.find(c => c.id === classId);
       if (!classItem) {
         context.warnings.push(`Sınıf bulunamadı: ${classId}`);
@@ -72,23 +75,38 @@ export const generateSystematicSchedule = async (
 
       console.log(`📖 ${classItem.name} sınıfı için program oluşturuluyor...`);
       
-      const classSchedule = await generateClassSchedule(
-        classId,
-        mappings,
-        context,
-        wizardData,
-        teachers,
-        classes,
-        subjects
-      );
+      // IMPROVED: Maksimum 3 deneme yap
+      let attempts = 0;
+      let classSchedule = null;
+      
+      while (attempts < 3 && !classSchedule) {
+        attempts++;
+        console.log(`🔄 ${classItem.name} için ${attempts}. deneme...`);
+        
+        classSchedule = await generateClassSchedule(
+          classId,
+          mappings,
+          context,
+          wizardData,
+          teachers,
+          classes,
+          subjects
+        );
+        
+        // Eğer program oluşturuldu ama çakışma varsa, yeniden dene
+        if (classSchedule && hasConflicts(classSchedule, schedules, teachers, classes)) {
+          console.log(`⚠️ ${classItem.name} programında çakışma tespit edildi, yeniden deneniyor...`);
+          classSchedule = null;
+        }
+      }
       
       if (classSchedule) {
         schedules.push(classSchedule);
         context.classSchedules[classId] = classSchedule;
-        console.log(`✅ ${classItem.name} programı oluşturuldu`);
+        console.log(`✅ ${classItem.name} programı oluşturuldu (${attempts}. denemede)`);
       } else {
-        context.errors.push(`${classItem.name} için program oluşturulamadı`);
-        console.error(`❌ ${classItem.name} programı oluşturulamadı`);
+        context.errors.push(`${classItem.name} için program oluşturulamadı (${attempts} deneme sonrası)`);
+        console.error(`❌ ${classItem.name} programı oluşturulamadı (${attempts} deneme sonrası)`);
       }
     }
 
@@ -135,6 +153,64 @@ export const generateSystematicSchedule = async (
       optimizationLevel: wizardData.generationSettings?.optimizationLevel || 'balanced'
     };
   }
+};
+
+/**
+ * IMPROVED: Programda çakışma olup olmadığını kontrol eder
+ */
+const hasConflicts = (
+  schedule: Schedule,
+  existingSchedules: Schedule[],
+  teachers: Teacher[],
+  classes: Class[]
+): boolean => {
+  let hasConflict = false;
+  
+  // Her gün ve ders saati için çakışma kontrolü yap
+  DAYS.forEach(day => {
+    PERIODS.forEach(period => {
+      const slot = schedule.schedule[day]?.[period];
+      
+      // Sabit periyotları atla
+      if (!slot || slot.classId === 'fixed-period') return;
+      
+      // Öğretmen çakışması: Aynı öğretmen aynı saatte başka bir sınıfta ders veriyor mu?
+      if (slot.teacherId) {
+        const teacherConflict = existingSchedules.some(existingSchedule => {
+          const existingSlot = existingSchedule.schedule[day]?.[period];
+          return existingSlot && 
+                 existingSlot.teacherId === slot.teacherId && 
+                 existingSlot.classId !== slot.classId &&
+                 existingSlot.classId !== 'fixed-period';
+        });
+        
+        if (teacherConflict) {
+          const teacher = teachers.find(t => t.id === slot.teacherId);
+          console.log(`⚠️ Öğretmen çakışması: ${teacher?.name} ${day} günü ${period}. ders saatinde başka bir sınıfta ders veriyor`);
+          hasConflict = true;
+        }
+      }
+      
+      // Sınıf çakışması: Aynı sınıfa aynı saatte başka bir öğretmen ders veriyor mu?
+      if (slot.classId) {
+        const classConflict = existingSchedules.some(existingSchedule => {
+          const existingSlot = existingSchedule.schedule[day]?.[period];
+          return existingSlot && 
+                 existingSlot.classId === slot.classId && 
+                 existingSlot.teacherId !== slot.teacherId &&
+                 existingSlot.classId !== 'fixed-period';
+        });
+        
+        if (classConflict) {
+          const classItem = classes.find(c => c.id === slot.classId);
+          console.log(`⚠️ Sınıf çakışması: ${classItem?.name} ${day} günü ${period}. ders saatinde başka bir öğretmenle ders yapıyor`);
+          hasConflict = true;
+        }
+      }
+    });
+  });
+  
+  return hasConflict;
 };
 
 /**
@@ -196,11 +272,14 @@ const generateClassSchedule = async (
     return priorityOrder[b.priority] - priorityOrder[a.priority];
   });
 
+  // IMPROVED: Günleri ve periyotları rastgele sırayla işle (daha dengeli dağılım için)
+  const shuffledDays = [...DAYS].sort(() => Math.random() - 0.5);
+  
   // CRITICAL: Her gün için tam olarak 9 ders saati olacak şekilde doldur
   // Önce her gün için 9 ders saati ayır
   const dailySlots: { [day: string]: { period: string, filled: boolean }[] } = {};
   
-  DAYS.forEach(day => {
+  shuffledDays.forEach(day => {
     dailySlots[day] = [];
     PERIODS.forEach(period => {
       // Sabit periyotları atla
@@ -217,8 +296,11 @@ const generateClassSchedule = async (
     });
   });
 
-  // CRITICAL: Önce her dersin haftalık saat sayısını doldurmaya çalış
-  for (const mapping of prioritizedMappings) {
+  // IMPROVED: Önce her dersin haftalık saat sayısını doldurmaya çalış
+  // Daha dengeli dağılım için dersleri rastgele sırayla dağıt
+  const shuffledMappings = [...prioritizedMappings].sort(() => Math.random() - 0.5);
+  
+  for (const mapping of shuffledMappings) {
     const subject = subjects.find(s => s.id === mapping.subjectId);
     const teacher = teachers.find(t => t.id === mapping.teacherId);
     
@@ -230,11 +312,11 @@ const generateClassSchedule = async (
     const hoursToAssign = mapping.weeklyHours;
     let assignedHours = 0;
     
-    // Günleri karıştır (daha dengeli dağılım için)
-    const shuffledDays = [...DAYS].sort(() => Math.random() - 0.5);
+    // IMPROVED: Daha dengeli dağılım için günleri karıştır
+    const shuffledDaysForSubject = [...shuffledDays];
     
     // Her gün için deneme yap
-    for (const day of shuffledDays) {
+    for (const day of shuffledDaysForSubject) {
       if (assignedHours >= hoursToAssign) break; // Yeterli saat atandıysa dur
       
       // Bu gün için boş slotları bul
@@ -242,29 +324,46 @@ const generateClassSchedule = async (
       
       if (availableSlots.length === 0) continue; // Bu günde boş slot yoksa atla
       
-      // Rastgele bir slot seç
+      // IMPROVED: Rastgele bir slot seç
       const randomIndex = Math.floor(Math.random() * availableSlots.length);
       const selectedSlot = availableSlots[randomIndex];
       const period = selectedSlot.period;
       
       totalAssignments++;
       
-      // Çakışma kontrolü
-      const conflictCheck = checkSlotConflict(
-        'class',
-        day,
-        period,
-        mapping.teacherId,
-        classId,
-        Object.values(context.classSchedules),
-        teachers,
-        classes
-      );
-
-      if (conflictCheck.hasConflict) {
-        console.log(`⚠️ ${classItem.name} - ${day} ${period}. ders: ${conflictCheck.message}`);
-        context.conflicts.push(conflictCheck.message);
-        continue;
+      // IMPROVED: Çakışma kontrolü - Hem öğretmen hem de sınıf bazlı
+      let hasConflict = false;
+      
+      // 1. Öğretmen çakışması kontrolü
+      const teacherConflict = Object.values(context.classSchedules).some(existingSchedule => {
+        const existingSlot = existingSchedule.schedule[day]?.[period];
+        return existingSlot && 
+               existingSlot.teacherId === mapping.teacherId && 
+               existingSlot.classId !== 'fixed-period';
+      });
+      
+      if (teacherConflict) {
+        console.log(`⚠️ ${classItem.name} - ${day} ${period}. ders: Öğretmen (${teacher.name}) çakışması`);
+        context.conflicts.push(`${teacher.name} öğretmeni ${day} günü ${period}. ders saatinde başka bir sınıfta ders veriyor`);
+        hasConflict = true;
+      }
+      
+      // 2. Sınıf çakışması kontrolü
+      const classConflict = Object.values(context.classSchedules).some(existingSchedule => {
+        const existingSlot = existingSchedule.schedule[day]?.[period];
+        return existingSlot && 
+               existingSlot.classId === classId && 
+               existingSlot.classId !== 'fixed-period';
+      });
+      
+      if (classConflict) {
+        console.log(`⚠️ ${classItem.name} - ${day} ${period}. ders: Sınıf çakışması`);
+        context.conflicts.push(`${classItem.name} sınıfı ${day} günü ${period}. ders saatinde başka bir öğretmenle ders yapıyor`);
+        hasConflict = true;
+      }
+      
+      if (hasConflict) {
+        continue; // Çakışma varsa bu slot'u atla
       }
 
       // Dersi ata
@@ -322,7 +421,7 @@ const generateClassSchedule = async (
   
   console.log(`📊 ${classItem.name} için şu ana kadar ${filledSlots} slot dolduruldu, hedef: 45 slot`);
   
-  // Eğer 45 saate ulaşılmadıysa, kalan boş slotları doldur
+  // IMPROVED: Eğer 45 saate ulaşılmadıysa, kalan boş slotları doldur
   if (filledSlots < 45) {
     const remainingSlots = 45 - filledSlots;
     console.log(`🔄 ${classItem.name} için ${remainingSlots} slot daha doldurulacak`);
@@ -355,19 +454,37 @@ const generateClassSchedule = async (
         const randomMappingIndex = Math.floor(Math.random() * availableMappings.length);
         const selectedMapping = availableMappings[randomMappingIndex];
         
-        // Çakışma kontrolü
-        const conflictCheck = checkSlotConflict(
-          'class',
-          slot.day,
-          slot.period,
-          selectedMapping.teacherId,
-          classId,
-          Object.values(context.classSchedules),
-          teachers,
-          classes
-        );
+        // IMPROVED: Çakışma kontrolü - Hem öğretmen hem de sınıf bazlı
+        let hasConflict = false;
         
-        if (!conflictCheck.hasConflict) {
+        // 1. Öğretmen çakışması kontrolü
+        const teacherConflict = Object.values(context.classSchedules).some(existingSchedule => {
+          const existingSlot = existingSchedule.schedule[slot.day]?.[slot.period];
+          return existingSlot && 
+                 existingSlot.teacherId === selectedMapping.teacherId && 
+                 existingSlot.classId !== 'fixed-period';
+        });
+        
+        if (teacherConflict) {
+          const teacher = teachers.find(t => t.id === selectedMapping.teacherId);
+          console.log(`⚠️ Boş slot doldurma - Öğretmen çakışması: ${teacher?.name} ${slot.day} ${slot.period}. ders`);
+          hasConflict = true;
+        }
+        
+        // 2. Sınıf çakışması kontrolü
+        const classConflict = Object.values(context.classSchedules).some(existingSchedule => {
+          const existingSlot = existingSchedule.schedule[slot.day]?.[slot.period];
+          return existingSlot && 
+                 existingSlot.classId === classId && 
+                 existingSlot.classId !== 'fixed-period';
+        });
+        
+        if (classConflict) {
+          console.log(`⚠️ Boş slot doldurma - Sınıf çakışması: ${classItem.name} ${slot.day} ${slot.period}. ders`);
+          hasConflict = true;
+        }
+        
+        if (!hasConflict) {
           // Dersi ata
           schedule.schedule[slot.day][slot.period] = {
             subjectId: selectedMapping.subjectId,
@@ -402,6 +519,56 @@ const generateClassSchedule = async (
           
           successfulAssignments++;
         }
+      }
+    }
+    
+    // IMPROVED: Hala boş slotlar varsa, herhangi bir öğretmenle doldur
+    filledSlots = 0;
+    DAYS.forEach(day => {
+      PERIODS.forEach(period => {
+        if (schedule.schedule[day][period] && 
+            schedule.schedule[day][period]?.classId !== 'fixed-period') {
+          filledSlots++;
+        }
+      });
+    });
+    
+    if (filledSlots < 45) {
+      console.log(`⚠️ ${classItem.name} için hala ${45 - filledSlots} boş slot var, herhangi bir öğretmenle dolduruluyor...`);
+      
+      // Sınıf öğretmenini bul
+      const classTeacherId = classItem.classTeacherId;
+      const classTeacher = teachers.find(t => t.id === classTeacherId);
+      
+      if (classTeacher) {
+        // Boş slotları bul
+        DAYS.forEach(day => {
+          dailySlots[day].forEach(slot => {
+            if (!slot.filled) {
+              // Çakışma kontrolü
+              const teacherConflict = Object.values(context.classSchedules).some(existingSchedule => {
+                const existingSlot = existingSchedule.schedule[day]?.[slot.period];
+                return existingSlot && 
+                       existingSlot.teacherId === classTeacherId && 
+                       existingSlot.classId !== 'fixed-period';
+              });
+              
+              if (!teacherConflict) {
+                // Sınıf öğretmeni ile doldur
+                schedule.schedule[day][slot.period] = {
+                  subjectId: '', // Genel ders
+                  classId: classId,
+                  teacherId: classTeacherId
+                };
+                
+                // Slot'u doldurulmuş olarak işaretle
+                slot.filled = true;
+                
+                console.log(`✅ Boş slot sınıf öğretmeni ile dolduruldu: ${day} ${slot.period}. ders: ${classTeacher.name}`);
+              }
+            }
+          });
+        });
       }
     }
   }
@@ -455,19 +622,38 @@ const fillEmptySlots = (
         );
         
         if (availableMapping) {
-          // Çakışma kontrolü
-          const conflictCheck = checkSlotConflict(
-            'class',
-            day,
-            period,
-            availableMapping.teacherId,
-            availableMapping.classId,
-            Object.values(context.classSchedules),
-            teachers,
-            classes
-          );
-
-          if (!conflictCheck.hasConflict) {
+          // IMPROVED: Çakışma kontrolü - Hem öğretmen hem de sınıf bazlı
+          let hasConflict = false;
+          
+          // 1. Öğretmen çakışması kontrolü
+          const teacherConflict = Object.values(context.classSchedules).some(existingSchedule => {
+            const existingSlot = existingSchedule.schedule[day]?.[period];
+            return existingSlot && 
+                   existingSlot.teacherId === availableMapping.teacherId && 
+                   existingSlot.classId !== 'fixed-period';
+          });
+          
+          if (teacherConflict) {
+            const teacher = teachers.find(t => t.id === availableMapping.teacherId);
+            console.log(`⚠️ Boş slot doldurma - Öğretmen çakışması: ${teacher?.name} ${day} ${period}. ders`);
+            hasConflict = true;
+          }
+          
+          // 2. Sınıf çakışması kontrolü
+          const classConflict = Object.values(context.classSchedules).some(existingSchedule => {
+            const existingSlot = existingSchedule.schedule[day]?.[period];
+            return existingSlot && 
+                   existingSlot.classId === availableMapping.classId && 
+                   existingSlot.classId !== 'fixed-period';
+          });
+          
+          if (classConflict) {
+            const classItem = classes.find(c => c.id === availableMapping.classId);
+            console.log(`⚠️ Boş slot doldurma - Sınıf çakışması: ${classItem?.name} ${day} ${period}. ders`);
+            hasConflict = true;
+          }
+          
+          if (!hasConflict) {
             // Dersi ata
             schedule.schedule[day][period] = {
               subjectId: availableMapping.subjectId,

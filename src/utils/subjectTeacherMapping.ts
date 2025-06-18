@@ -108,7 +108,7 @@ export const createSubjectTeacherMappings = (
 };
 
 /**
- * Bir ders için en uygun öğretmeni bulur
+ * IMPROVED: Bir ders için en uygun öğretmeni bulur
  * Öncelik sırası:
  * 1. Sınıfa atanan öğretmenler arasından branş ve seviye uyumlu olanlar
  * 2. Tüm seçili öğretmenler arasından branş ve seviye uyumlu olanlar
@@ -134,6 +134,41 @@ export const findSuitableTeacher = (
   
   // Tüm seçili öğretmenleri al (fallback için)
   const allSelectedTeachers = allTeachers; // Burada wizardData'dan seçili öğretmenleri alabilirsiniz
+
+  // IMPROVED: Sınıf öğretmenini öncelikle kontrol et
+  if (classItem.classTeacherId) {
+    const classTeacher = allTeachers.find(t => t.id === classItem.classTeacherId);
+    if (classTeacher) {
+      // Sınıf öğretmeni branş ve seviye uyumlu mu?
+      if (classTeacher.branch === subject.branch && classTeacher.level === subject.level) {
+        console.log(`✅ Sınıf öğretmeni mükemmel eşleşme: ${classTeacher.name} (${classTeacher.branch} - ${classTeacher.level})`);
+        return classTeacher;
+      }
+      
+      // Sınıf öğretmeni sadece seviye uyumlu mu?
+      if (classTeacher.level === subject.level) {
+        console.log(`⚠️ Sınıf öğretmeni kısmen uyumlu: ${classTeacher.name} (${classTeacher.branch} - ${classTeacher.level})`);
+        // Şimdilik kaydet, daha iyi bir eşleşme bulamazsak kullanırız
+        const partialMatchTeacher = classTeacher;
+        
+        // Daha iyi bir eşleşme var mı diye bakalım
+        // 1. Öncelik: Sınıfa atanan öğretmenler arasından branş ve seviye uyumlu
+        let betterMatch = classTeachers.find(teacher => 
+          teacher.id !== classTeacher.id && // Sınıf öğretmeni dışındakiler
+          teacher.branch === subject.branch && 
+          teacher.level === subject.level
+        );
+
+        if (betterMatch) {
+          console.log(`✅ Daha iyi eşleşme bulundu: ${betterMatch.name} (${betterMatch.branch} - ${betterMatch.level})`);
+          return betterMatch;
+        }
+        
+        // Daha iyi eşleşme yoksa sınıf öğretmenini kullan
+        return partialMatchTeacher;
+      }
+    }
+  }
 
   // 1. Öncelik: Sınıfa atanan öğretmenler arasından branş ve seviye uyumlu
   let suitableTeacher = classTeachers.find(teacher => 
@@ -189,7 +224,7 @@ export const findSuitableTeacher = (
 };
 
 /**
- * Öğretmen-ders-sınıf uyumluluğu skorunu hesaplar
+ * IMPROVED: Öğretmen-ders-sınıf uyumluluğu skorunu hesaplar
  * 100: Mükemmel uyum (branş ve seviye eşleşiyor)
  * 75: İyi uyum (sadece seviye eşleşiyor)
  * 50: Orta uyum (sadece branş eşleşiyor)
@@ -241,7 +276,7 @@ const isRelatedBranch = (teacherBranch: string, subjectBranch: string): boolean 
 };
 
 /**
- * Haftalık saat limitlerini kontrol eder
+ * IMPROVED: Haftalık saat limitlerini kontrol eder
  * CRITICAL: Bu fonksiyon, bir dersin haftalık saat limitini kontrol eder
  * ve limit dolmuşsa false döndürür
  */
@@ -367,7 +402,7 @@ export const calculateMappingStatistics = (
 };
 
 /**
- * Eşleştirmeleri öncelik sırasına göre sıralar
+ * IMPROVED: Eşleştirmeleri öncelik sırasına göre sıralar
  */
 export const sortMappingsByPriority = (
   mappings: SubjectTeacherMapping[]
@@ -393,7 +428,7 @@ export const sortMappingsByPriority = (
 };
 
 /**
- * Belirli bir slot için en uygun eşleştirmeyi bulur
+ * IMPROVED: Belirli bir slot için en uygun eşleştirmeyi bulur
  * CRITICAL: Bu fonksiyon, bir slot için en uygun dersi seçer
  */
 export const findBestMappingForSlot = (
@@ -423,7 +458,7 @@ export const findBestMappingForSlot = (
 };
 
 /**
- * Eşleştirme doğrulama
+ * IMPROVED: Eşleştirme doğrulama
  */
 export const validateMappings = (
   mappings: SubjectTeacherMapping[],

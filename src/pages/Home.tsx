@@ -231,10 +231,15 @@ const Home = () => {
                   {/* Alt Bilgi ve Aksiyonlar */}
                   <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-100">
                     <span className="text-xs text-gray-400 flex items-center">
-                      <Clock className="w-4 h-4 mr-1" />
-                      {new Date(template.updatedAt).toLocaleDateString('tr-TR')}
+                      {(() => {
+                        const date = new Date(template.updatedAt);
+                        if (!isNaN(date.getTime())) {
+                          return <><Clock className="w-4 h-4 mr-1" />{date.toLocaleDateString('tr-TR')}</>;
+                        }
+                        return null;
+                      })()}
                     </span>
-                    <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center space-x-2">
                       <button
                         onClick={e => { e.stopPropagation(); handleEditTemplate(template.id); }}
                         className="p-2 rounded-lg bg-ide-primary-50 hover:bg-ide-primary-100 text-ide-primary-700 hover:text-ide-primary-900 shadow-sm border border-transparent hover:border-ide-primary-200 transition"

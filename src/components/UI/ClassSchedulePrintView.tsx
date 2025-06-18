@@ -62,6 +62,7 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
     return null;
   };
 
+  // CRITICAL: Düzeltilmiş haftalık ders saati hesaplama
   const calculateWeeklyHours = () => {
     let totalHours = 0;
     DAYS.forEach(day => {
@@ -90,6 +91,9 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
     }
     return `${period}. Ders`;
   };
+
+  // CRITICAL: Tüm periyotları içeren dizi
+  const allPeriods = ['prep', ...PERIODS, 'afternoon-breakfast'];
 
   return (
     <div style={{ 
@@ -121,7 +125,7 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
           margin: 0,
           color: '#000000'
         }}>
-          {classItem.level}
+          {classItem.level} • Haftalık toplam: {calculateWeeklyHours()} ders saati
         </p>
       </div>
 
@@ -348,6 +352,22 @@ const ClassSchedulePrintView: React.FC<ClassSchedulePrintViewProps> = ({
           })}
         </tbody>
       </table>
+
+      {/* Footer */}
+      <div style={{
+        marginTop: '10mm',
+        display: 'flex',
+        justifyContent: 'space-between',
+        fontSize: '10px',
+        color: '#666666'
+      }}>
+        <div>
+          <p>Haftalık Toplam: {calculateWeeklyHours()} ders saati</p>
+        </div>
+        <div>
+          <p>İDE Okulları Ders Programı</p>
+        </div>
+      </div>
     </div>
   );
 };

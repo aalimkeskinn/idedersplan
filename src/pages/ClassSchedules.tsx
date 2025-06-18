@@ -134,12 +134,14 @@ const ClassSchedules = () => {
     return null;
   };
 
+  // CRITICAL: Düzeltilmiş haftalık ders saati hesaplama
   const calculateWeeklyHours = (classId: string) => {
     let totalHours = 0;
     const classSchedule = getClassSchedule(classId);
     
     DAYS.forEach(day => {
       PERIODS.forEach(period => {
+        // Sabit periyotlar hariç tüm dolu slotları say
         if (classSchedule[day][period] && !isFixedPeriod(day, period)) {
           totalHours++;
         }
@@ -154,6 +156,7 @@ const ClassSchedules = () => {
     const classSchedule = getClassSchedule(classId);
     
     PERIODS.forEach(period => {
+      // Sabit periyotlar hariç tüm dolu slotları say
       if (classSchedule[day][period] && !isFixedPeriod(day, period)) {
         dailyHours++;
       }
@@ -386,6 +389,9 @@ const ClassSchedules = () => {
   // Check if selected class has schedule
   const selectedClassHasSchedule = selectedClass ? calculateWeeklyHours(selectedClass.id) > 0 : false;
 
+  // CRITICAL: Tüm PERIODS dizisini kullan, sabit periyotları da dahil et
+  const allPeriods = ['prep', ...PERIODS, 'afternoon-breakfast'];
+
   return (
     <div className="container-mobile">
       {/* FIXED: Mobile-optimized header with consistent spacing */}
@@ -574,6 +580,7 @@ const ClassSchedules = () => {
                     })}
                   </tr>
 
+                  {/* CRITICAL: Tüm ders saatlerini göster */}
                   {PERIODS.map((period, index) => {
                     const classSchedule = getClassSchedule(selectedClass.id);
                     const isLunchPeriod = (

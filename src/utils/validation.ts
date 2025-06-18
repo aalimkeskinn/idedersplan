@@ -301,8 +301,8 @@ export const validateSchedule = (
   // Check daily hour limits
   DAYS.forEach(day => {
     const dayHours = dailyHours[day] || 0;
-    if (dayHours > 10) {
-      errors.push(`${day} günü için günlük ders saati 10'u geçemez (şu an: ${dayHours})`);
+    if (dayHours > 9) {
+      errors.push(`${day} günü için günlük ders saati 9'u geçemez (şu an: ${dayHours})`);
     }
   });
 

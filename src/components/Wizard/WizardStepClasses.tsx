@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building, Users, Plus, Minus, AlertTriangle, Edit, Trash2 } from 'lucide-react';
+import { Building, Users, Plus, Minus, Edit, Trash2 } from 'lucide-react';
 import { Class, EDUCATION_LEVELS, Teacher } from '../../types';
 import { WizardData } from '../../types/wizard';
 import { useFirestore } from '../../hooks/useFirestore';
@@ -574,7 +574,7 @@ const WizardStepClasses: React.FC<WizardStepClassesProps> = ({
       {classesData.selectedClasses.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-start">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" />
+            <Users className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" />
             <div>
               <h4 className="font-medium text-yellow-800">Sınıf Kapasitesi Önerileri</h4>
               <ul className="text-sm text-yellow-700 mt-2 space-y-1">

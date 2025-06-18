@@ -15,7 +15,7 @@ import Select from '../components/UI/Select';
 import ScheduleSlotModal from '../components/UI/ScheduleSlotModal';
 import ConfirmationModal from '../components/UI/ConfirmationModal';
 import ErrorModal from '../components/UI/ErrorModal';
-import { createSubjectTeacherMappings, checkWeeklyHourLimit } from '../utils/subjectTeacherMapping';
+import { createSubjectTeacherMappings, checkWeeklyHourLimits } from '../utils/subjectTeacherMapping';
 import { createWeeklyHourTrackers, canAssignHour, assignHourToTracker } from '../utils/weeklyHourManager';
 import { checkAllConflicts, summarizeConflicts } from '../utils/conflictDetection';
 import { optimizeSchedules, OptimizationStrategy } from '../utils/scheduleOptimization';
@@ -267,11 +267,11 @@ const Schedules = () => {
 
     // CRITICAL: Check weekly hour limit for the subject
     if (subjectId && classId && isAutoMode && subjectTeacherMappings.length > 0) {
-      const hourLimitCheck = checkWeeklyHourLimit(subjectId, classId, subjectTeacherMappings);
+      const hourLimitCheck = checkWeeklyHourLimits(subjectTeacherMappings, subjectId, classId);
       
-      if (hourLimitCheck.hasConflict) {
-        console.log('⚠️ Haftalık saat limiti aşıldı:', hourLimitCheck.message);
-        warning('⚠️ Haftalık Limit Aşıldı', hourLimitCheck.message);
+      if (!hourLimitCheck.canAssign) {
+        console.log('⚠️ Haftalık saat limiti aşıldı:', hourLimitCheck.reason);
+        warning('⚠️ Haftalık Limit Aşıldı', hourLimitCheck.reason);
         return;
       }
     }
